@@ -1,9 +1,8 @@
 use std::{borrow::Cow, collections::BTreeSet, fs, path::Path, sync::Arc};
 
-use seqdb::SeqDB;
 use vecdb::{
-    AnyStoredVec, AnyVec, CollectableVec, CompressedVec, GenericStoredVec, Stamp, VecIterator,
-    Version,
+    AnyStoredVec, AnyVec, CollectableVec, CompressedVec, GenericStoredVec, Stamp, VecDB,
+    VecIterator, Version,
 };
 
 #[allow(clippy::upper_case_acronyms)]
@@ -14,10 +13,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let version = Version::TWO;
 
-    let seqdb = Arc::new(SeqDB::open(Path::new("compressed"))?);
+    let vecdb = Arc::new(VecDB::open(Path::new("compressed"))?);
 
     {
-        let mut vec: VEC = CompressedVec::forced_import(&seqdb, "vec", version)?;
+        let mut vec: VEC = CompressedVec::forced_import(&vecdb, "vec", version)?;
 
         (0..21_u32).for_each(|v| {
             vec.push(v);
@@ -37,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     {
-        let mut vec: VEC = CompressedVec::forced_import(&seqdb, "vec", version)?;
+        let mut vec: VEC = CompressedVec::forced_import(&vecdb, "vec", version)?;
 
         vec.mut_header().update_stamp(Stamp::new(100));
 
@@ -73,7 +72,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     {
-        let mut vec: VEC = CompressedVec::forced_import(&seqdb, "vec", version)?;
+        let mut vec: VEC = CompressedVec::forced_import(&vecdb, "vec", version)?;
 
         assert!(vec.header().stamp() == Stamp::new(100));
 
@@ -114,7 +113,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     {
-        let mut vec: VEC = CompressedVec::forced_import(&seqdb, "vec", version)?;
+        let mut vec: VEC = CompressedVec::forced_import(&vecdb, "vec", version)?;
 
         vec.reset()?;
 
@@ -151,7 +150,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     {
-        let mut vec: VEC = CompressedVec::forced_import(&seqdb, "vec", version)?;
+        let mut vec: VEC = CompressedVec::forced_import(&vecdb, "vec", version)?;
 
         // assert!(vec.holes() == &BTreeSet::from([10]));
 
@@ -172,7 +171,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     {
-        let vec: VEC = CompressedVec::forced_import(&seqdb, "vec", version)?;
+        let vec: VEC = CompressedVec::forced_import(&vecdb, "vec", version)?;
 
         assert!(
             vec.collect()?

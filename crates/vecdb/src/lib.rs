@@ -7,17 +7,18 @@
 #![doc = include_str!("../examples/compressed.rs")]
 #![doc = "```"]
 
+pub use pco::data_types::LatentType;
+
+use seqdb::SeqDB;
+#[cfg(feature = "derive")]
+pub use vecdb_derive::StoredCompressed;
+
 mod error;
 mod exit;
 mod stamp;
 mod traits;
 mod variants;
 mod version;
-
-pub use pco::data_types::LatentType;
-
-#[cfg(feature = "derive")]
-pub use vecdb_derive::StoredCompressed;
 
 use variants::*;
 
@@ -30,3 +31,5 @@ pub use variants::{
     EagerVec, Format, LazyVecFrom1, LazyVecFrom2, LazyVecFrom3, RawVec, StoredVec,
 };
 pub use version::*;
+
+pub type VecDB = SeqDB;

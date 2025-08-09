@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Data, DataStruct, DeriveInput, Fields};
+use syn::{Data, DataStruct, DeriveInput, Fields, parse_macro_input};
 
 #[proc_macro_derive(StoredCompressed)]
 pub fn derive_stored_compressed(input: TokenStream) -> TokenStream {
@@ -28,7 +28,6 @@ pub fn derive_stored_compressed(input: TokenStream) -> TokenStream {
     let has_generics = !generics.params.is_empty();
 
     let expanded = if has_generics {
-        // Generic case: add where clause constraint
         let where_clause = if where_clause.is_some() {
             quote! { #where_clause #inner_type: StoredCompressed, }
         } else {
@@ -43,7 +42,6 @@ pub fn derive_stored_compressed(input: TokenStream) -> TokenStream {
             }
         }
     } else {
-        // Non-generic case: use the original approach
         quote! {
             impl ::vecdb::TransparentStoredCompressed<<#inner_type as StoredCompressed>::NumberType> for #struct_name {}
 

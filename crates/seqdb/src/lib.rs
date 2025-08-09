@@ -4,10 +4,8 @@
 #![doc = include_str!("../examples/seqdb.rs")]
 #![doc = "```\n"]
 
-#[cfg(target_os = "macos")]
-use std::fs::File;
 use std::{
-    fs::{self, OpenOptions},
+    fs::{self, File, OpenOptions},
     ops::Deref,
     os::unix::io::AsRawFd,
     path::{Path, PathBuf},
