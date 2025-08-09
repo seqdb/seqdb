@@ -1,0 +1,29 @@
+# Mac OS
+.DS_Store
+
+# Builds
+target
+
+# Copies
+*\ copy*
+
+# Ignored
+_*
+
+# Editors
+.vscode
+.zed
+
+# Logs
+.log
+
+# Environment variables/configs
+.env
+
+# Profiling
+profile.json.gz
+flamegraph.svg
+*.trace
+
+# AI
+CLAUDE.md

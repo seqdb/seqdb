@@ -1,0 +1,34 @@
+[package]
+name = "vecdb"
+description = "A KISS index-value storage engine"
+keywords.workspace = true
+categories.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+build = "build.rs"
+
+[features]
+# full = [
+#     "derive",
+# ]
+derive = ["vecdb_derive"]
+
+[dependencies]
+ctrlc = { workspace = true }
+log = { workspace = true }
+parking_lot = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }
+seqdb = { workspace = true }
+serde_derive = { workspace = true }
+serde_json = { workspace = true }
+vecdb_derive = { workspace = true, optional = true }
+zerocopy = { workspace = true }
+zerocopy-derive = { workspace = true }
+pco = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true

@@ -1,0 +1,18 @@
+[package]
+name = "vecdb_derive"
+description = "Derive for vecdb"
+keywords = ["vec", "disk", "data"]
+categories = ["database"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+build = "build.rs"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "2.0"
+quote = "1.0"
