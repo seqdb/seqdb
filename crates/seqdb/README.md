@@ -25,10 +25,10 @@ SeqDB provides a sophisticated storage system built around memory-mapped files a
 
 ```rust
 use std::path::Path;
-use seqdb::{SeqDB, PAGE_SIZE};
+use seqdb::{Database, PAGE_SIZE};
 
 // Open or create a database
-let db = SeqDB::open(Path::new("my_database"))?;
+let db = Database::open(Path::new("my_database"))?;
 
 // Create a new region
 let (region_id, _) = db.create_region_if_needed("my_region")?;

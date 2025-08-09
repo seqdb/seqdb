@@ -7,7 +7,7 @@ use std::{
 };
 
 use parking_lot::{RwLock, RwLockWriteGuard};
-use seqdb::{Reader, Region, RegionReader, SeqDB};
+use seqdb::{Database, Reader, Region, RegionReader};
 use zerocopy::{FromBytes, IntoBytes};
 
 use crate::{
@@ -25,7 +25,7 @@ const VERSION: Version = Version::ONE;
 
 #[derive(Debug)]
 pub struct RawVec<I, T> {
-    seqdb: SeqDB,
+    db: Database,
     region: Arc<RwLock<Region>>,
     region_index: usize,
 
@@ -45,48 +45,48 @@ where
     T: StoredRaw,
 {
     /// Same as import but will reset the vec under certain errors, so be careful !
-    pub fn forced_import(seqdb: &SeqDB, name: &str, mut version: Version) -> Result<Self> {
+    pub fn forced_import(db: &Database, name: &str, mut version: Version) -> Result<Self> {
         version = version + VERSION;
-        let res = Self::import(seqdb, name, version);
+        let res = Self::import(db, name, version);
         match res {
             Err(Error::DifferentCompressionMode)
             | Err(Error::WrongEndian)
             | Err(Error::WrongLength)
             | Err(Error::DifferentVersion { .. }) => {
-                let _ = seqdb.remove_region(Self::vec_region_name_(name).into());
-                let _ = seqdb.remove_region(Self::holes_region_name_(name).into());
-                Self::import(seqdb, name, version)
+                let _ = db.remove_region(Self::vec_region_name_(name).into());
+                let _ = db.remove_region(Self::holes_region_name_(name).into());
+                Self::import(db, name, version)
             }
             _ => res,
         }
     }
 
-    pub fn import(seqdb: &SeqDB, name: &str, version: Version) -> Result<Self> {
-        Self::any_import(seqdb, name, version, Format::Raw)
+    pub fn import(db: &Database, name: &str, version: Version) -> Result<Self> {
+        Self::any_import(db, name, version, Format::Raw)
     }
 
-    pub fn any_import(seqdb: &SeqDB, name: &str, version: Version, format: Format) -> Result<Self> {
-        let (region_index, region) =
-            seqdb.create_region_if_needed(&Self::vec_region_name_(name))?;
+    pub fn any_import(db: &Database, name: &str, version: Version, format: Format) -> Result<Self> {
+        let (region_index, region) = db.create_region_if_needed(&Self::vec_region_name_(name))?;
 
         let region_len = region.read().len() as usize;
         if region_len > 0
             && (region_len < HEADER_OFFSET
                 || (format.is_raw() && (region_len - HEADER_OFFSET) % Self::SIZE_OF_T != 0))
         {
+            dbg!(region_len, region_len, HEADER_OFFSET);
             return Err(Error::Str("Region was saved incorrectly"));
         }
 
         let header = if region_len == 0 {
-            Header::create_and_write(seqdb, region_index, version, format)?
+            Header::create_and_write(db, region_index, version, format)?
         } else {
-            Header::import_and_verify(seqdb, region_index, region.read().len(), version, format)?
+            Header::import_and_verify(db, region_index, region.read().len(), version, format)?
         };
 
-        let holes = if let Ok(holes) = seqdb.get_region(Self::holes_region_name_(name).into()) {
+        let holes = if let Ok(holes) = db.get_region(Self::holes_region_name_(name).into()) {
             Some(
                 holes
-                    .create_reader(seqdb)
+                    .create_reader(db)
                     .read_all()
                     .chunks(size_of::<usize>())
                     .map(|b| -> Result<usize> { usize::read_from_bytes(b).map_err(|e| e.into()) })
@@ -97,7 +97,7 @@ where
         };
 
         let s = Self {
-            seqdb: seqdb.clone(),
+            db: db.clone(),
             region: region.clone(),
             region_index,
             header,
@@ -134,7 +134,7 @@ where
 
     pub fn write_header_if_needed(&mut self) -> Result<()> {
         if self.header.modified() {
-            self.header.write(&self.seqdb, self.region_index)?;
+            self.header.write(&self.db, self.region_index)?;
         }
         Ok(())
     }
@@ -143,7 +143,7 @@ where
 impl<I, T> Clone for RawVec<I, T> {
     fn clone(&self) -> Self {
         Self {
-            seqdb: self.seqdb.clone(),
+            db: self.db.clone(),
             region: self.region.clone(),
             region_index: self.region_index,
             header: self.header.clone(),
@@ -234,14 +234,15 @@ where
         let from = (stored_len * Self::SIZE_OF_T + HEADER_OFFSET) as u64;
 
         if has_new_data {
-            self.seqdb.write_all_to_region_at(
+            let mut mut_stored_len = self.stored_len.write();
+            self.db.truncate_write_all_to_region(
                 self.region_index.into(),
-                mem::take(&mut self.pushed).as_bytes(),
                 from,
+                mem::take(&mut self.pushed).as_bytes(),
             )?;
-            *self.mut_stored_len() += pushed_len;
+            *mut_stored_len += pushed_len;
         } else if truncated {
-            self.seqdb.truncate_region(self.region_index.into(), from)?;
+            self.db.truncate_region(self.region_index.into(), from)?;
         }
 
         if has_updated_data {
@@ -250,7 +251,7 @@ where
                 .try_for_each(|(i, v)| -> Result<()> {
                     let bytes = v.as_bytes();
                     let at = ((i * Self::SIZE_OF_T) + HEADER_OFFSET) as u64;
-                    self.seqdb
+                    self.db
                         .write_all_to_region_at(self.region_index.into(), bytes, at)?;
                     Ok(())
                 })?;
@@ -259,27 +260,26 @@ where
         if has_holes || had_holes {
             if has_holes {
                 self.has_stored_holes = true;
-                let (holes_index, _) = self
-                    .seqdb
-                    .create_region_if_needed(&self.holes_region_name())?;
+                let (holes_index, _) =
+                    self.db.create_region_if_needed(&self.holes_region_name())?;
                 let bytes = self
                     .holes
                     .iter()
                     .flat_map(|i| i.to_ne_bytes())
                     .collect::<Vec<_>>();
-                self.seqdb
+                self.db
                     .truncate_write_all_to_region(holes_index.into(), 0, &bytes)?;
             } else if had_holes {
                 self.has_stored_holes = false;
-                let _ = self.seqdb.remove_region(self.holes_region_name().into());
+                let _ = self.db.remove_region(self.holes_region_name().into());
             }
         }
 
         Ok(())
     }
 
-    fn seqdb(&self) -> &SeqDB {
-        &self.seqdb
+    fn db(&self) -> &Database {
+        &self.db
     }
 
     fn region_index(&self) -> usize {

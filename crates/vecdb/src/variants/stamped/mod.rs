@@ -20,12 +20,7 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    pub fn forced_import(
-        seqdb: &SeqDB,
-        name: &str,
-        version: Version,
-        format: Format,
-    ) -> Result<Self> {
+    pub fn forced_import(db: &SeqDB, name: &str, version: Version, format: Format) -> Result<Self> {
         Ok(Self(StoredVec::forced_import(file, name, version, format)?))
     }
 

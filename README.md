@@ -61,10 +61,10 @@ vecdb = "0.0.1"
 
 ```rust
 use std::{path::Path, sync::Arc};
-use vecdb::{RawVec, VecDB, Version};
+use vecdb::{RawVec, Database, Version};
 
 // Create database
-let db = Arc::new(VecDB::open(Path::new("my_data"))?);
+let db = Database::open(Path::new("my_data"))?;
 
 // Create a vector for storing numbers
 let mut vec: RawVec<usize, u32> = RawVec::forced_import(&db, "numbers", Version::TWO)?;
@@ -86,7 +86,9 @@ vec.flush()?;
 ### Compressed Storage
 
 ```rust
-use vecdb::{CompressedVec, VecDB, Version};
+use vecdb::{CompressedVec, Database, Version};
+
+let db = Database::open(Path::new("my_data"))?;
 
 let mut compressed: CompressedVec<usize, f64> =
     CompressedVec::forced_import(&db, "sensor_data", Version::TWO)?;
@@ -136,7 +138,7 @@ Lightweight, dependency-minimal database for resource-constrained environments.
 cargo test --workspace
 
 # Run examples (from specific crates)
-cargo run --example seqdb -p seqdb
+cargo run --example db -p seqdb
 cargo run --example raw -p vecdb
 cargo run --example compressed -p vecdb
 

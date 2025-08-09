@@ -46,10 +46,10 @@ VecDB supports multiple vector implementations for different use cases:
 
 ```rust
 use std::{path::Path, sync::Arc};
-use vecdb::{RawVec, VecDB, Version};
+use vecdb::{RawVec, Database, Version};
 
-let vecdb = Arc::new(VecDB::open(Path::new("data"))?);
-let mut vec: RawVec<usize, u32> = RawVec::forced_import(&vecdb, "my_vec", Version::TWO)?;
+let database = Database::open(Path::new("data"))?;
+let mut vec: RawVec<usize, u32> = RawVec::forced_import(&database, "my_vec", Version::TWO)?;
 
 // Push values
 vec.push(42);
@@ -66,9 +66,10 @@ vec.flush()?;
 ### Compressed Storage
 
 ```rust
-use vecdb::{CompressedVec, VecDB, Version};
+use vecdb::{CompressedVec, Database, Version};
 
-let mut vec: CompressedVec<usize, u32> = CompressedVec::forced_import(&vecdb, "compressed_vec", Version::TWO)?;
+let database = Database::open(Path::new("data"))?;
+let mut vec: CompressedVec<usize, u32> = CompressedVec::forced_import(&database, "compressed_vec", Version::TWO)?;
 
 // Same API as raw vectors, but with compression
 vec.push(1000);

@@ -14,7 +14,7 @@ use super::{
 mod computation;
 
 pub use computation::*;
-use seqdb::SeqDB;
+use seqdb::Database;
 
 #[derive(Clone)]
 pub enum Dependencies<I, T, S1I, S1T, S2I, S2T, S3I, S3T>
@@ -73,7 +73,7 @@ where
 {
     pub fn forced_import_or_init_from_1(
         computation: Computation,
-        seqdb: &SeqDB,
+        db: &Database,
         name: &str,
         version: Version,
         format: Format,
@@ -82,7 +82,7 @@ where
     ) -> Result<Self> {
         Ok(match computation {
             Computation::Eager => Self::Eager {
-                vec: EagerVec::forced_import(seqdb, name, version, format)?,
+                vec: EagerVec::forced_import(db, name, version, format)?,
                 deps: Dependencies::From1(source, compute),
             },
             Computation::Lazy => {
@@ -94,7 +94,7 @@ where
     #[allow(clippy::too_many_arguments)]
     pub fn forced_import_or_init_from_2(
         computation: Computation,
-        seqdb: &SeqDB,
+        db: &Database,
         name: &str,
         version: Version,
         format: Format,
@@ -104,7 +104,7 @@ where
     ) -> Result<Self> {
         Ok(match computation {
             Computation::Eager => Self::Eager {
-                vec: EagerVec::forced_import(seqdb, name, version, format)?,
+                vec: EagerVec::forced_import(db, name, version, format)?,
                 deps: Dependencies::From2((source1, source2), compute),
             },
             Computation::Lazy => {
@@ -116,7 +116,7 @@ where
     #[allow(clippy::too_many_arguments)]
     pub fn forced_import_or_init_from_3(
         computation: Computation,
-        seqdb: &SeqDB,
+        db: &Database,
         name: &str,
         version: Version,
         format: Format,
@@ -127,7 +127,7 @@ where
     ) -> Result<Self> {
         Ok(match computation {
             Computation::Eager => Self::Eager {
-                vec: EagerVec::forced_import(seqdb, name, version, format)?,
+                vec: EagerVec::forced_import(db, name, version, format)?,
                 deps: Dependencies::From3((source1, source2, source3), compute),
             },
             Computation::Lazy => Self::LazyFrom3(LazyVecFrom3::init(

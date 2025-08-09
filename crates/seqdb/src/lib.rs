@@ -1,7 +1,7 @@
 #![doc = include_str!(concat!("../", env!("CARGO_PKG_README")))]
 #![doc = "\n## Example\n"]
 #![doc = "\n```rust"]
-#![doc = include_str!("../examples/seqdb.rs")]
+#![doc = include_str!("../examples/db.rs")]
 #![doc = "```\n"]
 
 use std::{
@@ -36,23 +36,23 @@ pub const PAGE_SIZE_MINUS_1: u64 = PAGE_SIZE - 1;
 const GB: u64 = 1024 * 1024 * 1024;
 
 #[derive(Debug, Clone)]
-pub struct SeqDB(Arc<SeqDBInner>);
+pub struct Database(Arc<DatabaseInner>);
 
-impl SeqDB {
+impl Database {
     pub fn open(path: &Path) -> Result<Self> {
-        Ok(Self(Arc::new(SeqDBInner::open(path)?)))
+        Ok(Self(Arc::new(DatabaseInner::open(path)?)))
     }
 }
 
-impl Deref for SeqDB {
-    type Target = SeqDBInner;
+impl Deref for Database {
+    type Target = DatabaseInner;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
 #[derive(Debug)]
-pub struct SeqDBInner {
+pub struct DatabaseInner {
     path: PathBuf,
     regions: RwLock<Regions>,
     layout: RwLock<Layout>,
@@ -60,7 +60,7 @@ pub struct SeqDBInner {
     mmap: RwLock<MmapMut>,
 }
 
-impl SeqDBInner {
+impl DatabaseInner {
     fn open(path: &Path) -> Result<Self> {
         fs::create_dir_all(path)?;
 

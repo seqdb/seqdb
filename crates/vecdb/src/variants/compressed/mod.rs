@@ -1,13 +1,12 @@
 use std::{
     borrow::Cow,
     collections::{BTreeMap, BTreeSet},
-    mem,
     sync::Arc,
 };
 
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use rayon::prelude::*;
-use seqdb::{Reader, Region, SeqDB};
+use seqdb::{Database, Reader, Region};
 
 use crate::{
     AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, AsInnerSlice, BaseVecIterator,
@@ -41,27 +40,27 @@ where
     const PER_PAGE: usize = MAX_PAGE_SIZE / Self::SIZE_OF_T;
 
     /// Same as import but will reset the vec under certain errors, so be careful !
-    pub fn forced_import(seqdb: &SeqDB, name: &str, mut version: Version) -> Result<Self> {
+    pub fn forced_import(db: &Database, name: &str, mut version: Version) -> Result<Self> {
         version = version + VERSION;
-        let res = Self::import(seqdb, name, version);
+        let res = Self::import(db, name, version);
         match res {
             Err(Error::DifferentCompressionMode)
             | Err(Error::WrongEndian)
             | Err(Error::WrongLength)
             | Err(Error::DifferentVersion { .. }) => {
-                let _ = seqdb.remove_region(Self::vec_region_name_(name).into());
-                let _ = seqdb.remove_region(Self::holes_region_name_(name).into());
-                let _ = seqdb.remove_region(Self::pages_region_name_(name).into());
-                Self::import(seqdb, name, version)
+                let _ = db.remove_region(Self::vec_region_name_(name).into());
+                let _ = db.remove_region(Self::holes_region_name_(name).into());
+                let _ = db.remove_region(Self::pages_region_name_(name).into());
+                Self::import(db, name, version)
             }
             _ => res,
         }
     }
 
-    pub fn import(seqdb: &SeqDB, name: &str, version: Version) -> Result<Self> {
-        let inner = RawVec::any_import(seqdb, name, version, Format::Compressed)?;
+    pub fn import(db: &Database, name: &str, version: Version) -> Result<Self> {
+        let inner = RawVec::any_import(db, name, version, Format::Compressed)?;
 
-        let pages = Pages::import(seqdb, &Self::pages_region_name_(name))?;
+        let pages = Pages::import(db, &Self::pages_region_name_(name))?;
 
         let this = Self {
             inner,
@@ -99,7 +98,7 @@ where
         let vec = T::from_inner_slice(vec);
 
         if vec.len() != page.values as usize {
-            dbg!((offset, len));
+            dbg!((offset, len, vec.len(), page.values));
             dbg!(vec);
             unreachable!()
         }
@@ -192,8 +191,8 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    fn seqdb(&self) -> &SeqDB {
-        self.inner.seqdb()
+    fn db(&self) -> &Database {
+        self.inner.db()
     }
 
     fn region(&self) -> &RwLock<Region> {
@@ -238,73 +237,38 @@ where
         }
 
         let mut pages = self.pages.write();
+        let pages_len = pages.len();
+        let starting_page_index = Self::index_to_page_index(stored_len);
+        assert!(starting_page_index <= pages_len);
 
-        let mut starting_page_index = pages.len();
-        // let mut values = vec![];
-        let mut truncate_at = None;
+        let mut values = vec![];
 
-        let last_page_index = pages.len() - 1;
+        let offset = HEADER_OFFSET as u64;
 
-        let page_index = Self::index_to_page_index(stored_len).max(last_page_index);
+        let truncate_at = if starting_page_index < pages_len {
+            let len = stored_len % Self::PER_PAGE;
+            if len != 0 {
+                let mut page_values = Self::decode_page_(
+                    stored_len,
+                    starting_page_index,
+                    &self.create_static_reader(),
+                    &pages,
+                )?;
+                page_values.truncate(len);
+                values = page_values;
+            }
 
-        let mut values = Self::decode_page_(
-            stored_len,
-            last_page_index,
-            &self.create_static_reader(),
-            &pages,
-        )?;
+            pages.truncate(starting_page_index).unwrap().start
+        } else {
+            pages
+                .last()
+                .map_or(offset, |page| page.start + page.bytes as u64)
+        };
 
-        let mut buf = vec![];
-
-        let mut page = pages.truncate(page_index).unwrap();
-
-        let decoded_index = stored_len % Self::PER_PAGE;
-
-        let from = page.start;
-
-        if decoded_index != 0 {
-            let chunk = &values[..decoded_index];
-
-            buf = Self::compress_page(chunk);
-
-            page.values = chunk.len() as u32;
-            page.bytes = buf.len() as u32;
-
-            pages.checked_push(page_index, page);
-        }
-
-        let seqdb = self.seqdb();
-
-        pages.flush(seqdb)?;
-
-        seqdb.truncate_write_all_to_region(self.region_index().into(), from, &buf)?;
-
-        if stored_len % Self::PER_PAGE != 0 {
-            assert!(!pages.is_empty());
-
-            let last_page_index = pages.len() - 1;
-
-            let reader = self.create_reader();
-
-            values = Self::decode_page_(stored_len, last_page_index, &reader, &pages)
-                .inspect_err(|_| {
-                    dbg!((
-                        last_page_index,
-                        &pages,
-                        self.region_index(),
-                        &self.region().read()
-                    ));
-                })
-                .unwrap();
-
-            let start = pages.pop().unwrap().start;
-            truncate_at.replace(start);
-            starting_page_index = last_page_index;
-        }
+        values.append(self.inner.mut_pushed());
 
         let compressed = values
             .into_par_iter()
-            .chain(mem::take(self.inner.mut_pushed()).into_par_iter())
             .chunks(Self::PER_PAGE)
             .map(|chunk| (Self::compress_page(chunk.as_slice()), chunk.len()))
             .collect::<Vec<_>>();
@@ -316,7 +280,7 @@ where
                 let prev = pages.get(page_index - 1).unwrap();
                 prev.start + prev.bytes as u64
             } else {
-                HEADER_OFFSET as u64
+                offset
             };
 
             let page = Page::new(start, bytes.len() as u32, *len as u32);
@@ -329,17 +293,15 @@ where
             .flat_map(|(v, _)| v)
             .collect::<Vec<_>>();
 
-        let seqdb = self.seqdb();
+        let db = self.db();
 
-        if let Some(truncate_at) = truncate_at {
-            // info!("truncate_write_all_to_region {}", self.region_index());
-            seqdb.truncate_write_all_to_region(self.region_index().into(), truncate_at, &buf)?;
-        } else {
-            // info!("write_all_to_region {}", self.region_index());
-            seqdb.write_all_to_region(self.region_index().into(), &buf)?;
-        }
+        let mut mut_stored_len = self.mut_stored_len();
 
-        pages.flush(seqdb)?;
+        db.truncate_write_all_to_region(self.region_index().into(), truncate_at, &buf)?;
+
+        *mut_stored_len += pushed_len;
+
+        pages.flush(db)?;
 
         Ok(())
     }

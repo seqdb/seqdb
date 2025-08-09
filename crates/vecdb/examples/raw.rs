@@ -1,7 +1,7 @@
-use std::{borrow::Cow, collections::BTreeSet, fs, path::Path, sync::Arc};
+use std::{borrow::Cow, collections::BTreeSet, fs, path::Path};
 
 use vecdb::{
-    AnyStoredVec, AnyVec, CollectableVec, GenericStoredVec, RawVec, Stamp, VecDB, VecIterator,
+    AnyStoredVec, AnyVec, CollectableVec, Database, GenericStoredVec, RawVec, Stamp, VecIterator,
     Version,
 };
 
@@ -13,10 +13,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let version = Version::TWO;
 
-    let vecdb = Arc::new(VecDB::open(Path::new("raw"))?);
+    let database = Database::open(Path::new("raw"))?;
 
     {
-        let mut vec: VEC = RawVec::forced_import(&vecdb, "vec", version)?;
+        let mut vec: VEC = RawVec::forced_import(&database, "vec", version)?;
 
         (0..21_u32).for_each(|v| {
             vec.push(v);
@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     {
-        let mut vec: VEC = RawVec::forced_import(&vecdb, "vec", version)?;
+        let mut vec: VEC = RawVec::forced_import(&database, "vec", version)?;
 
         vec.mut_header().update_stamp(Stamp::new(100));
 
@@ -72,7 +72,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     {
-        let mut vec: VEC = RawVec::forced_import(&vecdb, "vec", version)?;
+        let mut vec: VEC = RawVec::forced_import(&database, "vec", version)?;
 
         assert!(vec.header().stamp() == Stamp::new(100));
 
@@ -89,58 +89,75 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         vec.truncate_if_needed(14)?;
 
-        assert!(vec.stored_len() == 14);
-        assert!(vec.pushed_len() == 0);
-        assert!(vec.len() == 14);
+        assert_eq!(vec.stored_len(), 14);
+        assert_eq!(vec.pushed_len(), 0);
+        assert_eq!(vec.len(), 14);
 
         let mut iter = vec.into_iter();
-        assert!(iter.get(0) == Some(Cow::Borrowed(&0)));
-        assert!(iter.get(5) == Some(Cow::Borrowed(&5)));
-        assert!(iter.get(20).is_none());
+        assert_eq!(iter.get(0), Some(Cow::Borrowed(&0)));
+        assert_eq!(iter.get(5), Some(Cow::Borrowed(&5)));
+        assert_eq!(iter.get(20), None);
         drop(iter);
 
-        assert!(vec.collect_signed_range(Some(-5), None)? == vec![9, 10, 11, 12, 13]);
+        assert_eq!(
+            vec.collect_signed_range(Some(-5), None)?,
+            vec![9, 10, 11, 12, 13]
+        );
 
         vec.push(vec.len() as u32);
-        assert!(VecIterator::last(vec.into_iter()) == Some((14, Cow::Borrowed(&14))));
+        assert_eq!(
+            VecIterator::last(vec.into_iter()),
+            Some((14, Cow::Borrowed(&14)))
+        );
 
-        assert!(
+        assert_eq!(
             vec.into_iter()
                 .map(|(_, v)| v.into_owned())
-                .collect::<Vec<_>>()
-                == vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
         );
+
+        vec.flush()?;
     }
 
     {
-        let mut vec: VEC = RawVec::forced_import(&vecdb, "vec", version)?;
+        let mut vec: VEC = RawVec::forced_import(&database, "vec", version)?;
+
+        assert_eq!(
+            VecIterator::last(vec.into_iter()),
+            Some((14, Cow::Borrowed(&14)))
+        );
+
+        assert_eq!(
+            vec.into_iter()
+                .map(|(_, v)| v.into_owned())
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+        );
 
         vec.reset()?;
 
-        // dbg!(vec.header());
-        // assert len
-
-        assert!(vec.pushed_len() == 0);
-        assert!(vec.stored_len() == 0);
-        assert!(vec.len() == 0);
+        assert_eq!(vec.pushed_len(), 0);
+        assert_eq!(vec.stored_len(), 0);
+        assert_eq!(vec.len(), 0);
 
         (0..21_u32).for_each(|v| {
             vec.push(v);
         });
 
-        assert!(vec.pushed_len() == 21);
-        assert!(vec.stored_len() == 0);
-        assert!(vec.len() == 21);
+        assert_eq!(vec.pushed_len(), 21);
+        assert_eq!(vec.stored_len(), 0);
+        assert_eq!(vec.len(), 21);
 
         let mut iter = vec.into_iter();
-        assert!(iter.get(0) == Some(Cow::Borrowed(&0)));
-        assert!(iter.get(20) == Some(Cow::Borrowed(&20)));
+        assert_eq!(iter.get(0), Some(Cow::Borrowed(&0)));
+        assert_eq!(iter.get(20), Some(Cow::Borrowed(&20)));
         assert!(iter.get(21).is_none());
         drop(iter);
 
         let reader = vec.create_static_reader();
-        assert!(vec.take(10, &reader)? == Some(10));
-        assert!(vec.holes() == &BTreeSet::from([10]));
+        assert_eq!(vec.take(10, &reader)?, Some(10));
+        assert_eq!(vec.holes(), &BTreeSet::from([10]));
         assert!(vec.get_or_read(10, &reader)?.is_none());
         drop(reader);
 
@@ -150,7 +167,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     {
-        let mut vec: VEC = RawVec::forced_import(&vecdb, "vec", version)?;
+        let mut vec: VEC = RawVec::forced_import(&database, "vec", version)?;
 
         assert!(vec.holes() == &BTreeSet::from([10]));
 
@@ -162,22 +179,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec.update(0, 10)?;
 
         let reader = vec.create_static_reader();
-        assert!(vec.holes() == &BTreeSet::new());
-        assert!(vec.get_or_read(0, &reader)? == Some(Cow::Borrowed(&10)));
-        assert!(vec.get_or_read(10, &reader)? == Some(Cow::Borrowed(&10)));
+        assert_eq!(vec.holes(), &BTreeSet::new());
+        assert_eq!(vec.get_or_read(0, &reader)?, Some(Cow::Borrowed(&10)));
+        assert_eq!(vec.get_or_read(10, &reader)?, Some(Cow::Borrowed(&10)));
         drop(reader);
 
         vec.flush()?;
     }
 
     {
-        let vec: VEC = RawVec::forced_import(&vecdb, "vec", version)?;
+        let vec: VEC = RawVec::forced_import(&database, "vec", version)?;
 
-        assert!(
-            vec.collect()?
-                == vec![
-                    10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-                ]
+        assert_eq!(
+            vec.collect()?,
+            vec![
+                10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+            ]
         );
     }
 

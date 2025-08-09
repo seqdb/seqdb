@@ -9,7 +9,7 @@
 
 pub use pco::data_types::LatentType;
 
-use seqdb::SeqDB;
+pub use seqdb::Database;
 #[cfg(feature = "derive")]
 pub use vecdb_derive::StoredCompressed;
 
@@ -31,5 +31,3 @@ pub use variants::{
     EagerVec, Format, LazyVecFrom1, LazyVecFrom2, LazyVecFrom3, RawVec, StoredVec,
 };
 pub use version::*;
-
-pub type VecDB = SeqDB;

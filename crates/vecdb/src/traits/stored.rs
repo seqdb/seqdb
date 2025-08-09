@@ -1,10 +1,10 @@
 use parking_lot::RwLock;
-use seqdb::{Region, SeqDB};
+use seqdb::{Database, Region};
 
 use crate::{AnyVec, Exit, Result, Stamp, variants::Header};
 
 pub trait AnyStoredVec: AnyVec {
-    fn seqdb(&self) -> &SeqDB;
+    fn db(&self) -> &Database;
 
     fn region_index(&self) -> usize;
 

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use parking_lot::RwLock;
-use seqdb::{Region, RegionReader, SeqDB};
+use seqdb::{Database, Region, RegionReader};
 use zerocopy::{FromBytes, IntoBytes};
 
 use crate::Result;
@@ -20,7 +20,7 @@ pub struct Pages {
 impl Pages {
     const SIZE_OF_PAGE: usize = size_of::<Page>();
 
-    pub fn import(file: &SeqDB, name: &str) -> Result<Self> {
+    pub fn import(file: &Database, name: &str) -> Result<Self> {
         let (region_index, _region) = file.create_region_if_needed(name)?;
 
         let vec = _region
@@ -39,7 +39,7 @@ impl Pages {
         })
     }
 
-    pub fn flush(&mut self, file: &SeqDB) -> Result<()> {
+    pub fn flush(&mut self, file: &Database) -> Result<()> {
         if self.change_at.is_none() {
             return Ok(());
         }
@@ -60,24 +60,12 @@ impl Pages {
         self.vec.len()
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
     pub fn get(&self, page_index: usize) -> Option<&Page> {
         self.vec.get(page_index)
     }
 
     pub fn last(&self) -> Option<&Page> {
         self.vec.last()
-    }
-
-    pub fn pop(&mut self) -> Option<Page> {
-        let popped = self.vec.pop();
-        if popped.is_some() {
-            self.set_changed_at(self.vec.len());
-        }
-        popped
     }
 
     pub fn checked_push(&mut self, page_index: usize, page: Page) {

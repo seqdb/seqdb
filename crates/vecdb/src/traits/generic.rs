@@ -40,7 +40,7 @@ where
     fn create_static_reader(&self) -> Reader<'static> {
         unsafe {
             std::mem::transmute(
-                self.seqdb()
+                self.db()
                     .create_region_reader(self.region_index().into())
                     .unwrap(),
             )

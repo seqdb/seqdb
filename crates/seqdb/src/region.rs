@@ -2,7 +2,7 @@ use memmap2::MmapMut;
 use parking_lot::RwLockReadGuard;
 use zerocopy_derive::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
-use super::{PAGE_SIZE, Reader, SeqDBInner};
+use super::{DatabaseInner, PAGE_SIZE, Reader};
 
 #[derive(Debug, Clone, FromBytes, IntoBytes, Immutable, KnownLayout)]
 #[repr(C)]
@@ -69,14 +69,14 @@ impl Region {
 }
 
 pub trait RegionReader {
-    fn create_reader(self, seqdb: &'_ SeqDBInner) -> Reader<'_>;
+    fn create_reader(self, seqdb: &'_ DatabaseInner) -> Reader<'_>;
 }
 
 impl<'a> RegionReader for RwLockReadGuard<'a, Region> {
-    fn create_reader(self, seqdb: &SeqDBInner) -> Reader<'static> {
+    fn create_reader(self, db: &DatabaseInner) -> Reader<'static> {
         let region: RwLockReadGuard<'static, Region> = unsafe { std::mem::transmute(self) };
         let mmap: RwLockReadGuard<'static, MmapMut> =
-            unsafe { std::mem::transmute(seqdb.mmap.read()) };
+            unsafe { std::mem::transmute(db.mmap.read()) };
         Reader::new(mmap, region)
     }
 }

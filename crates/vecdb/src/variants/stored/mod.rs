@@ -4,7 +4,7 @@ use std::{
 };
 
 use parking_lot::{RwLock, RwLockWriteGuard};
-use seqdb::{Reader, Region, SeqDB};
+use seqdb::{Database, Reader, Region};
 
 use crate::{
     AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, BaseVecIterator, BoxedVecIterator,
@@ -29,22 +29,22 @@ where
     T: StoredCompressed,
 {
     pub fn forced_import(
-        seqdb: &SeqDB,
+        db: &Database,
         name: &str,
         version: Version,
         format: Format,
     ) -> Result<Self> {
         if version == Version::ZERO {
-            dbg!(seqdb, name);
+            dbg!(db, name);
             panic!("Version must be at least 1, can't verify endianess otherwise");
         }
 
         if format.is_compressed() {
             Ok(Self::Compressed(CompressedVec::forced_import(
-                seqdb, name, version,
+                db, name, version,
             )?))
         } else {
-            Ok(Self::Raw(RawVec::forced_import(seqdb, name, version)?))
+            Ok(Self::Raw(RawVec::forced_import(db, name, version)?))
         }
     }
 }
@@ -91,10 +91,10 @@ where
     T: StoredCompressed,
 {
     #[inline]
-    fn seqdb(&self) -> &SeqDB {
+    fn db(&self) -> &Database {
         match self {
-            StoredVec::Raw(v) => v.seqdb(),
-            StoredVec::Compressed(v) => v.seqdb(),
+            StoredVec::Raw(v) => v.db(),
+            StoredVec::Compressed(v) => v.db(),
         }
     }
 

@@ -9,7 +9,7 @@ use std::{
 
 use log::info;
 use parking_lot::{RwLock, RwLockWriteGuard};
-use seqdb::{Reader, Region, SeqDB};
+use seqdb::{Database, Reader, Region};
 
 use crate::{
     AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, BoxedVecIterator, CheckedSub,
@@ -26,13 +26,13 @@ where
     T: StoredCompressed,
 {
     pub fn forced_import(
-        seqdb: &SeqDB,
+        db: &Database,
         value_name: &str,
         version: Version,
         format: Format,
     ) -> Result<Self> {
         Ok(Self(StoredVec::forced_import(
-            seqdb, value_name, version, format,
+            db, value_name, version, format,
         )?))
     }
 
@@ -995,8 +995,8 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    fn seqdb(&self) -> &SeqDB {
-        self.0.seqdb()
+    fn db(&self) -> &Database {
+        self.0.db()
     }
 
     fn region_index(&self) -> usize {

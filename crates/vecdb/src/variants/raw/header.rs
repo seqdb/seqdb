@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use parking_lot::RwLock;
-use seqdb::SeqDB;
+use seqdb::Database;
 use zerocopy::{FromBytes, IntoBytes};
 use zerocopy_derive::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
@@ -20,12 +20,12 @@ pub struct Header {
 
 impl Header {
     pub fn create_and_write(
-        seqdb: &SeqDB,
+        db: &Database,
         region_index: usize,
         vec_version: Version,
         format: Format,
     ) -> Result<Self> {
-        let inner = HeaderInner::create_and_write(seqdb, region_index, vec_version, format)?;
+        let inner = HeaderInner::create_and_write(db, region_index, vec_version, format)?;
         Ok(Self {
             inner: Arc::new(RwLock::new(inner)),
             modified: false,
@@ -33,14 +33,14 @@ impl Header {
     }
 
     pub fn import_and_verify(
-        seqdb: &SeqDB,
+        db: &Database,
         region_index: usize,
         region_len: u64,
         vec_version: Version,
         format: Format,
     ) -> Result<Self> {
         let inner =
-            HeaderInner::import_and_verify(seqdb, region_index, region_len, vec_version, format)?;
+            HeaderInner::import_and_verify(db, region_index, region_len, vec_version, format)?;
         Ok(Self {
             inner: Arc::new(RwLock::new(inner)),
             modified: false,
@@ -78,8 +78,8 @@ impl Header {
         self.inner.read().stamp
     }
 
-    pub fn write(&mut self, seqdb: &SeqDB, region_index: usize) -> Result<()> {
-        self.inner.read().write(seqdb, region_index)?;
+    pub fn write(&mut self, db: &Database, region_index: usize) -> Result<()> {
+        self.inner.read().write(db, region_index)?;
         self.modified = false;
         Ok(())
     }
@@ -98,7 +98,7 @@ struct HeaderInner {
 
 impl HeaderInner {
     pub fn create_and_write(
-        seqdb: &SeqDB,
+        db: &Database,
         region_index: usize,
         vec_version: Version,
         format: Format,
@@ -111,17 +111,17 @@ impl HeaderInner {
             compressed: ZeroCopyBool::from(format),
             padding: Default::default(),
         };
-        header.write(seqdb, region_index)?;
+        header.write(db, region_index)?;
         Ok(header)
     }
 
-    pub fn write(&self, seqdb: &SeqDB, region_index: usize) -> Result<()> {
-        seqdb.write_all_to_region_at(region_index.into(), self.as_bytes(), 0)?;
+    pub fn write(&self, db: &Database, region_index: usize) -> Result<()> {
+        db.write_all_to_region_at(region_index.into(), self.as_bytes(), 0)?;
         Ok(())
     }
 
     pub fn import_and_verify(
-        seqdb: &SeqDB,
+        db: &Database,
         region_index: usize,
         region_len: u64,
         vec_version: Version,
@@ -133,7 +133,7 @@ impl HeaderInner {
             return Err(Error::WrongLength);
         }
 
-        let reader = seqdb.create_region_reader(region_index.into())?;
+        let reader = db.create_region_reader(region_index.into())?;
         let slice = reader.read(0, HEADER_OFFSET as u64);
         let header = HeaderInner::read_from_bytes(slice)?;
 

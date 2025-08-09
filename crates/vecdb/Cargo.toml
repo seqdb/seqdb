@@ -1,6 +1,6 @@
 [package]
 name = "vecdb"
-description = "A KISS index-value storage engine"
+description = "A K.I.S.S. index-value storage engine"
 keywords.workspace = true
 categories.workspace = true
 version.workspace = true
