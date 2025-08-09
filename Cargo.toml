@@ -1,7 +1,6 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
-package.description = "A K.I.S.S. sequential storage engine"
 package.license = "MIT"
 package.edition = "2024"
 package.version = "0.0.1"

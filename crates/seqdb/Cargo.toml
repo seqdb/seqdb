@@ -1,10 +1,9 @@
 [package]
 name = "seqdb"
-description.workspace = true
+description = "A K.I.S.S. sequential storage engine"
 keywords.workspace = true
 categories.workspace = true
 license.workspace = true
-readme.workspace = true
 homepage.workspace = true
 repository.workspace = true
 edition.workspace = true
