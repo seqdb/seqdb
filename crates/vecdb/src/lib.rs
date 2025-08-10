@@ -7,9 +7,7 @@
 #![doc = include_str!("../examples/compressed.rs")]
 #![doc = "```"]
 
-pub use pco::data_types::LatentType;
-
-pub use seqdb::Database;
+pub use seqdb::{Database, Error as SeqDBError, PAGE_SIZE, Reader};
 #[cfg(feature = "derive")]
 pub use vecdb_derive::StoredCompressed;
 

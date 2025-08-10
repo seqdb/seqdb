@@ -265,7 +265,10 @@ where
         self.truncate_if_needed_(index.to_usize()?)
     }
     fn truncate_if_needed_(&mut self, index: usize) -> Result<()> {
-        if !self.is_pushed_empty() || !self.holes().is_empty() || !self.updated().is_empty() {
+        let has_new_data = !self.is_pushed_empty();
+        let has_holes = !self.holes().is_empty();
+        let has_updated = !self.updated().is_empty();
+        if has_new_data || has_holes || has_updated {
             return Err(Error::Str("Expect clean/flushed state before truncating."));
         }
         let mut stored_len = self.mut_stored_len();
