@@ -8,12 +8,13 @@ homepage.workspace = true
 repository.workspace = true
 edition.workspace = true
 version.workspace = true
+rust-version.workspace = true
 build = "build.rs"
 
 [dependencies]
+libc = "0.2.175"
 log = { workspace = true }
-memmap2 = {workspace = true}
-libc = {workspace = true}
+memmap2 = "0.9.7"
 parking_lot = { workspace = true }
 rayon = { workspace = true }
 zerocopy = { workspace = true }

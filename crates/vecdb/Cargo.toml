@@ -8,6 +8,7 @@ edition.workspace = true
 license.workspace = true
 homepage.workspace = true
 repository.workspace = true
+rust-version.workspace = true
 build = "build.rs"
 
 [features]
@@ -17,18 +18,18 @@ build = "build.rs"
 derive = ["vecdb_derive"]
 
 [dependencies]
-ctrlc = { workspace = true }
+ctrlc = { version = "3.4.7", features = ["termination"] }
 log = { workspace = true }
 parking_lot = { workspace = true }
+pco = "0.4.6"
 rayon = { workspace = true }
-serde = { workspace = true }
 seqdb = { workspace = true }
-serde_derive = { workspace = true }
-serde_json = { workspace = true }
+serde = "1.0.219"
+serde_derive = "1.0.219"
+serde_json = { version = "1.0.142", features = ["float_roundtrip"] }
 vecdb_derive = { workspace = true, optional = true }
 zerocopy = { workspace = true }
 zerocopy-derive = { workspace = true }
-pco = { workspace = true }
 
 [package.metadata.docs.rs]
 all-features = true

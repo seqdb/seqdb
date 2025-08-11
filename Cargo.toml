@@ -9,6 +9,7 @@ package.repository = "https://github.com/seqdb/seqdb"
 package.readme = "README.md"
 package.keywords = ["vec", "disk", "data"]
 package.categories = ["database"]
+package.rust-version = "1.89"
 
 [profile.release]
 lto = "fat"
@@ -23,20 +24,10 @@ debug = true
 inherits = "release"
 
 [workspace.dependencies]
-ctrlc = { version = "3.4.7", features = ["termination"] }
-derive_deref = "1.1.1"
-jiff = "0.2.15"
-libc = "0.2.174"
 log = "0.4.27"
-memmap2 = "0.9.7"
 parking_lot = "0.12.4"
-pco = "0.4.6"
 rayon = "1.10.0"
 seqdb = { version = "0.1.0", path = "crates/seqdb" }
-serde = "1.0.219"
-serde_bytes = "0.11.17"
-serde_derive = "1.0.219"
-serde_json = { version = "1.0.142", features = ["float_roundtrip"] }
 vecdb = { version = "0.1.0", path = "crates/vecdb" }
 vecdb_derive = { version = "0.1.0", path = "crates/vecdb_derive" }
 zerocopy = "0.8.26"
