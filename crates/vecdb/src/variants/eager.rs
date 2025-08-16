@@ -14,7 +14,8 @@ use seqdb::{Database, Reader, Region};
 use crate::{
     AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, BoxedVecIterator, CheckedSub,
     CollectableVec, Exit, Format, GenericStoredVec, Result, StoredCompressed, StoredIndex,
-    StoredRaw, StoredVec, StoredVecIterator, VecIterator, Version, variants::Header,
+    StoredRaw, StoredVec, StoredVecIterator, VecIterator, Version,
+    variants::{Header, ImportOptions},
 };
 
 #[derive(Debug, Clone)]
@@ -25,15 +26,36 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
+    pub fn forced_import_compressed(db: &Database, name: &str, version: Version) -> Result<Self> {
+        Self::forced_import_compressed_with((db, name, version).into())
+    }
+
+    pub fn forced_import_compressed_with(options: ImportOptions) -> Result<Self> {
+        Ok(Self(StoredVec::forced_import_with(
+            options,
+            Format::Compressed,
+        )?))
+    }
+
+    pub fn forced_import_raw(db: &Database, name: &str, version: Version) -> Result<Self> {
+        Self::forced_import_raw_with((db, name, version).into())
+    }
+
+    pub fn forced_import_raw_with(options: ImportOptions) -> Result<Self> {
+        Ok(Self(StoredVec::forced_import_with(options, Format::Raw)?))
+    }
+
     pub fn forced_import(
         db: &Database,
-        value_name: &str,
+        name: &str,
         version: Version,
         format: Format,
     ) -> Result<Self> {
-        Ok(Self(StoredVec::forced_import(
-            db, value_name, version, format,
-        )?))
+        Self::forced_import_with((db, name, version).into(), format)
+    }
+
+    pub fn forced_import_with(options: ImportOptions, format: Format) -> Result<Self> {
+        Ok(Self(StoredVec::forced_import_with(options, format)?))
     }
 
     #[inline]
@@ -1023,36 +1045,53 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
+    #[inline]
     fn db(&self) -> &Database {
         self.0.db()
     }
 
+    #[inline]
     fn region_index(&self) -> usize {
         self.0.region_index()
     }
 
+    #[inline]
     fn region(&self) -> &RwLock<Region> {
         self.0.region()
     }
 
+    #[inline]
     fn header(&self) -> &Header {
         self.0.header()
     }
 
+    #[inline]
     fn mut_header(&mut self) -> &mut Header {
         self.0.mut_header()
     }
 
+    #[inline]
+    fn saved_stamped_changes(&self) -> u16 {
+        self.0.saved_stamped_changes()
+    }
+
+    #[inline]
     fn flush(&mut self) -> Result<()> {
         self.0.flush()
     }
 
+    #[inline]
     fn stored_len(&self) -> usize {
         self.0.stored_len()
     }
 
+    #[inline]
     fn real_stored_len(&self) -> usize {
         self.0.real_stored_len()
+    }
+
+    fn serialize_changes(&self) -> Result<Vec<u8>> {
+        self.0.serialize_changes()
     }
 }
 

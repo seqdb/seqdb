@@ -12,6 +12,7 @@ use crate::{
     AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, AsInnerSlice, BaseVecIterator,
     BoxedVecIterator, CollectableVec, Error, Format, FromInnerSlice, GenericStoredVec,
     HEADER_OFFSET, Header, RawVec, Result, StoredCompressed, StoredIndex, Version,
+    variants::ImportOptions,
 };
 
 mod page;
@@ -24,7 +25,7 @@ const ONE_KIB: usize = 1024;
 const MAX_PAGE_SIZE: usize = 16 * ONE_KIB;
 const PCO_COMPRESSION_LEVEL: usize = 4;
 
-const VERSION: Version = Version::ONE;
+const VERSION: Version = Version::TWO;
 
 #[derive(Debug)]
 pub struct CompressedVec<I, T> {
@@ -40,27 +41,42 @@ where
     const PER_PAGE: usize = MAX_PAGE_SIZE / Self::SIZE_OF_T;
 
     /// Same as import but will reset the vec under certain errors, so be careful !
-    pub fn forced_import(db: &Database, name: &str, mut version: Version) -> Result<Self> {
-        version = version + VERSION;
-        let res = Self::import(db, name, version);
+    pub fn forced_import(db: &Database, name: &str, version: Version) -> Result<Self> {
+        Self::forced_import_with((db, name, version).into())
+    }
+
+    /// Same as import but will reset the vec under certain errors, so be careful !
+    pub fn forced_import_with(mut options: ImportOptions) -> Result<Self> {
+        options.version = options.version + VERSION;
+        let res = Self::import_with(options);
         match res {
             Err(Error::DifferentCompressionMode)
             | Err(Error::WrongEndian)
             | Err(Error::WrongLength)
             | Err(Error::DifferentVersion { .. }) => {
-                let _ = db.remove_region(Self::vec_region_name_(name).into());
-                let _ = db.remove_region(Self::holes_region_name_(name).into());
-                let _ = db.remove_region(Self::pages_region_name_(name).into());
-                Self::import(db, name, version)
+                let _ = options
+                    .db
+                    .remove_region(Self::vec_region_name_(options.name).into());
+                let _ = options
+                    .db
+                    .remove_region(Self::holes_region_name_(options.name).into());
+                let _ = options
+                    .db
+                    .remove_region(Self::pages_region_name_(options.name).into());
+                Self::import_with(options)
             }
             _ => res,
         }
     }
 
     pub fn import(db: &Database, name: &str, version: Version) -> Result<Self> {
-        let inner = RawVec::any_import(db, name, version, Format::Compressed)?;
+        Self::import_with((db, name, version).into())
+    }
 
-        let pages = Pages::import(db, &Self::pages_region_name_(name))?;
+    pub fn import_with(options: ImportOptions) -> Result<Self> {
+        let inner = RawVec::import_(options, Format::Compressed)?;
+
+        let pages = Pages::import(options.db, &Self::pages_region_name_(options.name))?;
 
         let this = Self {
             inner,
@@ -195,20 +211,29 @@ where
         self.inner.db()
     }
 
+    #[inline]
     fn region(&self) -> &RwLock<Region> {
         self.inner.region()
     }
 
+    #[inline]
     fn region_index(&self) -> usize {
         self.inner.region_index()
     }
 
+    #[inline]
     fn header(&self) -> &Header {
         self.inner.header()
     }
 
+    #[inline]
     fn mut_header(&mut self) -> &mut Header {
         self.inner.mut_header()
+    }
+
+    #[inline]
+    fn saved_stamped_changes(&self) -> u16 {
+        self.inner.saved_stamped_changes()
     }
 
     #[inline]
@@ -304,6 +329,10 @@ where
         pages.flush(db)?;
 
         Ok(())
+    }
+
+    fn serialize_changes(&self) -> Result<Vec<u8>> {
+        self.inner.serialize_changes()
     }
 }
 

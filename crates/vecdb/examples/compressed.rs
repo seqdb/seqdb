@@ -15,8 +15,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let database = Database::open(Path::new("compressed"))?;
 
+    let options = (&database, "vec", version).into();
+
     {
-        let mut vec: VEC = CompressedVec::forced_import(&database, "vec", version)?;
+        let mut vec: VEC = CompressedVec::forced_import_with(options)?;
 
         (0..21_u32).for_each(|v| {
             vec.push(v);
@@ -36,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     {
-        let mut vec: VEC = CompressedVec::forced_import(&database, "vec", version)?;
+        let mut vec: VEC = CompressedVec::forced_import_with(options)?;
 
         vec.mut_header().update_stamp(Stamp::new(100));
 
@@ -72,7 +74,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     {
-        let mut vec: VEC = CompressedVec::forced_import(&database, "vec", version)?;
+        let mut vec: VEC = CompressedVec::forced_import_with(options)?;
 
         assert_eq!(vec.header().stamp(), Stamp::new(100));
 
@@ -121,7 +123,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     {
-        let mut vec: VEC = CompressedVec::forced_import(&database, "vec", version)?;
+        let mut vec: VEC = CompressedVec::forced_import_with(options)?;
 
         assert_eq!(
             vec.into_iter()
@@ -165,7 +167,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     {
-        let mut vec: VEC = CompressedVec::forced_import(&database, "vec", version)?;
+        let mut vec: VEC = CompressedVec::forced_import_with(options)?;
 
         assert_eq!(vec.pushed_len(), 0);
         assert_eq!(vec.stored_len(), 21);
@@ -181,7 +183,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     {
-        let vec: VEC = CompressedVec::forced_import(&database, "vec", version)?;
+        let vec: VEC = CompressedVec::forced_import_with(options)?;
 
         assert!(
             vec.collect()?

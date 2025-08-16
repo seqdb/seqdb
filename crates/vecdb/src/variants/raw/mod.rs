@@ -18,8 +18,10 @@ use crate::{
 use super::Format;
 
 mod header;
+mod options;
 
 pub use header::*;
+pub use options::*;
 
 const VERSION: Version = Version::ONE;
 
@@ -35,8 +37,11 @@ pub struct RawVec<I, T> {
     has_stored_holes: bool,
     holes: BTreeSet<usize>,
     updated: BTreeMap<usize, T>,
-    phantom: PhantomData<I>,
     stored_len: Arc<RwLock<usize>>,
+    /// Default is 0
+    saved_stamped_changes: u16,
+
+    phantom: PhantomData<I>,
 }
 
 impl<I, T> RawVec<I, T>
@@ -45,27 +50,49 @@ where
     T: StoredRaw,
 {
     /// Same as import but will reset the vec under certain errors, so be careful !
-    pub fn forced_import(db: &Database, name: &str, mut version: Version) -> Result<Self> {
-        version = version + VERSION;
-        let res = Self::import(db, name, version);
+    pub fn forced_import(db: &Database, name: &str, version: Version) -> Result<Self> {
+        Self::forced_import_with((db, name, version).into())
+    }
+
+    /// Same as import but will reset the vec under certain errors, so be careful !
+    pub fn forced_import_with(mut options: ImportOptions) -> Result<Self> {
+        options.version = options.version + VERSION;
+        let res = Self::import_with(options);
         match res {
             Err(Error::DifferentCompressionMode)
             | Err(Error::WrongEndian)
             | Err(Error::WrongLength)
             | Err(Error::DifferentVersion { .. }) => {
-                let _ = db.remove_region(Self::vec_region_name_(name).into());
-                let _ = db.remove_region(Self::holes_region_name_(name).into());
-                Self::import(db, name, version)
+                let _ = options
+                    .db
+                    .remove_region(Self::vec_region_name_(options.name).into());
+                let _ = options
+                    .db
+                    .remove_region(Self::holes_region_name_(options.name).into());
+                Self::import_with(options)
             }
             _ => res,
         }
     }
 
     pub fn import(db: &Database, name: &str, version: Version) -> Result<Self> {
-        Self::any_import(db, name, version, Format::Raw)
+        Self::import_with((db, name, version).into())
     }
 
-    pub fn any_import(db: &Database, name: &str, version: Version, format: Format) -> Result<Self> {
+    pub fn import_with(options: ImportOptions) -> Result<Self> {
+        Self::import_(options, Format::Raw)
+    }
+
+    #[doc(hidden)]
+    pub fn import_(
+        ImportOptions {
+            db,
+            name,
+            version,
+            saved_stamped_changes,
+        }: ImportOptions,
+        format: Format,
+    ) -> Result<Self> {
         let (region_index, region) = db.create_region_if_needed(&Self::vec_region_name_(name))?;
 
         let region_len = region.read().len() as usize;
@@ -108,11 +135,35 @@ where
             updated: BTreeMap::new(),
             phantom: PhantomData,
             stored_len: Arc::new(RwLock::new(0)),
+            saved_stamped_changes,
         };
 
         *s.stored_len.write() = s.real_stored_len();
 
         Ok(s)
+    }
+
+    fn read_holes(&self) -> Result<Option<BTreeSet<usize>>> {
+        Self::read_holes_(&self.db, self.name)
+    }
+
+    fn read_holes_(db: &Database, name: &str) -> Result<Option<BTreeSet<usize>>> {
+        Ok(
+            if let Ok(holes) = db.get_region(Self::holes_region_name_(name).into()) {
+                Some(
+                    holes
+                        .create_reader(db)
+                        .read_all()
+                        .chunks(size_of::<usize>())
+                        .map(|b| -> Result<usize> {
+                            usize::read_from_bytes(b).map_err(|e| e.into())
+                        })
+                        .collect::<Result<BTreeSet<usize>>>()?,
+                )
+            } else {
+                None
+            },
+        )
     }
 
     #[inline]
@@ -152,8 +203,9 @@ impl<I, T> Clone for RawVec<I, T> {
             updated: BTreeMap::new(),
             has_stored_holes: false,
             holes: BTreeSet::new(),
-            phantom: PhantomData,
             stored_len: self.stored_len.clone(),
+            saved_stamped_changes: self.saved_stamped_changes,
+            phantom: PhantomData,
         }
     }
 }
@@ -202,6 +254,11 @@ where
     #[inline]
     fn mut_header(&mut self) -> &mut Header {
         &mut self.header
+    }
+
+    #[inline]
+    fn saved_stamped_changes(&self) -> u16 {
+        self.saved_stamped_changes
     }
 
     #[inline]
@@ -288,6 +345,46 @@ where
 
     fn region(&self) -> &RwLock<Region> {
         &self.region
+    }
+
+    fn serialize_changes(&self) -> Result<Vec<u8>> {
+        let mut bytes = vec![];
+        let reader = self.create_reader();
+
+        let prev_stored_len = self.real_stored_len();
+        let stored_len = self.stored_len();
+
+        bytes.extend(stored_len.as_bytes());
+
+        let truncated = prev_stored_len.checked_sub(stored_len).unwrap_or_default();
+        bytes.extend(truncated.as_bytes());
+        if truncated > 0 {
+            bytes.extend(
+                (stored_len..prev_stored_len)
+                    .map(|i| self.unwrap_read_(i, &reader))
+                    .collect::<Vec<_>>()
+                    .as_bytes(),
+            );
+        }
+
+        let prev_holes = if self.has_stored_holes {
+            self.read_holes()?.unwrap().into_iter().collect::<Vec<_>>()
+        } else {
+            vec![]
+        };
+        bytes.extend(prev_holes.len().as_bytes());
+        bytes.extend(prev_holes.as_bytes());
+
+        let (modified_indexes, modified_values) = self
+            .updated
+            .keys()
+            .map(|&i| (i, self.unwrap_read_(i, &reader)))
+            .collect::<(Vec<_>, Vec<_>)>();
+        bytes.extend(modified_indexes.len().as_bytes());
+        bytes.extend(modified_indexes.as_bytes());
+        bytes.extend(modified_values.as_bytes());
+
+        Ok(bytes)
     }
 }
 
@@ -396,7 +493,7 @@ where
             .unwrap()
             .map(|v| (I::from(index), v));
 
-        if opt.is_some() {
+        if opt.is_some() || self.vec.holes.contains(&index) {
             self.index += 1;
         }
 

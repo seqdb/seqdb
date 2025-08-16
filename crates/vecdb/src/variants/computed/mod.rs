@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use crate::{
     AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BaseVecIterator,
     BoxedVecIterator, CollectableVec, Exit, Format, Result, StoredCompressed, StoredIndex,
-    StoredRaw, Version,
+    StoredRaw, Version, variants::ImportOptions,
 };
 
 use super::{
@@ -72,31 +72,69 @@ where
     S3T: StoredRaw,
 {
     pub fn forced_import_or_init_from_1(
-        computation: Computation,
         db: &Database,
         name: &str,
         version: Version,
+        computation: Computation,
+        format: Format,
+        source: AnyBoxedIterableVec<S1I, S1T>,
+        compute: ComputeFrom1<I, T, S1I, S1T>,
+    ) -> Result<Self> {
+        Self::forced_import_or_init_from_1_with(
+            (db, name, version).into(),
+            computation,
+            format,
+            source,
+            compute,
+        )
+    }
+
+    pub fn forced_import_or_init_from_1_with(
+        options: ImportOptions,
+        computation: Computation,
         format: Format,
         source: AnyBoxedIterableVec<S1I, S1T>,
         compute: ComputeFrom1<I, T, S1I, S1T>,
     ) -> Result<Self> {
         Ok(match computation {
             Computation::Eager => Self::Eager {
-                vec: EagerVec::forced_import(db, name, version, format)?,
+                vec: EagerVec::forced_import_with(options, format)?,
                 deps: Dependencies::From1(source, compute),
             },
-            Computation::Lazy => {
-                Self::LazyFrom1(LazyVecFrom1::init(name, version, source, compute))
-            }
+            Computation::Lazy => Self::LazyFrom1(LazyVecFrom1::init(
+                options.name,
+                options.version,
+                source,
+                compute,
+            )),
         })
     }
 
     #[allow(clippy::too_many_arguments)]
     pub fn forced_import_or_init_from_2(
-        computation: Computation,
         db: &Database,
         name: &str,
         version: Version,
+        computation: Computation,
+        format: Format,
+        source1: AnyBoxedIterableVec<S1I, S1T>,
+        source2: AnyBoxedIterableVec<S2I, S2T>,
+        compute: ComputeFrom2<I, T, S1I, S1T, S2I, S2T>,
+    ) -> Result<Self> {
+        Self::forced_import_or_init_from_2_with(
+            (db, name, version).into(),
+            computation,
+            format,
+            source1,
+            source2,
+            compute,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn forced_import_or_init_from_2_with(
+        options: ImportOptions,
+        computation: Computation,
         format: Format,
         source1: AnyBoxedIterableVec<S1I, S1T>,
         source2: AnyBoxedIterableVec<S2I, S2T>,
@@ -104,21 +142,46 @@ where
     ) -> Result<Self> {
         Ok(match computation {
             Computation::Eager => Self::Eager {
-                vec: EagerVec::forced_import(db, name, version, format)?,
+                vec: EagerVec::forced_import_with(options, format)?,
                 deps: Dependencies::From2((source1, source2), compute),
             },
-            Computation::Lazy => {
-                Self::LazyFrom2(LazyVecFrom2::init(name, version, source1, source2, compute))
-            }
+            Computation::Lazy => Self::LazyFrom2(LazyVecFrom2::init(
+                options.name,
+                options.version,
+                source1,
+                source2,
+                compute,
+            )),
         })
     }
 
     #[allow(clippy::too_many_arguments)]
     pub fn forced_import_or_init_from_3(
-        computation: Computation,
         db: &Database,
         name: &str,
         version: Version,
+        computation: Computation,
+        format: Format,
+        source1: AnyBoxedIterableVec<S1I, S1T>,
+        source2: AnyBoxedIterableVec<S2I, S2T>,
+        source3: AnyBoxedIterableVec<S3I, S3T>,
+        compute: ComputeFrom3<I, T, S1I, S1T, S2I, S2T, S3I, S3T>,
+    ) -> Result<Self> {
+        Self::forced_import_or_init_from_3_with(
+            (db, name, version).into(),
+            computation,
+            format,
+            source1,
+            source2,
+            source3,
+            compute,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn forced_import_or_init_from_3_with(
+        options: ImportOptions,
+        computation: Computation,
         format: Format,
         source1: AnyBoxedIterableVec<S1I, S1T>,
         source2: AnyBoxedIterableVec<S2I, S2T>,
@@ -127,11 +190,16 @@ where
     ) -> Result<Self> {
         Ok(match computation {
             Computation::Eager => Self::Eager {
-                vec: EagerVec::forced_import(db, name, version, format)?,
+                vec: EagerVec::forced_import_with(options, format)?,
                 deps: Dependencies::From3((source1, source2, source3), compute),
             },
             Computation::Lazy => Self::LazyFrom3(LazyVecFrom3::init(
-                name, version, source1, source2, source3, compute,
+                options.name,
+                options.version,
+                source1,
+                source2,
+                source3,
+                compute,
             )),
         })
     }

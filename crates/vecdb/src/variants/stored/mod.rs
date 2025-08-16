@@ -9,6 +9,7 @@ use seqdb::{Database, Reader, Region};
 use crate::{
     AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, BaseVecIterator, BoxedVecIterator,
     CollectableVec, GenericStoredVec, Header, Result, StoredCompressed, StoredIndex, Version,
+    variants::ImportOptions,
 };
 
 use super::{CompressedVec, CompressedVecIterator, RawVec, RawVecIterator};
@@ -34,17 +35,21 @@ where
         version: Version,
         format: Format,
     ) -> Result<Self> {
-        if version == Version::ZERO {
-            dbg!(db, name);
+        Self::forced_import_with((db, name, version).into(), format)
+    }
+
+    pub fn forced_import_with(options: ImportOptions, format: Format) -> Result<Self> {
+        if options.version == Version::ZERO {
+            dbg!(options);
             panic!("Version must be at least 1, can't verify endianess otherwise");
         }
 
         if format.is_compressed() {
-            Ok(Self::Compressed(CompressedVec::forced_import(
-                db, name, version,
+            Ok(Self::Compressed(CompressedVec::forced_import_with(
+                options,
             )?))
         } else {
-            Ok(Self::Raw(RawVec::forced_import(db, name, version)?))
+            Ok(Self::Raw(RawVec::forced_import_with(options)?))
         }
     }
 }
@@ -131,6 +136,14 @@ where
     }
 
     #[inline]
+    fn saved_stamped_changes(&self) -> u16 {
+        match self {
+            StoredVec::Raw(v) => v.saved_stamped_changes(),
+            StoredVec::Compressed(v) => v.saved_stamped_changes(),
+        }
+    }
+
+    #[inline]
     fn stored_len(&self) -> usize {
         match self {
             StoredVec::Raw(v) => v.stored_len(),
@@ -150,6 +163,13 @@ where
         match self {
             StoredVec::Raw(v) => v.flush(),
             StoredVec::Compressed(v) => v.flush(),
+        }
+    }
+
+    fn serialize_changes(&self) -> Result<Vec<u8>> {
+        match self {
+            StoredVec::Raw(v) => v.serialize_changes(),
+            StoredVec::Compressed(v) => v.serialize_changes(),
         }
     }
 }

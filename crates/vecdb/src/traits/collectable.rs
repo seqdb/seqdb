@@ -2,7 +2,7 @@ use crate::{Error, Result, i64_to_usize};
 
 use super::{AnyIterableVec, AnyVec, StoredIndex, StoredRaw};
 
-pub trait CollectableVec<I, T>: AnyVec + AnyIterableVec<I, T>
+pub trait CollectableVec<I, T>: AnyIterableVec<I, T>
 where
     Self: Clone,
     I: StoredIndex,

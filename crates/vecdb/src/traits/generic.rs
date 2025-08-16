@@ -2,10 +2,12 @@ use std::{
     borrow::Cow,
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet},
+    fs,
 };
 
 use parking_lot::RwLockWriteGuard;
 use seqdb::Reader;
+use zerocopy::FromBytes;
 
 use crate::{AnyStoredVec, Error, Exit, Result, Stamp};
 
@@ -50,6 +52,10 @@ where
     #[inline]
     fn unwrap_read(&self, index: I, reader: &Reader) -> T {
         self.read(index, reader).unwrap()
+    }
+    #[inline]
+    fn unwrap_read_(&self, index: usize, reader: &Reader) -> T {
+        self.read_(index, reader).unwrap()
     }
     #[inline]
     fn read(&self, index: I, reader: &Reader) -> Result<T> {
@@ -215,11 +221,14 @@ where
     fn mut_updated(&mut self) -> &mut BTreeMap<usize, T>;
     #[inline]
     fn update(&mut self, index: I, value: T) -> Result<()> {
-        let uindex = index.unwrap_to_usize();
+        self.update_(index.unwrap_to_usize(), value)
+    }
+    #[inline]
+    fn update_(&mut self, index: usize, value: T) -> Result<()> {
         let stored_len = self.stored_len();
 
-        if uindex >= stored_len {
-            if let Some(prev) = self.mut_pushed().get_mut(uindex - stored_len) {
+        if index >= stored_len {
+            if let Some(prev) = self.mut_pushed().get_mut(index - stored_len) {
                 *prev = value;
                 return Ok(());
             } else {
@@ -229,10 +238,10 @@ where
 
         let holes = self.mut_holes();
         if !holes.is_empty() {
-            holes.remove(&index.unwrap_to_usize());
+            holes.remove(&index);
         }
 
-        self.mut_updated().insert(index.unwrap_to_usize(), value);
+        self.mut_updated().insert(index, value);
 
         Ok(())
     }
@@ -266,9 +275,13 @@ where
     }
     fn truncate_if_needed_(&mut self, index: usize) -> Result<()> {
         let has_new_data = !self.is_pushed_empty();
-        let has_holes = !self.holes().is_empty();
-        let has_updated = !self.updated().is_empty();
-        if has_new_data || has_holes || has_updated {
+        let has_bad_hole = self.holes().last().is_some_and(|&h| h >= index);
+        let has_bad_update = self
+            .updated()
+            .last_key_value()
+            .is_some_and(|(&k, _)| k >= index);
+        if has_new_data || has_bad_hole || has_bad_update {
+            dbg!(self.pushed(), self.holes(), self.updated());
             return Err(Error::Str("Expect clean/flushed state before truncating."));
         }
         let mut stored_len = self.mut_stored_len();
@@ -283,6 +296,99 @@ where
     fn truncate_if_needed_with_stamp(&mut self, index: I, stamp: Stamp) -> Result<()> {
         self.update_stamp(stamp);
         self.truncate_if_needed(index)
+    }
+
+    fn deserialize_then_undo_changes(&mut self, bytes: &[u8]) -> Result<()> {
+        let mut pos = 0;
+        let mut len = 8;
+
+        let prev_stored_len = usize::read_from_bytes(&bytes[..pos + len])?;
+        self.truncate_if_needed_(prev_stored_len)?;
+        pos += len;
+
+        let truncated = usize::read_from_bytes(&bytes[pos..pos + len])?;
+        pos += len;
+
+        if truncated > 0 {
+            len = Self::SIZE_OF_T * truncated;
+            bytes[pos..pos + len]
+                .chunks(Self::SIZE_OF_T)
+                .try_for_each(|b| -> Result<()> {
+                    self.push(T::read_from_bytes(b)?);
+                    Ok(())
+                })?;
+            pos += len;
+        }
+
+        len = 8;
+        let prev_holes_len = usize::read_from_bytes(&bytes[pos..pos + len])?;
+        pos += len;
+
+        len = size_of::<usize>() * prev_holes_len;
+        let holes = bytes[pos..pos + len]
+            .chunks(8)
+            .map(|b| usize::read_from_bytes(b).map_err(|_| Error::ZeroCopyError))
+            .collect::<Result<BTreeSet<_>>>()?;
+        pos += len;
+
+        len = 8;
+        let modified_len = usize::read_from_bytes(&bytes[pos..pos + len])?;
+        pos += len;
+
+        len = size_of::<usize>() * modified_len;
+        let indexes = bytes[pos..pos + len].chunks(8);
+        pos += len;
+
+        len = Self::SIZE_OF_T * modified_len;
+        let values = bytes[pos..pos + len].chunks(Self::SIZE_OF_T);
+
+        let updated: BTreeMap<usize, T> = indexes
+            .zip(values)
+            .map(|(i, v)| {
+                let idx = usize::read_from_bytes(i).map_err(|_| Error::ZeroCopyError)?;
+                let val = T::read_from_bytes(v).map_err(|_| Error::ZeroCopyError)?;
+                Ok((idx, val))
+            })
+            .collect::<Result<_>>()?;
+
+        *self.mut_holes() = holes;
+        updated
+            .into_iter()
+            .try_for_each(|(i, v)| self.update_(i, v))?;
+
+        Ok(())
+    }
+
+    fn rollback_stamp(&mut self, stamp: Stamp) -> Result<()> {
+        let bytes = fs::read(self.changes_path().join(u64::from(stamp).to_string()))?;
+        self.deserialize_then_undo_changes(&bytes)
+    }
+
+    fn collect_holed(&self) -> Result<Vec<Option<T>>> {
+        self.collect_holed_range(None, None)
+    }
+
+    fn collect_holed_range(
+        &self,
+        from: Option<usize>,
+        to: Option<usize>,
+    ) -> Result<Vec<Option<T>>> {
+        let len = self.len();
+        let from = from.unwrap_or_default();
+        let to = to.map_or(len, |to| to.min(len));
+
+        if from >= len || from >= to {
+            return Ok(vec![]);
+        }
+
+        let reader = self.create_reader();
+
+        (from..to)
+            .map(|i| {
+                self.get_or_read_(i, &reader)
+                    .map(|o| o.map(|c| c.into_owned()))
+            })
+            .collect::<Result<Vec<_>>>()
     }
 
     fn index_to_name(&self) -> String {

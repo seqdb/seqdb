@@ -15,8 +15,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let database = Database::open(Path::new("raw"))?;
 
+    let mut options = (&database, "vec", version).into();
+
     {
-        let mut vec: VEC = RawVec::forced_import(&database, "vec", version)?;
+        let mut vec: VEC = RawVec::forced_import_with(options)?;
 
         (0..21_u32).for_each(|v| {
             vec.push(v);
@@ -36,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     {
-        let mut vec: VEC = RawVec::forced_import(&database, "vec", version)?;
+        let mut vec: VEC = RawVec::forced_import_with(options)?;
 
         vec.mut_header().update_stamp(Stamp::new(100));
 
@@ -72,7 +74,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     {
-        let mut vec: VEC = RawVec::forced_import(&database, "vec", version)?;
+        let mut vec: VEC = RawVec::forced_import_with(options)?;
 
         assert!(vec.header().stamp() == Stamp::new(100));
 
@@ -121,7 +123,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     {
-        let mut vec: VEC = RawVec::forced_import(&database, "vec", version)?;
+        let mut vec: VEC = RawVec::forced_import_with(options)?;
 
         assert_eq!(
             VecIterator::last(vec.into_iter()),
@@ -167,7 +169,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     {
-        let mut vec: VEC = RawVec::forced_import(&database, "vec", version)?;
+        let mut vec: VEC = RawVec::forced_import_with(options)?;
 
         assert!(vec.holes() == &BTreeSet::from([10]));
 
@@ -187,8 +189,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec.flush()?;
     }
 
+    options = options.with_saved_stamped_changes(10);
+
     {
-        let vec: VEC = RawVec::forced_import(&database, "vec", version)?;
+        let mut vec: VEC = RawVec::forced_import_with(options)?;
 
         assert_eq!(
             vec.collect()?,
@@ -196,6 +200,123 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
             ]
         );
+
+        vec.truncate_if_needed(10)?;
+
+        let reader = vec.create_static_reader();
+        vec.take(5, &reader)?;
+        vec.update(3, 5)?;
+        vec.push(21);
+        drop(reader);
+
+        assert_eq!(
+            vec.collect_holed()?,
+            vec![
+                Some(10),
+                Some(1),
+                Some(2),
+                Some(5),
+                Some(4),
+                None,
+                Some(6),
+                Some(7),
+                Some(8),
+                Some(9),
+                Some(21)
+            ]
+        );
+
+        vec.stamped_flush(Stamp::new(1))?;
+    }
+
+    {
+        let mut vec: VEC = RawVec::forced_import_with(options)?;
+
+        assert_eq!(vec.collect()?, vec![10, 1, 2, 5, 4]);
+
+        let reader = vec.create_static_reader();
+        vec.take(0, &reader)?;
+        vec.update(1, 5)?;
+        vec.push(5);
+        vec.push(6);
+        vec.push(7);
+        drop(reader);
+
+        assert_eq!(
+            vec.collect_holed()?,
+            vec![
+                None,
+                Some(5),
+                Some(2),
+                Some(5),
+                Some(4),
+                None,
+                Some(6),
+                Some(7),
+                Some(8),
+                Some(9),
+                Some(21),
+                Some(5),
+                Some(6),
+                Some(7)
+            ]
+        );
+
+        vec.stamped_flush(Stamp::new(2))?;
+    }
+
+    {
+        let mut vec: VEC = RawVec::forced_import_with(options)?;
+
+        assert_eq!(
+            vec.collect_holed()?,
+            vec![
+                None,
+                Some(5),
+                Some(2),
+                Some(5),
+                Some(4),
+                None,
+                Some(6),
+                Some(7),
+                Some(8),
+                Some(9),
+                Some(21),
+                Some(5),
+                Some(6),
+                Some(7)
+            ]
+        );
+
+        vec.rollback_stamp(Stamp::new(2))?;
+
+        assert_eq!(
+            vec.collect_holed()?,
+            vec![
+                Some(10),
+                Some(1),
+                Some(2),
+                Some(5),
+                Some(4),
+                None,
+                Some(6),
+                Some(7),
+                Some(8),
+                Some(9),
+                Some(21)
+            ]
+        );
+
+        vec.rollback_stamp(Stamp::new(1))?;
+
+        assert_eq!(
+            vec.collect()?,
+            vec![
+                10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+            ]
+        );
+
+        // vec.stamped_flush(Stamp::new(1))?;
     }
 
     Ok(())

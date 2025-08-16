@@ -628,6 +628,10 @@ impl DatabaseInner {
             "Hole punching not supported on this platform".to_string(),
         ))
     }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
 }
 
 #[repr(C)]
