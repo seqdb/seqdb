@@ -7,12 +7,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [v0.2.0] - 2025-08-16
+## [v0.2.0](https://github.com/seqdb/seqdb/releases/tag/v0.2.0) - 2025-08-16
 
 ### Added
 - **New rollback functionality**: Implemented `stamped_flush` with change tracking and rollback capabilities in `Stored` trait
 - **ImportOptions struct**: Added `ImportOptions` in `crates/vecdb/src/variants/raw/options.rs` for better configuration management
-- **Change serialization**: Added `serialize_changes()` and `saved_stamped_changes()` methods to support rollback functionality  
+- **Change serialization**: Added `serialize_changes()` and `saved_stamped_changes()` methods to support rollback functionality
 - **Enhanced generic traits**: Extended `unwrap_read_()` and `update_()` methods in generic traits
 - **Compressed variant improvements**: Enhanced compressed vector handling
 
@@ -30,7 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated `Cargo.toml` version dependencies
 - Refreshed `Cargo.lock` with new dependency versions
 
-## [v0.1.2] - 2025-08-13
+[View changes](https://github.com/seqdb/seqdb/compare/v0.1.2...v0.2.0)
+
+## [v0.1.2](https://github.com/seqdb/seqdb/releases/tag/v0.1.2) - 2025-08-13
 
 ### Added
 - **New transformation method**: Added `compute_transform2()` method to eager variant for handling dual input transformations
@@ -40,7 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced eager variant capabilities with dual-input transformation support
 - Updated version dependencies in `Cargo.toml`
 
-## [v0.1.1] - 2025-08-11
+[View changes](https://github.com/seqdb/seqdb/compare/v0.1.1...v0.1.2)
+
+## [v0.1.1](https://github.com/seqdb/seqdb/releases/tag/v0.1.1) - 2025-08-11
 
 ### Changed
 - **Dependency management**: Updated workspace dependencies configuration in `Cargo.toml`
@@ -50,7 +54,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Dependency version consistency across workspace crates
 
-## [v0.1.0] - 2025-08-10
+[View changes](https://github.com/seqdb/seqdb/compare/v0.1.0...v0.1.1)
+
+## [v0.1.0](https://github.com/seqdb/seqdb/releases/tag/v0.1.0) - 2025-08-10
 
 ### Changed
 - **Core library improvements**: Enhanced generic traits implementation in `crates/vecdb/src/traits/generic.rs`
@@ -61,14 +67,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Generic trait implementations for better type safety
 
-## [v0.0.2] - 2025-08-09
+[View changes](https://github.com/seqdb/seqdb/compare/v0.0.2...v0.1.0)
+
+## [v0.0.2](https://github.com/seqdb/seqdb/releases/tag/v0.0.2) - 2025-08-09
 
 ### Added
 - **Initial release**: First tagged release of seqdb
 - Core database functionality with sequence storage
 - Vector database (`vecdb`) with multiple storage variants:
   - Raw vectors
-  - Compressed vectors  
+  - Compressed vectors
   - Computed vectors
   - Eager vectors
   - Stamped vectors (later removed in v0.2.0)
