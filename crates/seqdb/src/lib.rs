@@ -622,7 +622,34 @@ impl DatabaseInner {
         Ok(())
     }
 
-    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    #[cfg(target_os = "freebsd")]
+    fn punch_hole2(file: &File, start: u64, length: u64) -> Result<()> {
+        let fd = file.as_raw_fd();
+
+        let mut spacectl = libc::spacectl_range {
+            r_offset: offset as libc::off_t,
+            r_len: length as libc::off_t,
+        };
+
+        let result = unsafe {
+            libc::fspacectl(
+                fd,
+                libc::SPACECTL_DEALLOC,
+                &spacectl as *const libc::spacectl_range,
+                0,
+                &mut spacectl as *mut libc::spacectl_range,
+            )
+        };
+
+        if result == -1 {
+            let err = std::io::Error::last_os_error();
+            return Err(Error::String(format!("Failed to punch hole: {err}")));
+        }
+
+        Ok(())
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "freebsd")))]
     fn punch_hole(_file: &File, _start: u64, _length: u64) -> Result<()> {
         Err(Error::String(
             "Hole punching not supported on this platform".to_string(),

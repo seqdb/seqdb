@@ -1,54 +1,70 @@
-# [seqdb]
+# seqdb
 
-A high-performance, memory-mapped database engine for sequential data storage with dynamic region management.
+A K.I.S.S. (Keep It Simple, Stupid) sequential storage engine that provides memory-mapped file-based storage with dynamic region management.
 
-## Overview
+## What is seqdb?
 
-SeqDB provides a sophisticated storage system built around memory-mapped files and dynamic region allocation. It efficiently handles variable-sized data regions with features like hole punching, region defragmentation, and automatic file growth.
+seqdb is a lightweight storage engine designed for applications that need to store and retrieve data in named regions on disk. It provides:
+
+- **Memory-mapped file access** for fast I/O operations
+- **Dynamic region management** with automatic resizing and defragmentation
+- **Sequential writes** optimized for append-heavy workloads
+- **Hole punching** to reclaim unused disk space
+- **Thread-safe operations** using parking_lot locks
 
 ## Key Features
 
-- **Memory-mapped I/O**: Direct memory access to disk-backed data for optimal performance
-- **Dynamic regions**: Create and manage named data regions that can grow and shrink as needed
-- **Space reclamation**: Automatic hole punching and region compaction to minimize disk usage
-- **Thread-safe**: Built with `parking_lot` for efficient concurrent access
-- **Cross-platform**: Support for Linux, macOS, and other Unix-like systems
+- **Named regions**: Store data in logical regions identified by strings or numbers
+- **Automatic space management**: Regions grow dynamically and can be moved/defragmented
+- **Memory efficiency**: Uses memory mapping for zero-copy reads
+- **Cross-platform hole punching**: Supports Linux, macOS, and FreeBSD
+- **Thread-safe**: Concurrent access using RwLocks
 
-## Core Concepts
-
-- **Regions**: Named, variable-size data containers within the database file
-- **Layout**: Tracks region positions and manages free space efficiently
-- **Page-aligned**: All operations work with 4KB page boundaries for optimal filesystem performance
-- **Reserved space**: Regions pre-allocate space to reduce fragmentation during growth
-
-## Example Usage
+## Usage
 
 ```rust
-use std::path::Path;
-use seqdb::{Database, PAGE_SIZE};
+use std::{fs, path::Path};
+use seqdb::{Database, PAGE_SIZE, Result};
 
-// Open or create a database
-let db = Database::open(Path::new("my_database"))?;
-
-// Create a new region
-let (region_id, _) = db.create_region_if_needed("my_region")?;
-
-// Write data to the region
-db.write_all_to_region(region_id.into(), b"Hello, world!")?;
-
-// Read data back
-let reader = db.create_region_reader(region_id.into())?;
-// ... read operations
-
-// Flush changes to disk
-db.flush()?;
+fn main() -> Result<()> {
+    // Create or open a database
+    let database = Database::open(Path::new("my_db"))?;
+    
+    // Create a region
+    let (region_id, _) = database.create_region_if_needed("my_region")?;
+    
+    // Write data to the region
+    database.write_all_to_region(region_id.into(), b"Hello, world!")?;
+    
+    // Write at a specific offset
+    database.write_all_to_region_at(region_id.into(), b"Hi", 0)?;
+    
+    // Read data using a reader
+    let reader = database.create_region_reader(region_id.into())?;
+    let data = reader.read_all();
+    
+    // Truncate region to specific length
+    database.truncate_region(region_id.into(), 5)?;
+    
+    // Flush changes and reclaim space
+    database.flush_then_punch()?;
+    
+    Ok(())
+}
 ```
 
-## Architecture
+## Core Types
 
-The database consists of three main components:
-- A data file containing the actual region content
-- Region metadata tracking each region's location, size, and ID mapping
-- Layout information managing free space and region placement
+- **`Database`**: Main entry point for database operations
+- **`Identifier`**: Region identifier (string or number)
+- **`Reader`**: Zero-copy reader for region data
+- **`Region`**: Metadata about storage regions
 
-SeqDB handles complex scenarios like region growth, movement, and space optimization automatically while maintaining data consistency.
+## Storage Model
+
+seqdb organizes data into regions within a single memory-mapped file. Each region has:
+- **Start offset**: Position in the file (page-aligned)
+- **Length**: Current data size
+- **Reserved space**: Allocated space (≥ length, page-aligned)
+
+Regions can grow automatically and are moved/defragmented as needed for efficient space utilization.
