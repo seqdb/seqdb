@@ -26,6 +26,6 @@ pub use stamp::*;
 pub use traits::*;
 pub use variants::{
     CompressedVec, Computation, ComputedVec, ComputedVecFrom1, ComputedVecFrom2, ComputedVecFrom3,
-    EagerVec, Format, LazyVecFrom1, LazyVecFrom2, LazyVecFrom3, RawVec, StoredVec,
+    EagerVec, Format, ImportOptions, LazyVecFrom1, LazyVecFrom2, LazyVecFrom3, RawVec, StoredVec,
 };
 pub use version::*;

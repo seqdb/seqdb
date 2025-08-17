@@ -3,6 +3,7 @@ use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet},
     fs,
+    path::PathBuf,
 };
 
 use parking_lot::RwLockWriteGuard;
@@ -302,7 +303,11 @@ where
         let mut pos = 0;
         let mut len = 8;
 
-        let prev_stored_len = usize::read_from_bytes(&bytes[..pos + len])?;
+        let prev_stamp = u64::read_from_bytes(&bytes[..pos + len])?;
+        self.mut_header().update_stamp(Stamp::new(prev_stamp));
+        pos += len;
+
+        let prev_stored_len = usize::read_from_bytes(&bytes[pos..pos + len])?;
         self.truncate_if_needed_(prev_stored_len)?;
         pos += len;
 
@@ -357,6 +362,64 @@ where
             .try_for_each(|(i, v)| self.update_(i, v))?;
 
         Ok(())
+    }
+
+    #[inline]
+    fn stamped_flush_maybe_with_changes(&mut self, stamp: Stamp, with_changes: bool) -> Result<()> {
+        if with_changes {
+            self.stamped_flush_with_changes(stamp)
+        } else {
+            self.stamped_flush(stamp)
+        }
+    }
+
+    fn changes_path(&self) -> PathBuf {
+        self.db().path().join(self.index_to_name()).join("changes")
+    }
+
+    #[inline]
+    fn stamped_flush_with_changes(&mut self, stamp: Stamp) -> Result<()> {
+        let saved_stamped_changes = self.saved_stamped_changes();
+
+        if saved_stamped_changes == 0 {
+            return self.stamped_flush(stamp);
+        }
+
+        let path = self.changes_path();
+
+        fs::create_dir_all(&path)?;
+
+        let files: BTreeMap<Stamp, PathBuf> = fs::read_dir(&path)?
+            .filter_map(|entry| {
+                let path = entry.ok()?.path();
+                let name = path.file_name()?.to_str()?;
+                if let Ok(s) = name.parse::<u64>().map(Stamp::from) {
+                    if s < stamp {
+                        Some((s, path))
+                    } else {
+                        let _ = fs::remove_file(path);
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for (_, path) in files.iter().take(
+            files
+                .len()
+                .saturating_sub((saved_stamped_changes - 1) as usize),
+        ) {
+            fs::remove_file(path)?;
+        }
+
+        fs::write(
+            path.join(u64::from(stamp).to_string()),
+            self.serialize_changes()?,
+        )?;
+
+        self.stamped_flush(stamp)
     }
 
     fn rollback_stamp(&mut self, stamp: Stamp) -> Result<()> {

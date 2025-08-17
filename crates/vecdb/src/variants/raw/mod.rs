@@ -351,6 +351,8 @@ where
         let mut bytes = vec![];
         let reader = self.create_reader();
 
+        bytes.extend(self.stamp().as_bytes());
+
         let prev_stored_len = self.real_stored_len();
         let stored_len = self.stored_len();
 

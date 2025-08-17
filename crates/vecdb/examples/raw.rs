@@ -226,7 +226,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ]
         );
 
-        vec.stamped_flush(Stamp::new(1))?;
+        vec.stamped_flush_with_changes(Stamp::new(1))?;
     }
 
     {
@@ -262,7 +262,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ]
         );
 
-        vec.stamped_flush(Stamp::new(2))?;
+        vec.stamped_flush_with_changes(Stamp::new(2))?;
     }
 
     {
@@ -290,6 +290,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         vec.rollback_stamp(Stamp::new(2))?;
 
+        assert_eq!(vec.stamp(), Stamp::new(1));
+
         assert_eq!(
             vec.collect_holed()?,
             vec![
@@ -316,7 +318,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ]
         );
 
-        // vec.stamped_flush(Stamp::new(1))?;
+        // vec.stamped_flush_with_changes(Stamp::new(1))?;
     }
 
     Ok(())
