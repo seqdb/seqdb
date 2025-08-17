@@ -201,6 +201,47 @@ where
         self.safe_flush(exit)
     }
 
+    pub fn compute_transform3<A, B, C, D, F>(
+        &mut self,
+        max_from: A,
+        other1: &impl AnyIterableVec<A, B>,
+        other2: &impl AnyIterableVec<A, C>,
+        other3: &impl AnyIterableVec<A, D>,
+        mut t: F,
+        exit: &Exit,
+    ) -> Result<()>
+    where
+        A: StoredIndex,
+        B: StoredRaw,
+        C: StoredRaw,
+        D: StoredRaw,
+        F: FnMut((A, B, C, D, &Self)) -> (I, T),
+    {
+        self.validate_computed_version_or_reset(
+            Version::ZERO
+                + self.inner_version()
+                + other1.version()
+                + other2.version()
+                + other3.version(),
+        )?;
+
+        let index = max_from.min(A::from(self.len()));
+        let mut iter2 = other2.iter_at(index);
+        let mut iter3 = other3.iter_at(index);
+        other1.iter_at(index).try_for_each(|(a, b)| {
+            let (i, v) = t((
+                a,
+                b.into_owned(),
+                iter2.unwrap_get_inner(a),
+                iter3.unwrap_get_inner(a),
+                self,
+            ));
+            self.forced_push_at(i, v, exit)
+        })?;
+
+        self.safe_flush(exit)
+    }
+
     pub fn compute_add(
         &mut self,
         max_from: I,
