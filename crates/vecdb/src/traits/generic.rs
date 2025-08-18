@@ -422,8 +422,39 @@ where
         self.stamped_flush(stamp)
     }
 
-    fn rollback_stamp(&mut self, stamp: Stamp) -> Result<()> {
-        let bytes = fs::read(self.changes_path().join(u64::from(stamp).to_string()))?;
+    fn rollback_before(&mut self, stamp: Stamp) -> Result<Stamp> {
+        let dir = fs::read_dir(self.changes_path())?
+            .filter_map(|entry| {
+                let path = entry.ok()?.path();
+                let name = path.file_name()?.to_str()?;
+                if let Ok(stamp) = name.parse::<u64>().map(Stamp::from) {
+                    Some((stamp, path))
+                } else {
+                    None
+                }
+            })
+            .collect::<BTreeMap<Stamp, PathBuf>>();
+
+        let mut iter = dir.range(..=self.stamp());
+
+        while let Some((&s, _)) = iter.next_back()
+            && self.stamp() >= stamp
+        {
+            if s != self.stamp() {
+                // dbg!((s, self.stamp()));
+                return Err(Error::Str("File stamp should be the same as vec stamp"));
+            }
+            self.rollback()?;
+        }
+
+        Ok(self.stamp())
+    }
+
+    fn rollback(&mut self) -> Result<()> {
+        let bytes = fs::read(
+            self.changes_path()
+                .join(u64::from(self.stamp()).to_string()),
+        )?;
         self.deserialize_then_undo_changes(&bytes)
     }
 
