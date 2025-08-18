@@ -623,7 +623,7 @@ impl DatabaseInner {
     }
 
     #[cfg(target_os = "freebsd")]
-    fn punch_hole2(file: &File, start: u64, length: u64) -> Result<()> {
+    fn punch_hole(file: &File, start: u64, length: u64) -> Result<()> {
         let fd = file.as_raw_fd();
 
         let mut spacectl = libc::spacectl_range {
