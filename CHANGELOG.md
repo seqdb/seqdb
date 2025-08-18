@@ -7,48 +7,84 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.2.2](https://github.com/seqdb/seqdb/releases/tag/v0.2.2) - 2025-08-18
+
+### Changed
+- **Simplified rollback API**: Replaced `rollback_stamp(stamp)` with simpler `rollback()` method in [Generic trait](https://github.com/seqdb/seqdb/blob/v0.2.2/crates/vecdb/src/traits/generic.rs#L453-L459) for easier usage
+- **Enhanced rollback functionality**: Added `rollback_before(stamp)` method in [Generic trait](https://github.com/seqdb/seqdb/blob/v0.2.2/crates/vecdb/src/traits/generic.rs#L425-L451) with sophisticated file system-based rollback logic
+- **Improved examples**: Updated rollback usage patterns in [raw example](https://github.com/seqdb/seqdb/blob/v0.2.2/crates/vecdb/examples/raw.rs) to demonstrate the new simplified API
+
+### Fixed
+- **Rollback error handling**: Enhanced error checking and validation in rollback operations with better stamp verification
+- **File system operations**: Improved robustness of change file management during rollback operations
+
+### Dependencies
+- Updated all workspace versions from 0.2.1 to 0.2.2 in workspace manifests
+
+[View changes](https://github.com/seqdb/seqdb/compare/v0.2.1...v0.2.2)
+
+## [v0.2.1](https://github.com/seqdb/seqdb/releases/tag/v0.2.1) - 2025-08-18
+
+### Added
+- **FreeBSD platform support**: Added [`punch_hole2()` function](https://github.com/seqdb/seqdb/blob/v0.2.1/crates/seqdb/src/lib.rs#L625-L650) for FreeBSD hole punching compatibility using `fspacectl`
+- **Triple input transformations**: Added [`compute_transform3()` method](https://github.com/seqdb/seqdb/blob/v0.2.1/crates/vecdb/src/variants/eager.rs#L204) to EagerVec for handling three input vector transformations
+- **Comprehensive documentation**: Complete rewrite of README files with practical examples:
+  - Enhanced seqdb README with K.I.S.S. approach and usage examples
+  - Improved vecdb README with storage variant explanations and code samples
+
+### Changed
+- **Enhanced rollback functionality**: Improved rollback API and change tracking capabilities in Stored trait
+- **Project organization**: Updated TODO.md with reorganized development priorities and new feature requests
+- **Build configuration**: Updated `.gitignore` to include `.claude` directory for AI tooling
+- **Documentation quality**: Improved code examples in raw example with enhanced rollback demonstrations
+
+### Dependencies
+- Updated all workspace versions from 0.2.0 to 0.2.1 in workspace manifests
+
+[View changes](https://github.com/seqdb/seqdb/compare/v0.2.0...v0.2.1)
+
 ## [v0.2.0](https://github.com/seqdb/seqdb/releases/tag/v0.2.0) - 2025-08-16
 
 ### Added
-- **New rollback functionality**: Implemented `stamped_flush` with change tracking and rollback capabilities in `Stored` trait
-- **ImportOptions struct**: Added `ImportOptions` in `crates/vecdb/src/variants/raw/options.rs` for better configuration management
-- **Change serialization**: Added `serialize_changes()` and `saved_stamped_changes()` methods to support rollback functionality
-- **Enhanced generic traits**: Extended `unwrap_read_()` and `update_()` methods in generic traits
-- **Compressed variant improvements**: Enhanced compressed vector handling
+- **New rollback functionality**: Implemented [`stamped_flush`](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/vecdb/src/traits/stored.rs) with change tracking and rollback capabilities in Stored trait
+- **ImportOptions struct**: Added [`ImportOptions`](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/vecdb/src/variants/raw/options.rs) for better configuration management
+- **Change serialization**: Added [`serialize_changes()` and `saved_stamped_changes()` methods](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/vecdb/src/traits/stored.rs) in Stored trait to support rollback functionality
+- **Enhanced generic traits**: Extended `unwrap_read_()` and `update_()` methods in Generic trait
+- **Compressed variant improvements**: Enhanced compressed vector handling in CompressedVec
 
 ### Changed
-- **Major refactoring**: Significant changes to core traits and variants (665 insertions, 310 deletions)
-- **Improved raw variant**: Enhanced raw vector implementation with new options support
-- **Updated computed variant**: Substantial improvements to computed vector handling
-- **Enhanced eager variant**: Extended eager vector functionality
-- **Stored trait expansion**: Added change tracking and rollback capabilities
+- **Major refactoring**: Significant changes to core traits (Generic and Stored) and variants
+- **Improved raw variant**: Enhanced RawVec implementation with new options support
+- **Updated computed variant**: Substantial improvements to ComputedVec handling
+- **Enhanced eager variant**: Extended EagerVec functionality
+- **Stored trait expansion**: Added change tracking and rollback capabilities in StoredVec
 
 ### Removed
-- **Stamped variant**: Completely removed `StampedVec` implementation (`crates/vecdb/src/variants/stamped/mod.rs`)
+- **Stamped variant**: Completely removed StampedVec implementation
 
 ### Dependencies
-- Updated `Cargo.toml` version dependencies
-- Refreshed `Cargo.lock` with new dependency versions
+- Updated version dependencies from 0.1.2 to 0.2.0
+- Refreshed dependency lock file
 
 [View changes](https://github.com/seqdb/seqdb/compare/v0.1.2...v0.2.0)
 
 ## [v0.1.2](https://github.com/seqdb/seqdb/releases/tag/v0.1.2) - 2025-08-13
 
 ### Added
-- **New transformation method**: Added `compute_transform2()` method to eager variant for handling dual input transformations
+- **New transformation method**: Added [`compute_transform2()` method](https://github.com/seqdb/seqdb/blob/v0.1.2/crates/vecdb/src/variants/eager.rs#L154) in EagerVec for handling dual input transformations
 - Support for transforming with two input vectors simultaneously
 
 ### Changed
-- Enhanced eager variant capabilities with dual-input transformation support
-- Updated version dependencies in `Cargo.toml`
+- Enhanced EagerVec capabilities with dual-input transformation support
+- Updated version dependencies from 0.1.1 to 0.1.2
 
 [View changes](https://github.com/seqdb/seqdb/compare/v0.1.1...v0.1.2)
 
 ## [v0.1.1](https://github.com/seqdb/seqdb/releases/tag/v0.1.1) - 2025-08-11
 
 ### Changed
-- **Dependency management**: Updated workspace dependencies configuration in `Cargo.toml`
-- **Crate organization**: Improved crate-level dependency specifications across seqdb, vecdb, and vecdb_derive
+- **Dependency management**: Updated workspace dependencies configuration
+- **Crate organization**: Improved crate-level dependency specifications in seqdb, vecdb, and vecdb_derive
 - **Project structure**: Enhanced TODO.md with additional project planning items
 
 ### Fixed
@@ -59,8 +95,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [v0.1.0](https://github.com/seqdb/seqdb/releases/tag/v0.1.0) - 2025-08-10
 
 ### Changed
-- **Core library improvements**: Enhanced generic traits implementation in `crates/vecdb/src/traits/generic.rs`
-- **Library reorganization**: Improved module structure in `crates/vecdb/src/lib.rs`
+- **Core library improvements**: Enhanced Generic trait implementation
+- **Library reorganization**: Improved vecdb module structure
 - **Project planning**: Updated TODO.md with development roadmap
 - **Dependency updates**: Version bumps and dependency management improvements
 
