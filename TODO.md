@@ -15,3 +15,5 @@
     - support other compression algos such as lz4 and zstd
 - __docs__
   - benchmark using fjall bench
+- __links__
+  - https://www.marginalia.nu/log/a_123_index_io/
