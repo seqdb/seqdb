@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/*"]
 package.license = "MIT"
 package.edition = "2024"
-package.version = "0.2.3"
+package.version = "0.2.4"
 package.homepage = "https://github.com/seqdb/seqdb"
 package.repository = "https://github.com/seqdb/seqdb"
 package.readme = "README.md"
@@ -27,9 +27,9 @@ inherits = "release"
 log = "0.4.27"
 parking_lot = "0.12.4"
 rayon = "1.11.0"
-seqdb = { version = "0.2.3", path = "crates/seqdb" }
-vecdb = { version = "0.2.3", path = "crates/vecdb" }
-vecdb_derive = { version = "0.2.3", path = "crates/vecdb_derive" }
+seqdb = { version = "0.2.4", path = "crates/seqdb" }
+vecdb = { version = "0.2.4", path = "crates/vecdb" }
+vecdb_derive = { version = "0.2.4", path = "crates/vecdb_derive" }
 zerocopy = "0.8.26"
 zerocopy-derive = "0.8.26"
 
