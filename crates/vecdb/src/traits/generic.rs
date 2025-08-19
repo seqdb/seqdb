@@ -275,21 +275,38 @@ where
         self.truncate_if_needed_(index.to_usize()?)
     }
     fn truncate_if_needed_(&mut self, index: usize) -> Result<()> {
-        let has_new_data = !self.is_pushed_empty();
-        let has_bad_hole = self.holes().last().is_some_and(|&h| h >= index);
-        let has_bad_update = self
-            .updated()
-            .last_key_value()
-            .is_some_and(|(&k, _)| k >= index);
-        if has_new_data || has_bad_hole || has_bad_update {
-            dbg!(self.pushed(), self.holes(), self.updated());
-            return Err(Error::Str("Expect clean/flushed state before truncating."));
-        }
-        let mut stored_len = self.mut_stored_len();
-        if index >= *stored_len {
+        let stored_len = self.stored_len();
+        let pushed_len = self.pushed_len();
+        let len = stored_len + pushed_len;
+
+        if index >= len {
             return Ok(());
         }
-        *stored_len = index;
+
+        if self.holes().last().is_some_and(|&h| h >= index) {
+            self.mut_holes().retain(|&i| i < index);
+        }
+
+        if self
+            .updated()
+            .last_key_value()
+            .is_some_and(|(&k, _)| k >= index)
+        {
+            self.mut_updated().retain(|&i, _| i < index);
+        }
+
+        if index <= stored_len {
+            self.mut_pushed().clear();
+        } else {
+            self.mut_pushed().truncate(index - stored_len);
+        }
+
+        if index >= stored_len {
+            return Ok(());
+        }
+
+        *self.mut_stored_len() = index;
+
         Ok(())
     }
 
@@ -423,6 +440,10 @@ where
     }
 
     fn rollback_before(&mut self, stamp: Stamp) -> Result<Stamp> {
+        if self.stamp() < stamp {
+            return Ok(self.stamp());
+        }
+
         let dir = fs::read_dir(self.changes_path())?
             .filter_map(|entry| {
                 let path = entry.ok()?.path();

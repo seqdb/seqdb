@@ -433,19 +433,6 @@ where
         &mut self.updated
     }
 
-    fn truncate_if_needed(&mut self, index: I) -> Result<()> {
-        if !self.is_pushed_empty() || !self.holes.is_empty() || !self.updated.is_empty() {
-            return Err(Error::Str("Expect clean/flushed state before truncating."));
-        }
-        let index = index.to_usize()?;
-        let mut stored_len = self.stored_len.write();
-        if index >= *stored_len {
-            return Ok(());
-        }
-        *stored_len = index;
-        Ok(())
-    }
-
     fn reset(&mut self) -> Result<()> {
         self.reset_()
     }
