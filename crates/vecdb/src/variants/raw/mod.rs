@@ -33,10 +33,14 @@ pub struct RawVec<I, T> {
 
     header: Header,
     name: &'static str,
+    prev_pushed: Vec<T>,
     pushed: Vec<T>,
     has_stored_holes: bool,
     holes: BTreeSet<usize>,
+    prev_holes: BTreeSet<usize>,
     updated: BTreeMap<usize, T>,
+    prev_updated: BTreeMap<usize, T>,
+    prev_stored_len: usize,
     stored_len: Arc<RwLock<usize>>,
     /// Default is 0
     saved_stamped_changes: u16,
@@ -123,47 +127,30 @@ where
             None
         };
 
-        let s = Self {
+        let mut s = Self {
             db: db.clone(),
             region: region.clone(),
             region_index,
             header,
             name: Box::leak(Box::new(name.to_string())),
+            prev_pushed: vec![],
             pushed: vec![],
             has_stored_holes: holes.is_some(),
-            holes: holes.unwrap_or_default(),
+            holes: holes.clone().unwrap_or_default(),
+            prev_holes: holes.unwrap_or_default(),
             updated: BTreeMap::new(),
+            prev_updated: BTreeMap::new(),
             phantom: PhantomData,
+            prev_stored_len: 0,
             stored_len: Arc::new(RwLock::new(0)),
             saved_stamped_changes,
         };
 
-        *s.stored_len.write() = s.real_stored_len();
+        let len = s.real_stored_len();
+        s.prev_stored_len = len;
+        *s.stored_len.write() = len;
 
         Ok(s)
-    }
-
-    fn read_holes(&self) -> Result<Option<BTreeSet<usize>>> {
-        Self::read_holes_(&self.db, self.name)
-    }
-
-    fn read_holes_(db: &Database, name: &str) -> Result<Option<BTreeSet<usize>>> {
-        Ok(
-            if let Ok(holes) = db.get_region(Self::holes_region_name_(name).into()) {
-                Some(
-                    holes
-                        .create_reader(db)
-                        .read_all()
-                        .chunks(size_of::<usize>())
-                        .map(|b| -> Result<usize> {
-                            usize::read_from_bytes(b).map_err(|e| e.into())
-                        })
-                        .collect::<Result<BTreeSet<usize>>>()?,
-                )
-            } else {
-                None
-            },
-        )
     }
 
     #[inline]
@@ -189,6 +176,10 @@ where
         }
         Ok(())
     }
+
+    pub fn prev_holes(&self) -> &BTreeSet<usize> {
+        &self.prev_holes
+    }
 }
 
 impl<I, T> Clone for RawVec<I, T> {
@@ -199,10 +190,14 @@ impl<I, T> Clone for RawVec<I, T> {
             region_index: self.region_index,
             header: self.header.clone(),
             name: self.name,
+            prev_pushed: vec![],
             pushed: vec![],
             updated: BTreeMap::new(),
+            prev_updated: BTreeMap::new(),
             has_stored_holes: false,
             holes: BTreeSet::new(),
+            prev_holes: BTreeSet::new(),
+            prev_stored_len: 0,
             stored_len: self.stored_len.clone(),
             saved_stamped_changes: self.saved_stamped_changes,
             phantom: PhantomData,
@@ -280,15 +275,26 @@ where
         assert!(stored_len <= real_stored_len);
         let truncated = stored_len != real_stored_len;
         let has_new_data = pushed_len != 0;
+        let has_prev_updated_data = !self.prev_updated.is_empty();
         let has_updated_data = !self.updated.is_empty();
         let has_holes = !self.holes.is_empty();
-        let had_holes = self.has_stored_holes && !has_holes;
+        let had_holes = !self.prev_holes.is_empty() || self.has_stored_holes;
 
-        if !truncated && !has_new_data && !has_updated_data && !has_holes && !had_holes {
+        if !truncated
+            && !has_new_data
+            && !has_prev_updated_data
+            && !has_updated_data
+            && !has_holes
+            && !had_holes
+        {
             return Ok(());
         }
 
         let from = (stored_len * Self::SIZE_OF_T + HEADER_OFFSET) as u64;
+
+        self.prev_stored_len = stored_len;
+
+        self.prev_pushed = self.pushed.clone();
 
         if has_new_data {
             let mut mut_stored_len = self.stored_len.write();
@@ -302,35 +308,46 @@ where
             self.db.truncate_region(self.region_index.into(), from)?;
         }
 
-        if has_updated_data {
-            mem::take(&mut self.updated)
-                .into_iter()
-                .try_for_each(|(i, v)| -> Result<()> {
-                    let bytes = v.as_bytes();
-                    let at = ((i * Self::SIZE_OF_T) + HEADER_OFFSET) as u64;
-                    self.db
-                        .write_all_to_region_at(self.region_index.into(), bytes, at)?;
-                    Ok(())
-                })?;
+        let reader = self.create_reader();
+        // let prev_values = self
+        //     .updated
+        //     .keys()
+        //     .map(|&i| (i, self.unwrap_read_(i, &reader)))
+        //     .collect::<BTreeMap<_, _>>();
+        drop(reader);
+        dbg!(&self.updated);
+        dbg!(&self.prev_updated);
+        // self.prev_updated = prev_values;
+        dbg!(&self.prev_updated);
+
+        if has_updated_data || has_prev_updated_data {
+            let mut u = mem::take(&mut self.updated);
+            u.append(&mut mem::take(&mut self.prev_updated));
+            u.into_iter().try_for_each(|(i, v)| -> Result<()> {
+                let bytes = v.as_bytes();
+                let at = ((i * Self::SIZE_OF_T) + HEADER_OFFSET) as u64;
+                self.db
+                    .write_all_to_region_at(self.region_index.into(), bytes, at)?;
+                Ok(())
+            })?;
         }
 
-        if has_holes || had_holes {
-            if has_holes {
-                self.has_stored_holes = true;
-                let (holes_index, _) =
-                    self.db.create_region_if_needed(&self.holes_region_name())?;
-                let bytes = self
-                    .holes
-                    .iter()
-                    .flat_map(|i| i.to_ne_bytes())
-                    .collect::<Vec<_>>();
-                self.db
-                    .truncate_write_all_to_region(holes_index.into(), 0, &bytes)?;
-            } else if had_holes {
-                self.has_stored_holes = false;
-                let _ = self.db.remove_region(self.holes_region_name().into());
-            }
+        if has_holes {
+            self.has_stored_holes = true;
+            let (holes_index, _) = self.db.create_region_if_needed(&self.holes_region_name())?;
+            let bytes = self
+                .holes
+                .iter()
+                .flat_map(|i| i.to_ne_bytes())
+                .collect::<Vec<_>>();
+            self.db
+                .truncate_write_all_to_region(holes_index.into(), 0, &bytes)?;
+        } else if had_holes {
+            self.has_stored_holes = false;
+            let _ = self.db.remove_region(self.holes_region_name().into());
         }
+
+        self.prev_holes = self.holes.clone();
 
         Ok(())
     }
@@ -353,14 +370,24 @@ where
 
         bytes.extend(self.stamp().as_bytes());
 
-        let prev_stored_len = self.real_stored_len();
+        // let real_stored_len = self.real_stored_len();
+        let prev_stored_len = self.prev_stored_len();
         let stored_len = self.stored_len();
 
+        bytes.extend(prev_stored_len.as_bytes());
         bytes.extend(stored_len.as_bytes());
 
         let truncated = prev_stored_len.checked_sub(stored_len).unwrap_or_default();
         bytes.extend(truncated.as_bytes());
         if truncated > 0 {
+            // dbg!((
+            //     "trunc",
+            //     stored_len,
+            //     prev_stored_len,
+            //     (stored_len..prev_stored_len)
+            //         .map(|i| self.unwrap_read_(i, &reader))
+            //         .collect::<Vec<_>>()
+            // ));
             bytes.extend(
                 (stored_len..prev_stored_len)
                     .map(|i| self.unwrap_read_(i, &reader))
@@ -369,13 +396,20 @@ where
             );
         }
 
-        let prev_holes = if self.has_stored_holes {
-            self.read_holes()?.unwrap().into_iter().collect::<Vec<_>>()
-        } else {
-            vec![]
-        };
-        bytes.extend(prev_holes.len().as_bytes());
-        bytes.extend(prev_holes.as_bytes());
+        bytes.extend(self.prev_pushed.len().as_bytes());
+        bytes.extend(self.prev_pushed.iter().flat_map(|v| v.as_bytes()));
+
+        bytes.extend(self.pushed.len().as_bytes());
+        bytes.extend(self.pushed.iter().flat_map(|v| v.as_bytes()));
+
+        let (prev_modified_indexes, prev_modified_values) = self
+            .prev_updated
+            .iter()
+            .map(|(&i, v)| (i, v.clone()))
+            .collect::<(Vec<_>, Vec<_>)>();
+        bytes.extend(prev_modified_indexes.len().as_bytes());
+        bytes.extend(prev_modified_indexes.as_bytes());
+        bytes.extend(prev_modified_values.as_bytes());
 
         let (modified_indexes, modified_values) = self
             .updated
@@ -385,6 +419,14 @@ where
         bytes.extend(modified_indexes.len().as_bytes());
         bytes.extend(modified_indexes.as_bytes());
         bytes.extend(modified_values.as_bytes());
+
+        let prev_holes = self.prev_holes.iter().copied().collect::<Vec<_>>();
+        bytes.extend(prev_holes.len().as_bytes());
+        bytes.extend(prev_holes.as_bytes());
+
+        let holes = self.holes.iter().copied().collect::<Vec<_>>();
+        bytes.extend(holes.len().as_bytes());
+        bytes.extend(holes.as_bytes());
 
         Ok(bytes)
     }
@@ -410,6 +452,14 @@ where
     fn mut_pushed(&mut self) -> &mut Vec<T> {
         &mut self.pushed
     }
+    #[inline]
+    fn prev_pushed(&self) -> &[T] {
+        self.prev_pushed.as_slice()
+    }
+    #[inline]
+    fn mut_prev_pushed(&mut self) -> &mut Vec<T> {
+        &mut self.prev_pushed
+    }
 
     #[inline]
     fn holes(&self) -> &BTreeSet<usize> {
@@ -419,7 +469,21 @@ where
     fn mut_holes(&mut self) -> &mut BTreeSet<usize> {
         &mut self.holes
     }
+    #[inline]
+    fn prev_holes(&self) -> &BTreeSet<usize> {
+        &self.prev_holes
+    }
+    #[inline]
+    fn mut_prev_holes(&mut self) -> &mut BTreeSet<usize> {
+        &mut self.prev_holes
+    }
 
+    fn prev_stored_len(&self) -> usize {
+        self.prev_stored_len
+    }
+    fn mut_prev_stored_len(&mut self) -> &mut usize {
+        &mut self.prev_stored_len
+    }
     fn mut_stored_len(&'_ self) -> RwLockWriteGuard<'_, usize> {
         self.stored_len.write()
     }
@@ -431,6 +495,14 @@ where
     #[inline]
     fn mut_updated(&mut self) -> &mut BTreeMap<usize, T> {
         &mut self.updated
+    }
+    #[inline]
+    fn prev_updated(&self) -> &BTreeMap<usize, T> {
+        &self.prev_updated
+    }
+    #[inline]
+    fn mut_prev_updated(&mut self) -> &mut BTreeMap<usize, T> {
+        &mut self.prev_updated
     }
 
     fn reset(&mut self) -> Result<()> {

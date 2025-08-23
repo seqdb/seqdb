@@ -201,6 +201,20 @@ where
             StoredVec::Compressed(v) => v.mut_pushed(),
         }
     }
+    #[inline]
+    fn prev_pushed(&self) -> &[T] {
+        match self {
+            StoredVec::Raw(v) => v.prev_pushed(),
+            StoredVec::Compressed(v) => v.prev_pushed(),
+        }
+    }
+    #[inline]
+    fn mut_prev_pushed(&mut self) -> &mut Vec<T> {
+        match self {
+            StoredVec::Raw(v) => v.mut_prev_pushed(),
+            StoredVec::Compressed(v) => v.mut_prev_pushed(),
+        }
+    }
 
     #[inline]
     fn holes(&self) -> &BTreeSet<usize> {
@@ -214,6 +228,20 @@ where
         match self {
             StoredVec::Raw(v) => v.mut_holes(),
             StoredVec::Compressed(v) => v.mut_holes(),
+        }
+    }
+    #[inline]
+    fn prev_holes(&self) -> &BTreeSet<usize> {
+        match self {
+            StoredVec::Raw(v) => v.prev_holes(),
+            StoredVec::Compressed(v) => v.prev_holes(),
+        }
+    }
+    #[inline]
+    fn mut_prev_holes(&mut self) -> &mut BTreeSet<usize> {
+        match self {
+            StoredVec::Raw(v) => v.mut_prev_holes(),
+            StoredVec::Compressed(v) => v.mut_prev_holes(),
         }
     }
 
@@ -231,11 +259,37 @@ where
             StoredVec::Compressed(v) => v.mut_updated(),
         }
     }
+    #[inline]
+    fn prev_updated(&self) -> &BTreeMap<usize, T> {
+        match self {
+            StoredVec::Raw(v) => v.prev_updated(),
+            StoredVec::Compressed(v) => v.prev_updated(),
+        }
+    }
+    #[inline]
+    fn mut_prev_updated(&mut self) -> &mut BTreeMap<usize, T> {
+        match self {
+            StoredVec::Raw(v) => v.mut_prev_updated(),
+            StoredVec::Compressed(v) => v.mut_prev_updated(),
+        }
+    }
 
     fn mut_stored_len(&'_ self) -> RwLockWriteGuard<'_, usize> {
         match self {
             StoredVec::Raw(v) => v.mut_stored_len(),
             StoredVec::Compressed(v) => v.mut_stored_len(),
+        }
+    }
+    fn prev_stored_len(&self) -> usize {
+        match self {
+            StoredVec::Raw(v) => v.prev_stored_len(),
+            StoredVec::Compressed(v) => v.prev_stored_len(),
+        }
+    }
+    fn mut_prev_stored_len(&mut self) -> &mut usize {
+        match self {
+            StoredVec::Raw(v) => v.mut_prev_stored_len(),
+            StoredVec::Compressed(v) => v.mut_prev_stored_len(),
         }
     }
 

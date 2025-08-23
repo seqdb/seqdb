@@ -44,6 +44,7 @@ pub type ComputedVecFrom2<I, T, S1I, S1T, S2I, S2T> =
 pub type ComputedVecFrom3<I, T, S1I, S1T, S2I, S2T, S3I, S3T> =
     ComputedVec<I, T, S1I, S1T, S2I, S2T, S3I, S3T>;
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone)]
 pub enum ComputedVec<I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where

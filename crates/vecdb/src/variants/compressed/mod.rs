@@ -361,12 +361,28 @@ where
         self.inner.mut_pushed()
     }
     #[inline]
+    fn prev_pushed(&self) -> &[T] {
+        self.inner.prev_pushed()
+    }
+    #[inline]
+    fn mut_prev_pushed(&mut self) -> &mut Vec<T> {
+        self.inner.mut_prev_pushed()
+    }
+    #[inline]
     fn holes(&self) -> &BTreeSet<usize> {
         self.inner.holes()
     }
     #[inline]
     fn mut_holes(&mut self) -> &mut BTreeSet<usize> {
-        panic!("unsupported")
+        panic!("unsupported for now")
+    }
+    #[inline]
+    fn prev_holes(&self) -> &BTreeSet<usize> {
+        self.inner.prev_holes()
+    }
+    #[inline]
+    fn mut_prev_holes(&mut self) -> &mut BTreeSet<usize> {
+        panic!("unsupported for now")
     }
     #[inline]
     fn updated(&self) -> &BTreeMap<usize, T> {
@@ -374,12 +390,28 @@ where
     }
     #[inline]
     fn mut_updated(&mut self) -> &mut BTreeMap<usize, T> {
-        panic!("unsupported")
+        panic!("unsupported for now")
+    }
+    #[inline]
+    fn prev_updated(&self) -> &BTreeMap<usize, T> {
+        self.inner.prev_updated()
+    }
+    #[inline]
+    fn mut_prev_updated(&mut self) -> &mut BTreeMap<usize, T> {
+        panic!("unsupported for now")
     }
 
     #[inline]
     fn mut_stored_len(&'_ self) -> RwLockWriteGuard<'_, usize> {
         self.inner.mut_stored_len()
+    }
+    #[inline]
+    fn prev_stored_len(&self) -> usize {
+        self.inner.prev_stored_len()
+    }
+    #[inline]
+    fn mut_prev_stored_len(&mut self) -> &mut usize {
+        self.inner.mut_prev_stored_len()
     }
 
     fn reset(&mut self) -> Result<()> {

@@ -1154,6 +1154,14 @@ where
     fn mut_pushed(&mut self) -> &mut Vec<T> {
         self.0.mut_pushed()
     }
+    #[inline]
+    fn prev_pushed(&self) -> &[T] {
+        self.0.prev_pushed()
+    }
+    #[inline]
+    fn mut_prev_pushed(&mut self) -> &mut Vec<T> {
+        self.0.mut_prev_pushed()
+    }
 
     #[inline]
     fn holes(&self) -> &BTreeSet<usize> {
@@ -1162,6 +1170,14 @@ where
     #[inline]
     fn mut_holes(&mut self) -> &mut BTreeSet<usize> {
         self.0.mut_holes()
+    }
+    #[inline]
+    fn prev_holes(&self) -> &BTreeSet<usize> {
+        self.0.prev_holes()
+    }
+    #[inline]
+    fn mut_prev_holes(&mut self) -> &mut BTreeSet<usize> {
+        self.0.mut_prev_holes()
     }
 
     #[inline]
@@ -1172,10 +1188,27 @@ where
     fn mut_updated(&mut self) -> &mut BTreeMap<usize, T> {
         self.0.mut_updated()
     }
+    #[inline]
+    fn prev_updated(&self) -> &BTreeMap<usize, T> {
+        self.0.prev_updated()
+    }
+    #[inline]
+    fn mut_prev_updated(&mut self) -> &mut BTreeMap<usize, T> {
+        self.0.mut_prev_updated()
+    }
 
     #[inline]
     fn mut_stored_len(&'_ self) -> RwLockWriteGuard<'_, usize> {
         self.0.mut_stored_len()
+    }
+
+    #[inline]
+    fn prev_stored_len(&self) -> usize {
+        self.0.prev_stored_len()
+    }
+    #[inline]
+    fn mut_prev_stored_len(&mut self) -> &mut usize {
+        self.0.mut_prev_stored_len()
     }
 
     #[inline]
