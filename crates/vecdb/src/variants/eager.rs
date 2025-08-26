@@ -4,6 +4,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     f32,
     fmt::Debug,
+    iter::Sum,
     ops::{Add, Div, Mul, Sub},
 };
 
@@ -881,6 +882,83 @@ where
         self.safe_flush(exit)
     }
 
+    pub fn compute_ema<T2>(
+        &mut self,
+        max_from: I,
+        source: &impl CollectableVec<I, T2>,
+        ema: usize,
+        exit: &Exit,
+    ) -> Result<()>
+    where
+        T: From<T2> + From<f32>,
+        T2: StoredRaw + Div<usize, Output = T2> + Sum,
+        f32: From<T2> + From<T>,
+    {
+        self.compute_ema_(max_from, source, ema, exit, None)
+    }
+
+    pub fn compute_ema_<T2>(
+        &mut self,
+        max_from: I,
+        source: &impl CollectableVec<I, T2>,
+        ema: usize,
+        exit: &Exit,
+        min_i: Option<I>,
+    ) -> Result<()>
+    where
+        T: From<T2> + From<f32>,
+        T2: StoredRaw + Div<usize, Output = T2> + Sum,
+        f32: From<T2> + From<T>,
+    {
+        self.validate_computed_version_or_reset(
+            Version::new(3) + self.inner_version() + source.version(),
+        )?;
+
+        let smoothing: f32 = 2.0;
+        let k = smoothing / (ema as f32 + 1.0);
+        let _1_minus_k = 1.0 - k;
+
+        let index = max_from.min(I::from(self.len()));
+        let mut prev = None;
+        let min_prev_i = min_i.unwrap_or_default().unwrap_to_usize();
+        source.iter_at(index).try_for_each(|(index, value)| {
+            let value = value.into_owned();
+
+            if min_i.is_none() || min_i.is_some_and(|min_i| min_i <= index) {
+                let i = index.unwrap_to_usize();
+
+                if prev.is_none() {
+                    prev.replace(if i > min_prev_i {
+                        self.into_iter().unwrap_get_inner_(i - 1)
+                    } else {
+                        T::from(0.0)
+                    });
+                }
+
+                let processed_values_count = i - min_prev_i + 1;
+
+                let value = f32::from(value);
+
+                let ema = if processed_values_count > ema {
+                    let prev = f32::from(prev.unwrap());
+                    let prev = if prev.is_nan() { 0.0 } else { prev };
+                    T::from((value * k) + (prev * _1_minus_k))
+                } else {
+                    let len = (processed_values_count).min(ema);
+                    let prev = f32::from(prev.unwrap());
+                    T::from((prev * (len - 1) as f32 + value) / len as f32)
+                };
+
+                prev.replace(ema);
+                self.forced_push_at(index, ema, exit)
+            } else {
+                self.forced_push_at(index, T::from(f32::NAN), exit)
+            }
+        })?;
+
+        self.safe_flush(exit)
+    }
+
     pub fn compute_previous_value<T2>(
         &mut self,
         max_from: I,
@@ -1021,7 +1099,7 @@ where
     pub fn compute_zscore<T2, T3, T4>(
         &mut self,
         max_from: I,
-        ratio: &impl AnyIterableVec<I, T2>,
+        source: &impl AnyIterableVec<I, T2>,
         sma: &impl AnyIterableVec<I, T3>,
         sd: &impl AnyIterableVec<I, T4>,
         exit: &Exit,
@@ -1039,7 +1117,7 @@ where
 
         self.compute_transform(
             max_from,
-            ratio,
+            source,
             |(i, ratio, ..)| {
                 let sma = sma_iter.unwrap_get_inner(i);
                 let sd = sd_iter.unwrap_get_inner(i);
