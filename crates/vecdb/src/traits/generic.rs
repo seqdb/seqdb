@@ -10,7 +10,7 @@ use parking_lot::RwLockWriteGuard;
 use seqdb::Reader;
 use zerocopy::FromBytes;
 
-use crate::{AnyStoredVec, Error, Exit, Result, Stamp};
+use crate::{_TO_, AnyStoredVec, Error, Exit, Result, Stamp};
 
 const ONE_KIB: usize = 1024;
 const ONE_MIB: usize = ONE_KIB * ONE_KIB;
@@ -45,6 +45,9 @@ where
             std::mem::transmute(
                 self.db()
                     .create_region_reader(self.region_index().into())
+                    .inspect_err(|_| {
+                        dbg!(self.region_index());
+                    })
                     .unwrap(),
             )
         }
@@ -643,15 +646,12 @@ where
             .collect::<Result<Vec<_>>>()
     }
 
-    fn index_to_name(&self) -> String {
-        format!("{}_to_{}", I::to_string(), self.name())
-    }
-
     fn vec_region_name(&self) -> String {
         Self::vec_region_name_(self.name())
     }
+    // MUST BE in sync with AnyVec::index_to_name
     fn vec_region_name_(name: &str) -> String {
-        format!("{}_to_{name}", I::to_string())
+        format!("{}{_TO_}{}", I::to_string(), name)
     }
 
     fn holes_region_name(&self) -> String {

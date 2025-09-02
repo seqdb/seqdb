@@ -9,6 +9,8 @@ pub fn i64_to_usize(i: i64, len: usize) -> usize {
     }
 }
 
+pub const _TO_: &str = "_to_";
+
 pub trait AnyVec: Send + Sync {
     fn version(&self) -> Version;
     fn name(&self) -> &str;
@@ -17,6 +19,10 @@ pub trait AnyVec: Send + Sync {
         self.len() == 0
     }
     fn index_type_to_string(&self) -> &'static str;
+    fn index_to_name(&self) -> String {
+        format!("{}{_TO_}{}", self.index_type_to_string(), self.name())
+    }
+    fn region_names(&self) -> Vec<String>;
     fn value_type_to_size_of(&self) -> usize;
     fn etag(&self, stamp: Stamp, to: Option<i64>) -> String {
         let len = self.len();

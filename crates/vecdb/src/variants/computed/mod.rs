@@ -303,6 +303,16 @@ where
     fn value_type_to_size_of(&self) -> usize {
         size_of::<T>()
     }
+
+    #[inline]
+    fn region_names(&self) -> Vec<String> {
+        match self {
+            ComputedVec::Eager { vec, .. } => vec.region_names(),
+            ComputedVec::LazyFrom1(v) => v.region_names(),
+            ComputedVec::LazyFrom2(v) => v.region_names(),
+            ComputedVec::LazyFrom3(v) => v.region_names(),
+        }
+    }
 }
 
 pub enum ComputedVecIterator<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T>

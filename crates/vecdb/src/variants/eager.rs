@@ -1158,6 +1158,11 @@ where
     fn value_type_to_size_of(&self) -> usize {
         size_of::<T>()
     }
+
+    #[inline]
+    fn region_names(&self) -> Vec<String> {
+        self.0.region_names()
+    }
 }
 
 impl<I, T> AnyStoredVec for EagerVec<I, T>

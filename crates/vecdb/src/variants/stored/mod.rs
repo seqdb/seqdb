@@ -88,6 +88,14 @@ where
     fn value_type_to_size_of(&self) -> usize {
         size_of::<T>()
     }
+
+    #[inline]
+    fn region_names(&self) -> Vec<String> {
+        match self {
+            StoredVec::Raw(v) => v.region_names(),
+            StoredVec::Compressed(v) => v.region_names(),
+        }
+    }
 }
 
 impl<I, T> AnyStoredVec for StoredVec<I, T>

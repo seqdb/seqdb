@@ -234,6 +234,11 @@ where
     fn value_type_to_size_of(&self) -> usize {
         size_of::<T>()
     }
+
+    #[inline]
+    fn region_names(&self) -> Vec<String> {
+        vec![self.index_to_name()]
+    }
 }
 
 impl<I, T> AnyStoredVec for RawVec<I, T>

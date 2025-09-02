@@ -157,6 +157,9 @@ where
         iter
     }
 
+    fn pages_region_name(&self) -> String {
+        Self::pages_region_name_(self.name())
+    }
     fn pages_region_name_(name: &str) -> String {
         format!("{}_pages", Self::vec_region_name_(name))
     }
@@ -199,6 +202,13 @@ where
     #[inline]
     fn value_type_to_size_of(&self) -> usize {
         size_of::<T>()
+    }
+
+    #[inline]
+    fn region_names(&self) -> Vec<String> {
+        let mut v = self.inner.region_names();
+        v.push(self.pages_region_name());
+        v
     }
 }
 

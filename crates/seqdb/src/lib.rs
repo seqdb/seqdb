@@ -5,6 +5,7 @@
 #![doc = "```\n"]
 
 use std::{
+    collections::HashSet,
     fs::{self, File, OpenOptions},
     ops::Deref,
     os::unix::io::AsRawFd,
@@ -409,6 +410,22 @@ impl DatabaseInner {
         drop(region_);
 
         Ok(Some(region))
+    }
+
+    pub fn retain_regions(&self, mut ids: HashSet<String>) -> Result<()> {
+        let ids_to_remove = self
+            .regions
+            .read()
+            .id_to_index()
+            .keys()
+            .filter(|id| !ids.remove(&**id))
+            .cloned()
+            .collect::<Vec<String>>();
+
+        ids_to_remove.into_iter().try_for_each(|id| -> Result<()> {
+            self.remove_region(id.into())?;
+            Ok(())
+        })
     }
 
     fn create_mmap(file: &File) -> Result<MmapMut> {

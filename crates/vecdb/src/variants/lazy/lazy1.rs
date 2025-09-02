@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use crate::{
-    AnyCollectableVec, AnyIterableVec, AnyVec, BaseVecIterator, AnyBoxedIterableVec,
+    AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BaseVecIterator,
     BoxedVecIterator, CollectableVec, Result, StoredIndex, StoredRaw, Version,
 };
 
@@ -148,6 +148,11 @@ where
     #[inline]
     fn value_type_to_size_of(&self) -> usize {
         size_of::<T>()
+    }
+
+    #[inline]
+    fn region_names(&self) -> Vec<String> {
+        vec![]
     }
 }
 
