@@ -355,9 +355,10 @@ where
         let mut multiplier_iter = multiplier.iter();
 
         multiplied.iter_at(index).try_for_each(|(i, v)| {
-            let v = v.into_owned() * multiplier_iter.unwrap_get_inner(i);
-
-            self.forced_push_at(i, v.into(), exit)
+            let multiplied = v.into_owned();
+            let multiplier = multiplier_iter.unwrap_get_inner(i);
+            let result = multiplied * multiplier;
+            self.forced_push_at(i, result.into(), exit)
         })?;
 
         self.safe_flush(exit)
