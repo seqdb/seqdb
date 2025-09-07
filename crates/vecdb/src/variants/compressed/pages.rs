@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use allocative::Allocative;
 use parking_lot::RwLock;
 use seqdb::{Database, Region, RegionReader};
 use zerocopy::{FromBytes, IntoBytes};
@@ -8,7 +9,7 @@ use crate::Result;
 
 use super::Page;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Allocative)]
 pub struct Pages {
     _region: Arc<RwLock<Region>>,
     region_index: usize,

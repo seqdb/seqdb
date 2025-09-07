@@ -12,6 +12,8 @@ rust-version.workspace = true
 build = "build.rs"
 
 [dependencies]
+allocative = { workspace = true }
+allocative_derive = { workspace = true }
 libc = "0.2.175"
 log = { workspace = true }
 memmap2 = "0.9.7"

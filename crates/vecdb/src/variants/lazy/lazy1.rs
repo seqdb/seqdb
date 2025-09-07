@@ -1,5 +1,7 @@
 use std::borrow::Cow;
 
+use allocative::Allocative;
+
 use crate::{
     AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BaseVecIterator,
     BoxedVecIterator, CollectableVec, Result, StoredIndex, StoredRaw, Version,
@@ -8,14 +10,16 @@ use crate::{
 pub type ComputeFrom1<I, T, S1I, S1T> =
     for<'a> fn(I, &mut dyn BaseVecIterator<Item = (S1I, Cow<'a, S1T>)>) -> Option<T>;
 
-#[derive(Clone)]
+#[derive(Clone, Allocative)]
 pub struct LazyVecFrom1<I, T, S1I, S1T>
 where
     S1T: Clone,
 {
     name: String,
     version: Version,
+    #[allocative(skip)]
     source: AnyBoxedIterableVec<S1I, S1T>,
+    #[allocative(skip)]
     compute: ComputeFrom1<I, T, S1I, S1T>,
 }
 

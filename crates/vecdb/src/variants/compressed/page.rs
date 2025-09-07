@@ -1,6 +1,7 @@
+use allocative::Allocative;
 use zerocopy_derive::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
-#[derive(Debug, Clone, IntoBytes, Immutable, FromBytes, KnownLayout)]
+#[derive(Debug, Clone, IntoBytes, Immutable, FromBytes, KnownLayout, Allocative)]
 #[repr(C)]
 pub struct Page {
     pub start: u64,

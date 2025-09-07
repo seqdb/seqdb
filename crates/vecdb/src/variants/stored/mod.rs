@@ -3,6 +3,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
 };
 
+use allocative::Allocative;
 use parking_lot::{RwLock, RwLockWriteGuard};
 use seqdb::{Database, Reader, Region};
 
@@ -18,7 +19,7 @@ mod format;
 
 pub use format::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Allocative)]
 pub enum StoredVec<I, T> {
     Raw(RawVec<I, T>),
     Compressed(CompressedVec<I, T>),

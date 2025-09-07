@@ -18,6 +18,8 @@ build = "build.rs"
 derive = ["vecdb_derive"]
 
 [dependencies]
+allocative = { version = "0.3.4", features = ["parking_lot"] }
+allocative_derive = { workspace = true }
 ctrlc = { version = "3.4.7", features = ["termination"] }
 log = { workspace = true }
 parking_lot = { workspace = true }

@@ -24,6 +24,8 @@ debug = true
 inherits = "release"
 
 [workspace.dependencies]
+allocative = "0.3.4"
+allocative_derive = "0.3.3"
 log = "0.4.27"
 parking_lot = "0.12.4"
 rayon = "1.11.0"

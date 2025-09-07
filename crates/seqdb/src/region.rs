@@ -1,10 +1,11 @@
+use allocative::Allocative;
 use memmap2::MmapMut;
 use parking_lot::RwLockReadGuard;
 use zerocopy_derive::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 use super::{DatabaseInner, PAGE_SIZE, Reader};
 
-#[derive(Debug, Clone, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Debug, Clone, FromBytes, IntoBytes, Immutable, KnownLayout, Allocative)]
 #[repr(C)]
 pub struct Region {
     /// Must be multiple of 4096

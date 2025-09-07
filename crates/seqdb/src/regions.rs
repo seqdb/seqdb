@@ -6,6 +6,7 @@ use std::{
     sync::Arc,
 };
 
+use allocative::Allocative;
 use memmap2::MmapMut;
 use parking_lot::{RwLock, RwLockWriteGuard};
 use zerocopy::{FromBytes, IntoBytes};
@@ -17,12 +18,14 @@ use super::{
     region::{Region, SIZE_OF_REGION},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Allocative)]
 pub struct Regions {
     id_to_index: HashMap<String, usize>,
     id_to_index_path: PathBuf,
     index_to_region: Vec<Option<Arc<RwLock<Region>>>>,
+    #[allocative(skip)]
     index_to_region_file: File,
+    #[allocative(skip)]
     index_to_region_mmap: MmapMut,
 }
 

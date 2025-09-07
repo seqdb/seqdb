@@ -1,9 +1,12 @@
 use std::{
     borrow::Cow,
     collections::{BTreeMap, BTreeSet},
+    mem,
     sync::Arc,
 };
 
+use allocative::Allocative;
+use log::info;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use rayon::prelude::*;
 use seqdb::{Database, Reader, Region};
@@ -27,7 +30,7 @@ const PCO_COMPRESSION_LEVEL: usize = 4;
 
 const VERSION: Version = Version::TWO;
 
-#[derive(Debug)]
+#[derive(Debug, Allocative)]
 pub struct CompressedVec<I, T> {
     inner: RawVec<I, T>,
     pages: Arc<RwLock<Pages>>,
@@ -54,6 +57,7 @@ where
             | Err(Error::WrongEndian)
             | Err(Error::WrongLength)
             | Err(Error::DifferentVersion { .. }) => {
+                info!("Resetting {}...", options.name);
                 let _ = options
                     .db
                     .remove_region(Self::vec_region_name_(options.name).into());
@@ -300,7 +304,7 @@ where
                 .map_or(offset, |page| page.start + page.bytes as u64)
         };
 
-        values.append(self.inner.mut_pushed());
+        values.append(&mut mem::take(self.inner.mut_pushed()));
 
         let compressed = values
             .into_par_iter()

@@ -8,7 +8,7 @@ use std::{
     ops::{Add, Div, Mul, Sub},
 };
 
-use log::info;
+use allocative::Allocative;
 use parking_lot::{RwLock, RwLockWriteGuard};
 use seqdb::{Database, Reader, Region};
 
@@ -19,7 +19,7 @@ use crate::{
     variants::{Header, ImportOptions},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Allocative)]
 pub struct EagerVec<I, T>(StoredVec<I, T>);
 
 impl<I, T> EagerVec<I, T>
@@ -69,29 +69,6 @@ where
 
     pub fn inner_version(&self) -> Version {
         self.0.header().vec_version()
-    }
-
-    fn update_computed_version(&mut self, computed_version: Version) {
-        self.mut_header().update_computed_version(computed_version);
-    }
-
-    pub fn validate_computed_version_or_reset(&mut self, version: Version) -> Result<()> {
-        if version != self.header().computed_version() {
-            self.update_computed_version(version);
-            if !self.is_empty() {
-                self.reset()?;
-            }
-        }
-
-        if self.is_empty() {
-            info!(
-                "Computing {}_to_{}...",
-                self.index_type_to_string(),
-                self.name()
-            )
-        }
-
-        Ok(())
     }
 
     pub fn compute_to<F>(
@@ -364,7 +341,7 @@ where
         self.safe_flush(exit)
     }
 
-    pub fn compute_divide<T2, T3, T4, T5>(
+    pub fn compute_divide<T2, T3>(
         &mut self,
         max_from: I,
         divided: &impl AnyIterableVec<I, T2>,
@@ -372,87 +349,88 @@ where
         exit: &Exit,
     ) -> Result<()>
     where
-        T2: StoredRaw + Mul<usize, Output = T4>,
+        T2: StoredRaw,
         T3: StoredRaw,
-        T4: Div<T3, Output = T5> + From<T2>,
-        T5: CheckedSub<usize>,
-        T: From<T5>,
-    {
-        self.compute_divide_(max_from, divided, divider, exit, false, false)
-    }
-
-    pub fn compute_percentage<T2, T3, T4, T5>(
-        &mut self,
-        max_from: I,
-        divided: &impl AnyIterableVec<I, T2>,
-        divider: &impl AnyIterableVec<I, T3>,
-        exit: &Exit,
-    ) -> Result<()>
-    where
-        T2: StoredRaw + Mul<usize, Output = T4>,
-        T3: StoredRaw,
-        T4: Div<T3, Output = T5> + From<T2>,
-        T5: CheckedSub<usize>,
-        T: From<T5>,
-    {
-        self.compute_divide_(max_from, divided, divider, exit, true, false)
-    }
-
-    pub fn compute_percentage_difference<T2, T3, T4, T5>(
-        &mut self,
-        max_from: I,
-        divided: &impl AnyIterableVec<I, T2>,
-        divider: &impl AnyIterableVec<I, T3>,
-        exit: &Exit,
-    ) -> Result<()>
-    where
-        T2: StoredRaw + Mul<usize, Output = T4>,
-        T3: StoredRaw,
-        T4: Div<T3, Output = T5> + From<T2>,
-        T5: CheckedSub<usize>,
-        T: From<T5>,
-    {
-        self.compute_divide_(max_from, divided, divider, exit, true, true)
-    }
-
-    pub fn compute_divide_<T2, T3, T4, T5>(
-        &mut self,
-        max_from: I,
-        divided: &impl AnyIterableVec<I, T2>,
-        divider: &impl AnyIterableVec<I, T3>,
-        exit: &Exit,
-        as_percentage: bool,
-        as_difference: bool,
-    ) -> Result<()>
-    where
-        T2: StoredRaw + Mul<usize, Output = T4>,
-        T3: StoredRaw,
-        T4: Div<T3, Output = T5> + From<T2>,
-        T5: CheckedSub<usize>,
-        T: From<T5>,
+        T: From<T2> + Mul<usize, Output = T> + Div<T3, Output = T> + CheckedSub<usize>,
     {
         self.validate_computed_version_or_reset(
             Version::ONE + self.inner_version() + divided.version() + divider.version(),
         )?;
 
         let index = max_from.min(I::from(self.len()));
-        let multiplier = if as_percentage { 100 } else { 1 };
 
         let mut divider_iter = divider.iter();
         divided.iter_at(index).try_for_each(|(i, divided)| {
-            let divided = divided.into_owned();
+            let divided = T::from(divided.into_owned());
             let divider = divider_iter.unwrap_get_inner(i);
+            self.forced_push_at(i, divided / divider, exit)
+        })?;
 
-            let v = if as_percentage {
-                divided * multiplier
-            } else {
-                T4::from(divided)
-            };
+        self.safe_flush(exit)
+    }
+
+    pub fn compute_percentage<T2, T3>(
+        &mut self,
+        max_from: I,
+        divided: &impl AnyIterableVec<I, T2>,
+        divider: &impl AnyIterableVec<I, T3>,
+        exit: &Exit,
+    ) -> Result<()>
+    where
+        T2: StoredRaw,
+        T3: StoredRaw,
+        T: From<T2> + From<T3> + Mul<usize, Output = T> + Div<T, Output = T> + CheckedSub<usize>,
+    {
+        self.compute_percentage_(max_from, divided, divider, exit, false)
+    }
+
+    pub fn compute_percentage_difference<T2, T3>(
+        &mut self,
+        max_from: I,
+        divided: &impl AnyIterableVec<I, T2>,
+        divider: &impl AnyIterableVec<I, T3>,
+        exit: &Exit,
+    ) -> Result<()>
+    where
+        T2: StoredRaw,
+        T3: StoredRaw,
+        T: From<T2> + From<T3> + Mul<usize, Output = T> + Div<T, Output = T> + CheckedSub<usize>,
+    {
+        self.compute_percentage_(max_from, divided, divider, exit, true)
+    }
+
+    pub fn compute_percentage_<T2, T3>(
+        &mut self,
+        max_from: I,
+        divided: &impl AnyIterableVec<I, T2>,
+        divider: &impl AnyIterableVec<I, T3>,
+        exit: &Exit,
+        as_difference: bool,
+    ) -> Result<()>
+    where
+        T2: StoredRaw,
+        T3: StoredRaw,
+        T: From<T2> + From<T3> + Mul<usize, Output = T> + Div<T, Output = T> + CheckedSub<usize>,
+    {
+        self.validate_computed_version_or_reset(
+            Version::ONE + self.inner_version() + divided.version() + divider.version(),
+        )?;
+
+        let index = max_from.min(I::from(self.len()));
+        let multiplier = 100;
+
+        let mut divider_iter = divider.iter();
+        divided.iter_at(index).try_for_each(|(i, divided)| {
+            let divided = T::from(divided.into_owned());
+            let divider = T::from(divider_iter.unwrap_get_inner(i));
+
+            let v = divided * multiplier;
+
             let mut v = v / divider;
             if as_difference {
                 v = v.checked_sub(multiplier).unwrap();
             }
-            self.forced_push_at(i, T::from(v), exit)
+            self.forced_push_at(i, v, exit)
         })?;
 
         self.safe_flush(exit)
@@ -655,6 +633,56 @@ where
                 T::from(other_to_self_iter.unwrap_get_inner(other.into_owned()) == i),
                 exit,
             )
+        })?;
+
+        self.safe_flush(exit)
+    }
+
+    pub fn compute_sum<T2>(
+        &mut self,
+        max_from: I,
+        source: &impl AnyIterableVec<I, T2>,
+        window: usize,
+        exit: &Exit,
+    ) -> Result<()>
+    where
+        T: Add<T, Output = T> + From<T2> + Default + CheckedSub,
+        T2: StoredRaw,
+    {
+        self.validate_computed_version_or_reset(
+            Version::ONE + self.inner_version() + source.version(),
+        )?;
+
+        let index = max_from.min(I::from(self.len()));
+        let mut prev = None;
+        let mut other_iter = source.iter();
+        source.iter_at(index).try_for_each(|(i, value)| {
+            let value = T::from(value.into_owned());
+
+            if prev.is_none() {
+                let i = i.unwrap_to_usize();
+                prev.replace(if i > 0 {
+                    self.into_iter().unwrap_get_inner_(i - 1)
+                } else {
+                    T::default()
+                });
+            }
+
+            let processed_values_count = i.unwrap_to_usize() + 1;
+            let len = (processed_values_count).min(window);
+
+            let sum = if processed_values_count > len {
+                let prev_sum = prev.unwrap();
+                let value_to_subtract = T::from(
+                    other_iter.unwrap_get_inner_(i.unwrap_to_usize().checked_sub(len).unwrap()),
+                );
+                prev_sum.checked_sub(value_to_subtract).unwrap() + value
+            } else {
+                prev.unwrap() + value
+            };
+
+            prev.replace(sum);
+            self.forced_push_at(i, sum, exit)
         })?;
 
         self.safe_flush(exit)

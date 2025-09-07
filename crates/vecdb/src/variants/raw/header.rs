@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use allocative::Allocative;
 use parking_lot::RwLock;
 use seqdb::Database;
 use zerocopy::{FromBytes, IntoBytes};
@@ -12,7 +13,7 @@ use super::Format;
 const HEADER_VERSION: Version = Version::ONE;
 pub const HEADER_OFFSET: usize = size_of::<HeaderInner>();
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Allocative)]
 pub struct Header {
     inner: Arc<RwLock<HeaderInner>>,
     modified: bool,
@@ -85,7 +86,7 @@ impl Header {
     }
 }
 
-#[derive(Debug, Clone, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Debug, Clone, FromBytes, IntoBytes, Immutable, KnownLayout, Allocative)]
 #[repr(C)]
 struct HeaderInner {
     pub header_version: Version,
@@ -175,6 +176,7 @@ impl HeaderInner {
     IntoBytes,
     Immutable,
     KnownLayout,
+    Allocative,
 )]
 pub struct ZeroCopyBool(u8);
 

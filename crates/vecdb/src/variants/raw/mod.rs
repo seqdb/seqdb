@@ -6,6 +6,8 @@ use std::{
     sync::Arc,
 };
 
+use allocative::Allocative;
+use log::info;
 use parking_lot::{RwLock, RwLockWriteGuard};
 use seqdb::{Database, Reader, Region, RegionReader};
 use zerocopy::{FromBytes, IntoBytes};
@@ -25,7 +27,7 @@ pub use options::*;
 
 const VERSION: Version = Version::ONE;
 
-#[derive(Debug)]
+#[derive(Debug, Allocative)]
 pub struct RawVec<I, T> {
     db: Database,
     region: Arc<RwLock<Region>>,
@@ -67,6 +69,7 @@ where
             | Err(Error::WrongEndian)
             | Err(Error::WrongLength)
             | Err(Error::DifferentVersion { .. }) => {
+                info!("Resetting {}...", options.name);
                 let _ = options
                     .db
                     .remove_region(Self::vec_region_name_(options.name).into());
@@ -297,9 +300,11 @@ where
 
         let from = (stored_len * Self::SIZE_OF_T + HEADER_OFFSET) as u64;
 
-        self.prev_stored_len = stored_len;
+        // self.prev_stored_len = stored_len;
 
-        self.prev_pushed = self.pushed.clone();
+        // BE CAREFUL WITH `.clone()` !
+        // Take into account the first pass which hold a ton of data
+        // self.prev_pushed = self.pushed.clone();
 
         if has_new_data {
             let mut mut_stored_len = self.stored_len.write();
@@ -352,7 +357,7 @@ where
             let _ = self.db.remove_region(self.holes_region_name().into());
         }
 
-        self.prev_holes = self.holes.clone();
+        // self.prev_holes = self.holes.clone();
 
         Ok(())
     }

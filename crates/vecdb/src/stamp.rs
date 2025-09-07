@@ -1,3 +1,4 @@
+use allocative::Allocative;
 use zerocopy_derive::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 #[derive(
@@ -13,6 +14,7 @@ use zerocopy_derive::{FromBytes, Immutable, IntoBytes, KnownLayout};
     IntoBytes,
     Immutable,
     KnownLayout,
+    Allocative,
 )]
 pub struct Stamp(u64);
 

@@ -6,12 +6,14 @@ use std::{
     path::Path,
 };
 
+use allocative::Allocative;
 use zerocopy::{FromBytes, IntoBytes};
 use zerocopy_derive::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 use crate::{Error, Result};
 
 #[derive(
+    Allocative,
     Default,
     Debug,
     Clone,

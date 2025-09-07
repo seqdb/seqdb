@@ -1,10 +1,12 @@
 use std::collections::BTreeMap;
 
+use allocative::Allocative;
+
 use crate::{Error, Result};
 
 use super::{Region, Regions};
 
-#[derive(Debug)]
+#[derive(Debug, Allocative)]
 pub struct Layout {
     start_to_index: BTreeMap<u64, usize>,
     start_to_hole: BTreeMap<u64, u64>,

@@ -13,6 +13,7 @@ use std::{
     sync::Arc,
 };
 
+use allocative::Allocative;
 use libc::off_t;
 use memmap2::{MmapMut, MmapOptions};
 use parking_lot::{RwLock, RwLockReadGuard};
@@ -36,7 +37,7 @@ pub const PAGE_SIZE: u64 = 4096;
 pub const PAGE_SIZE_MINUS_1: u64 = PAGE_SIZE - 1;
 const GB: u64 = 1024 * 1024 * 1024;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Allocative)]
 pub struct Database(Arc<DatabaseInner>);
 
 impl Database {
@@ -52,12 +53,14 @@ impl Deref for Database {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Allocative)]
 pub struct DatabaseInner {
     path: PathBuf,
     regions: RwLock<Regions>,
     layout: RwLock<Layout>,
+    #[allocative(skip)]
     file: RwLock<File>,
+    #[allocative(skip)]
     mmap: RwLock<MmapMut>,
 }
 

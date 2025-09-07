@@ -6,11 +6,12 @@ use std::{
     path::PathBuf,
 };
 
+use log::info;
 use parking_lot::RwLockWriteGuard;
 use seqdb::Reader;
 use zerocopy::FromBytes;
 
-use crate::{_TO_, AnyStoredVec, Error, Exit, Result, Stamp};
+use crate::{_TO_, AnyStoredVec, Error, Exit, Result, Stamp, Version};
 
 const ONE_KIB: usize = 1024;
 const ONE_MIB: usize = ONE_KIB * ONE_KIB;
@@ -274,6 +275,25 @@ where
     #[inline]
     fn reset_(&mut self) -> Result<()> {
         self.truncate_if_needed_(0)
+    }
+
+    fn validate_computed_version_or_reset(&mut self, version: Version) -> Result<()> {
+        if version != self.header().computed_version() {
+            self.mut_header().update_computed_version(version);
+            if !self.is_empty() {
+                self.reset()?;
+            }
+        }
+
+        if self.is_empty() {
+            info!(
+                "Computing {}_to_{}...",
+                self.index_type_to_string(),
+                self.name()
+            )
+        }
+
+        Ok(())
     }
 
     #[inline]
