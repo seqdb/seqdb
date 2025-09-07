@@ -24,7 +24,7 @@ debug = true
 inherits = "release"
 
 [workspace.dependencies]
-allocative = "0.3.4"
+allocative = { version = "0.3.4", features = ["parking_lot"] }
 allocative_derive = "0.3.3"
 log = "0.4.27"
 parking_lot = "0.12.4"
