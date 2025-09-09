@@ -1,7 +1,7 @@
 use core::error;
 use std::{
     borrow::Cow,
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     f32,
     fmt::Debug,
     iter::Sum,
@@ -275,7 +275,7 @@ where
         self.safe_flush(exit)
     }
 
-    pub fn compute_max<T2>(
+    pub fn compute_all_time_high<T2>(
         &mut self,
         max_from: I,
         source: &impl AnyIterableVec<I, T2>,
@@ -634,6 +634,100 @@ where
                 exit,
             )
         })?;
+
+        self.safe_flush(exit)
+    }
+
+    pub fn compute_max<T2>(
+        &mut self,
+        max_from: I,
+        source: &impl AnyIterableVec<I, T2>,
+        window: usize,
+        exit: &Exit,
+    ) -> Result<()>
+    where
+        T2: StoredRaw + Ord,
+        T: From<T2>,
+    {
+        self.validate_computed_version_or_reset(
+            Version::ZERO + self.inner_version() + source.version(),
+        )?;
+
+        let index = max_from.min(I::from(self.len()));
+        let mut prev = VecDeque::new();
+        source
+            .iter_at_(
+                (index.unwrap_to_usize())
+                    .checked_sub(window)
+                    .unwrap_or_default(),
+            )
+            .try_for_each(|(i, value)| {
+                let value = value.into_owned();
+
+                let len = prev.len();
+                if len > window {
+                    unreachable!()
+                } else if len == window {
+                    prev.pop_front();
+                }
+
+                prev.push_back(value);
+
+                if i < index {
+                    return Ok(());
+                }
+
+                let v = prev.iter().max().cloned().unwrap();
+
+                self.forced_push_at(i, T::from(v), exit)
+            })?;
+
+        self.safe_flush(exit)
+    }
+
+    pub fn compute_min<T2>(
+        &mut self,
+        max_from: I,
+        source: &impl AnyIterableVec<I, T2>,
+        window: usize,
+        exit: &Exit,
+    ) -> Result<()>
+    where
+        T2: StoredRaw + Ord,
+        T: From<T2>,
+    {
+        self.validate_computed_version_or_reset(
+            Version::ZERO + self.inner_version() + source.version(),
+        )?;
+
+        let index = max_from.min(I::from(self.len()));
+        let mut prev = VecDeque::new();
+        source
+            .iter_at_(
+                (index.unwrap_to_usize())
+                    .checked_sub(window)
+                    .unwrap_or_default(),
+            )
+            .try_for_each(|(i, value)| {
+                let value = value.into_owned();
+
+                let len = prev.len();
+                if len > window {
+                    unreachable!()
+                } else if len == window {
+                    prev.pop_front();
+                }
+
+                prev.push_back(value);
+
+                if i < index {
+                    return Ok(());
+                }
+
+                let v = prev.iter().min().cloned().unwrap();
+
+                self.forced_push_at(i, T::from(v), exit)
+            })?;
 
         self.safe_flush(exit)
     }
