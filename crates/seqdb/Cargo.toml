@@ -16,7 +16,7 @@ allocative = { workspace = true }
 allocative_derive = { workspace = true }
 libc = "0.2.175"
 log = { workspace = true }
-memmap2 = "0.9.7"
+memmap2 = "0.9.8"
 parking_lot = { workspace = true }
 rayon = { workspace = true }
 zerocopy = { workspace = true }

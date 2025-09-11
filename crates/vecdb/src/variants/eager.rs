@@ -311,6 +311,62 @@ where
         self.safe_flush(exit)
     }
 
+    pub fn compute_all_time_low<T2>(
+        &mut self,
+        max_from: I,
+        source: &impl AnyIterableVec<I, T2>,
+        exit: &Exit,
+    ) -> Result<()>
+    where
+        T: From<T2> + Ord + Default,
+        T2: StoredRaw,
+    {
+        self.compute_all_time_low_(max_from, source, exit, false)
+    }
+
+    pub fn compute_all_time_low_<T2>(
+        &mut self,
+        max_from: I,
+        source: &impl AnyIterableVec<I, T2>,
+        exit: &Exit,
+        exclude_default: bool,
+    ) -> Result<()>
+    where
+        T: From<T2> + Ord + Default,
+        T2: StoredRaw,
+    {
+        self.validate_computed_version_or_reset(
+            Version::ONE + self.inner_version() + source.version(),
+        )?;
+
+        let index = max_from.min(I::from(self.len()));
+
+        let mut prev = None;
+
+        source.iter_at(index).try_for_each(|(i, v)| {
+            if prev.is_none() {
+                let i = i.unwrap_to_usize();
+                prev.replace(if i > 0 {
+                    self.into_iter().unwrap_get_inner_(i - 1)
+                } else {
+                    T::from(source.iter().unwrap_get_inner_(0))
+                });
+            }
+            let v = T::from(v.into_owned());
+            let min = prev.unwrap().min(v);
+
+            prev.replace(if !exclude_default || min != T::default() {
+                min
+            } else {
+                prev.unwrap().max(v)
+            });
+
+            self.forced_push_at(i, min, exit)
+        })?;
+
+        self.safe_flush(exit)
+    }
+
     pub fn compute_multiply<T2, T3, T4>(
         &mut self,
         max_from: I,
