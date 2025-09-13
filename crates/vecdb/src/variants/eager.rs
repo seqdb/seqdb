@@ -367,7 +367,7 @@ where
         self.safe_flush(exit)
     }
 
-    pub fn compute_multiply<T2, T3, T4>(
+    pub fn compute_multiply<T2, T3>(
         &mut self,
         max_from: I,
         multiplied: &impl AnyIterableVec<I, T2>,
@@ -375,10 +375,9 @@ where
         exit: &Exit,
     ) -> Result<()>
     where
-        T2: StoredRaw + Mul<T3, Output = T4>,
+        T2: StoredRaw,
         T3: StoredRaw,
-        T4: StoredRaw,
-        T: From<T4>,
+        T: From<T2> + Mul<T3, Output = T>,
     {
         self.validate_computed_version_or_reset(
             Version::ZERO + self.inner_version() + multiplied.version() + multiplier.version(),
@@ -388,10 +387,10 @@ where
         let mut multiplier_iter = multiplier.iter();
 
         multiplied.iter_at(index).try_for_each(|(i, v)| {
-            let multiplied = v.into_owned();
+            let multiplied = T::from(v.into_owned());
             let multiplier = multiplier_iter.unwrap_get_inner(i);
             let result = multiplied * multiplier;
-            self.forced_push_at(i, result.into(), exit)
+            self.forced_push_at(i, result, exit)
         })?;
 
         self.safe_flush(exit)
