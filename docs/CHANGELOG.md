@@ -7,123 +7,507 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [v0.2.2](https://github.com/seqdb/seqdb/releases/tag/v0.2.2) - 2025-08-18
+## [v0.2.14](https://github.com/seqdb/seqdb/releases/tag/v0.2.14) - 2025-09-13
 
 ### Changed
-- **Simplified rollback API**: Replaced `rollback_stamp(stamp)` with simpler `rollback()` method in [Generic trait](https://github.com/seqdb/seqdb/blob/v0.2.2/crates/vecdb/src/traits/generic.rs#L453-L459) for easier usage
-- **Enhanced rollback functionality**: Added `rollback_before(stamp)` method in [Generic trait](https://github.com/seqdb/seqdb/blob/v0.2.2/crates/vecdb/src/traits/generic.rs#L425-L451) with sophisticated file system-based rollback logic
-- **Improved examples**: Updated rollback usage patterns in [raw example](https://github.com/seqdb/seqdb/blob/v0.2.2/crates/vecdb/examples/raw.rs) to demonstrate the new simplified API
+- **Simplified multiplication method signature**: Streamlined [`compute_multiply()` method](https://github.com/seqdb/seqdb/blob/v0.2.14/crates/vecdb/src/variants/eager.rs#L370-L382) in EagerVec by eliminating the intermediate generic type parameter `T4`, reducing type complexity while maintaining the same computational functionality
+- **Enhanced type conversion efficiency**: Optimized multiplication computation by using direct `T::from(v.into_owned())` conversion and removing unnecessary `result.into()` call, improving performance and code clarity
 
-### Fixed
-- **Rollback error handling**: Enhanced error checking and validation in rollback operations with better stamp verification
-- **File system operations**: Improved robustness of change file management during rollback operations
+### Technical Implementation
+- **Simplified generic constraints**: The multiplication method now uses more direct type constraints:
+  - Removed intermediate `T4` type parameter that was only used for temporary storage
+  - Simplified from `T2: StoredRaw + Mul<T3, Output = T4>, T4: StoredRaw, T: From<T4>` to `T2: StoredRaw, T3: StoredRaw, T: From<T2> + Mul<T3, Output = T>`
+  - Enabled direct computation flow without intermediate type conversions
+- **Performance optimization**: Eliminated redundant type conversions in the multiplication loop, reducing computational overhead and memory allocations
 
 ### Dependencies
-- Updated all workspace versions from 0.2.1 to 0.2.2 in workspace manifests
+- Updated all workspace package versions from 0.2.13 to 0.2.14 across seqdb, vecdb, and vecdb_derive crates
+- Maintained external dependency stability while updating internal version references
+
+### Files Modified
+- [crates/vecdb/src/variants/eager.rs](https://github.com/seqdb/seqdb/blob/v0.2.14/crates/vecdb/src/variants/eager.rs#L370-L395): Simplified compute_multiply method signature and implementation
+
+[View changes](https://github.com/seqdb/seqdb/compare/v0.2.13...v0.2.14)
+
+## [v0.2.13](https://github.com/seqdb/seqdb/releases/tag/v0.2.13) - 2025-09-11
+
+### Added
+- **All-time low computation**: Added [`compute_all_time_low()` method](https://github.com/seqdb/seqdb/blob/v0.2.13/crates/vecdb/src/variants/eager.rs#L314-L325) for tracking minimum values across the entire dataset history
+- **Advanced windowed aggregations**: Implemented windowed statistical functions:
+  - [`compute_max()`](https://github.com/seqdb/seqdb/blob/v0.2.13/crates/vecdb/src/variants/eager.rs#L697-L742) for sliding window maximum calculation
+  - [`compute_min()`](https://github.com/seqdb/seqdb/blob/v0.2.13/crates/vecdb/src/variants/eager.rs#L744-L789) for sliding window minimum calculation
+- **Flexible default value handling**: Added [`compute_all_time_low_()` private method](https://github.com/seqdb/seqdb/blob/v0.2.13/crates/vecdb/src/variants/eager.rs#L327-L368) with `exclude_default` parameter for sophisticated default value exclusion logic
+- **Enhanced development tooling**: Added [`clippy` profile](https://github.com/seqdb/seqdb/blob/v0.2.13/Cargo.toml#L26-L27) inheriting from dev profile for consistent linting configuration
+
+### Changed
+- **Improved method naming consistency**: Renamed [`compute_max()` to `compute_all_time_high()`](https://github.com/seqdb/seqdb/blob/v0.2.13/crates/vecdb/src/variants/eager.rs#L278) for better clarity and semantic meaning, distinguishing it from the new windowed max function
+- **Enhanced error handling infrastructure**: Added `core::error` import to EagerVec for improved error handling capabilities
+
+### Technical Implementation
+- **Sliding window algorithm**: The windowed aggregation functions implement efficient sliding window computation:
+  - Use `VecDeque` for optimal O(1) front/back operations in window management
+  - Intelligent window initialization starting from `index - window` offset for proper context
+  - Memory-efficient window maintenance with automatic front element removal
+  - Support for variable window sizes with proper boundary handling
+- **All-time tracking logic**: The all-time low computation features:
+  - Sophisticated previous value initialization from either current vector state or source data
+  - Flexible default value exclusion with fallback to max value when excluding defaults
+  - Comprehensive version validation ensuring data consistency across computations
+- **Performance optimizations**: Enhanced computational methods with optimized iteration patterns and minimal memory allocation
+
+### Dependencies
+- **External dependency updates**: Updated multiple core dependencies:
+  - bitflags: 2.9.1 → 2.9.4
+  - cfg-if: 1.0.1 → 1.0.3
+  - ctrlc: 3.4.7 → 3.5.0 (added dispatch dependency)
+  - log: 0.4.27 → 0.4.28
+  - memmap2: 0.9.7 → 0.9.8
+  - proc-macro2: 1.0.97 → 1.0.101
+  - serde_json: 1.0.142 → 1.0.143
+  - unicode-ident: 1.0.18 → 1.0.19
+  - windows-sys: 0.59.0 → 0.61.0 (added windows-link dependency)
+  - zerocopy: 0.8.26 → 0.8.27
+  - zerocopy-derive: 0.8.26 → 0.8.27
+- Updated all workspace package versions from 0.2.11 to 0.2.13 across seqdb, vecdb, and vecdb_derive crates
+
+### Files Modified
+- [Cargo.toml](https://github.com/seqdb/seqdb/blob/v0.2.13/Cargo.toml): Added clippy profile and updated dependency versions
+- [crates/vecdb/src/variants/eager.rs](https://github.com/seqdb/seqdb/blob/v0.2.13/crates/vecdb/src/variants/eager.rs): Added all-time low computation, windowed aggregations, and renamed compute_max to compute_all_time_high
+- [Multiple Cargo.toml files](https://github.com/seqdb/seqdb/blob/v0.2.13/crates/): Updated individual dependency versions across workspace members
+
+[View changes](https://github.com/seqdb/seqdb/compare/v0.2.11...v0.2.13)
+
+## [v0.2.11](https://github.com/seqdb/seqdb/releases/tag/v0.2.11) - 2025-09-07
+
+### Added
+- **Memory profiling infrastructure**: Integrated [allocative](https://crates.io/crates/allocative) crate for comprehensive memory usage tracking and analysis across all core data structures
+- **Comprehensive memory attribution**: Added `Allocative` derive to all major types including:
+  - [`Database` and `DatabaseInner`](https://github.com/seqdb/seqdb/blob/v0.2.11/crates/seqdb/src/lib.rs#L40-L56) for tracking database-level memory usage
+  - [`Layout`](https://github.com/seqdb/seqdb/blob/v0.2.11/crates/seqdb/src/layout.rs#L7) for region layout memory tracking
+  - [`Region` and `Regions`](https://github.com/seqdb/seqdb/blob/v0.2.11/crates/seqdb/src/region.rs#L7) for region metadata memory analysis
+  - [`Stamp`](https://github.com/seqdb/seqdb/blob/v0.2.11/crates/vecdb/src/stamp.rs#L17) for timestamp memory footprint
+  - All vector variants and their internal structures for comprehensive vector memory profiling
+- **Centralized computation validation**: Added [`validate_computed_version_or_reset()` method](https://github.com/seqdb/seqdb/blob/v0.2.11/crates/vecdb/src/traits/generic.rs#L280-L297) to Generic trait for consistent computed vector validation logic
+- **Enhanced logging infrastructure**: Added informational logging for computation start events and vector resets using the `log` crate
+
+### Changed
+- **Simplified computational method signatures**: Major refactoring of EagerVec computational methods:
+  - [`compute_divide()`](https://github.com/seqdb/seqdb/blob/v0.2.11/crates/vecdb/src/variants/eager.rs#L344-L370) - Simplified generic constraints and eliminated intermediate types
+  - [`compute_percentage()`](https://github.com/seqdb/seqdb/blob/v0.2.11/crates/vecdb/src/variants/eager.rs#L372-L385) - Streamlined type requirements and direct computation flow
+  - [`compute_percentage_difference()`](https://github.com/seqdb/seqdb/blob/v0.2.11/crates/vecdb/src/variants/eager.rs#L387-L400) - Unified approach with other percentage methods
+- **Improved computational logic organization**: Refactored computation validation by moving shared validation logic from individual EagerVec methods to centralized Generic trait implementation
+- **Enhanced memory footprint management**: Added selective memory tracking with `#[allocative(skip)]` attributes for non-owned resources like file handles and memory maps
+
+### Technical Implementation
+- **Memory tracking architecture**: The allocative integration provides:
+  - Accurate memory usage reporting for all heap-allocated structures
+  - Selective tracking with skip attributes for external resources (files, memory maps)
+  - Support for parking_lot synchronization primitives through feature flags
+  - Comprehensive coverage from database-level down to individual vector elements
+- **Computation validation consolidation**: The new `validate_computed_version_or_reset()` method:
+  - Centralizes version checking logic across all computed vector types
+  - Provides consistent reset behavior when version mismatches occur
+  - Adds informational logging for computation start events
+  - Reduces code duplication across different computation methods
+- **Type system simplification**: Computational methods now use more direct type constraints, eliminating complex intermediate type parameters while maintaining the same functionality
+
+### Dependencies
+- **New dependencies**: Added allocative 0.3.4 and allocative_derive 0.3.3 for memory profiling capabilities
+- **Enhanced features**: Enabled parking_lot support in allocative for accurate synchronization primitive tracking
+- Updated all workspace package versions from 0.2.9 to 0.2.11 across seqdb, vecdb, and vecdb_derive crates
+
+### Files Modified
+- [Cargo.toml](https://github.com/seqdb/seqdb/blob/v0.2.11/Cargo.toml): Added allocative dependencies to workspace
+- [crates/seqdb/](https://github.com/seqdb/seqdb/blob/v0.2.11/crates/seqdb/): Added Allocative derives to all core types and selective skip attributes
+- [crates/vecdb/src/traits/generic.rs](https://github.com/seqdb/seqdb/blob/v0.2.11/crates/vecdb/src/traits/generic.rs#L280-L297): Added centralized computation validation
+- [crates/vecdb/src/variants/](https://github.com/seqdb/seqdb/blob/v0.2.11/crates/vecdb/src/variants/): Added Allocative derives and simplified computation methods across all variants
+
+[View changes](https://github.com/seqdb/seqdb/compare/v0.2.9...v0.2.11)
+
+## [v0.2.9](https://github.com/seqdb/seqdb/releases/tag/v0.2.9) - 2025-09-03
+
+### Added
+- **Region retention functionality**: Added [`retain_regions()` method](https://github.com/seqdb/seqdb/blob/v0.2.9/crates/seqdb/src/lib.rs#L415-L429) to Database for bulk region cleanup, allowing retention of only specified regions while removing all others
+- **Region name enumeration**: Added [`region_names()` method](https://github.com/seqdb/seqdb/blob/v0.2.9/crates/vecdb/src/traits/any.rs#L25) to AnyVec trait for listing all regions associated with a vector, enabling comprehensive resource management
+- **Enhanced debugging support**: Added debug inspection in [`create_reader()` method](https://github.com/seqdb/seqdb/blob/v0.2.9/crates/vecdb/src/traits/generic.rs#L48-L50) to help diagnose region reader creation failures
+
+### Changed
+- **Consistent region naming**: Refactored region naming logic to use centralized [`_TO_` constant](https://github.com/seqdb/seqdb/blob/v0.2.9/crates/vecdb/src/traits/any.rs#L12) across all vector variants, ensuring consistent naming patterns and easier maintenance
+- **Improved import organization**: Enhanced import statements in lazy vector variants to include `AnyBoxedIterableVec` for better trait organization and consistency
+
+### Technical Implementation
+- **Bulk region management**: The `retain_regions()` method efficiently processes region sets by:
+  - Using `HashSet` for O(1) lookup performance during filtering
+  - Collecting regions to remove before iteration to avoid borrow checker conflicts
+  - Processing deletions in batch for optimal performance
+- **Universal region enumeration**: Each vector variant now implements `region_names()` returning appropriate region collections:
+  - **RawVec**: Returns single region name from `index_to_name()`
+  - **CompressedVec**: Returns both base and pages regions
+  - **ComputedVec**: Delegates to underlying vector implementation
+  - **EagerVec**: Delegates to wrapped vector implementation
+  - **StoredVec**: Delegates based on variant type
+  - **LazyVec variants**: Return empty collections as they don't own regions
+- **Centralized naming conventions**: All region naming now uses the `_TO_` constant for consistent separator usage across the codebase
+
+### Dependencies
+- Updated all workspace package versions from 0.2.6 to 0.2.9 across seqdb, vecdb, and vecdb_derive crates
+- Maintained external dependency stability while updating internal version references
+
+### Files Modified
+- [crates/seqdb/src/lib.rs](https://github.com/seqdb/seqdb/blob/v0.2.9/crates/seqdb/src/lib.rs#L415-L429): Added retain_regions method and HashSet import
+- [crates/vecdb/src/traits/any.rs](https://github.com/seqdb/seqdb/blob/v0.2.9/crates/vecdb/src/traits/any.rs#L12-L25): Added _TO_ constant and region_names method
+- [crates/vecdb/src/traits/generic.rs](https://github.com/seqdb/seqdb/blob/v0.2.9/crates/vecdb/src/traits/generic.rs): Updated region naming to use _TO_ constant and added debug support
+- [All vector variants](https://github.com/seqdb/seqdb/blob/v0.2.9/crates/vecdb/src/variants/): Implemented region_names() method for each variant
+
+[View changes](https://github.com/seqdb/seqdb/compare/v0.2.6...v0.2.9)
+
+## [v0.2.6](https://github.com/seqdb/seqdb/releases/tag/v0.2.6) - 2025-09-02
+
+### Changed
+- **Improved multiplication variable clarity**: Enhanced [`compute_multiply()` method](https://github.com/seqdb/seqdb/blob/v0.2.6/crates/vecdb/src/variants/eager.rs#L357-L361) in EagerVec to use more descriptive variable names (`multiplied` and `multiplier`) instead of generic `v`, improving code readability and maintainability
+- **Cleaned up debug output**: Commented out debug statements in [RawVec implementation](https://github.com/seqdb/seqdb/blob/v0.2.6/crates/vecdb/src/variants/raw/mod.rs#L318-L321) to reduce console noise during normal operations while preserving debugging infrastructure for development
+
+### Technical Implementation
+- **Enhanced code clarity**: The multiplication operation now clearly separates the multiplicand (`multiplied`) from the multiplier (`multiplier`) values, making the mathematical operation more explicit and easier to follow
+- **Preserved debugging capability**: Debug statements remain in the codebase as comments, allowing for easy re-activation during debugging sessions without requiring code reconstruction
+
+### Dependencies
+- Updated all workspace package versions from 0.2.5 to 0.2.6 across seqdb, vecdb, and vecdb_derive crates
+- Maintained external dependency stability while updating internal version references
+
+### Files Modified
+- [crates/vecdb/src/variants/eager.rs](https://github.com/seqdb/seqdb/blob/v0.2.6/crates/vecdb/src/variants/eager.rs#L357-L361): Improved variable naming in compute_multiply method
+- [crates/vecdb/src/variants/raw/mod.rs](https://github.com/seqdb/seqdb/blob/v0.2.6/crates/vecdb/src/variants/raw/mod.rs#L318-L321): Commented out debug output statements
+
+[View changes](https://github.com/seqdb/seqdb/compare/v0.2.5...v0.2.6)
+
+## [v0.2.5](https://github.com/seqdb/seqdb/releases/tag/v0.2.5) - 2025-08-26
+
+### Added
+- **Previous state tracking system**: Implemented comprehensive historical state tracking with new methods:
+  - [`prev_pushed()` and `mut_prev_pushed()`](https://github.com/seqdb/seqdb/blob/v0.2.5/crates/vecdb/src/traits/generic.rs#L111-L112) for tracking previous pushed data
+  - [`prev_holes()` and `mut_prev_holes()`](https://github.com/seqdb/seqdb/blob/v0.2.5/crates/vecdb/src/traits/generic.rs#L207-L208) for tracking previous hole positions
+  - [`prev_updated()` and `mut_prev_updated()`](https://github.com/seqdb/seqdb/blob/v0.2.5/crates/vecdb/src/traits/generic.rs#L238-L239) for tracking previous updates
+  - [`prev_stored_len()` and `mut_prev_stored_len()`](https://github.com/seqdb/seqdb/blob/v0.2.5/crates/vecdb/src/traits/generic.rs#L290-L291) for tracking previous stored length
+- **Enhanced state access in get operations**: Added [`prev_updated` lookup](https://github.com/seqdb/seqdb/blob/v0.2.5/crates/vecdb/src/traits/generic.rs#L96-L101) in `get_or_read_()` method to check previous updates before falling back to disk reads
+- **Comprehensive debugging capabilities**: Added extensive debug output throughout [raw example](https://github.com/seqdb/seqdb/blob/v0.2.5/crates/vecdb/examples/raw.rs) to demonstrate state tracking across all operations and rollback scenarios
+
+### Changed
+- **Major rollback deserialization overhaul**: Completely refactored [`deserialize_then_undo_changes()` method](https://github.com/seqdb/seqdb/blob/v0.2.5/crates/vecdb/src/traits/generic.rs#L321) with sophisticated binary format parsing:
+  - Enhanced to handle previous state restoration with separate `prev_stored_len`, `stored_len`, and comprehensive state reconstruction
+  - Improved truncated data handling with proper pushed data management and previous state preservation
+  - Added complex state coordination between current and previous data structures
+- **Enhanced example demonstrations**: Significantly expanded [raw example](https://github.com/seqdb/seqdb/blob/v0.2.5/crates/vecdb/examples/raw.rs) with detailed debugging scenarios showcasing the new state tracking capabilities through multiple complex rollback and state management operations
+
+### Technical Implementation
+- **Sophisticated binary deserialization**: The enhanced deserialization now handles:
+  - Previous stamp restoration with proper timestamp management
+  - Dual stored length tracking (`prev_stored_len` and `stored_len`) for accurate state reconstruction
+  - Complex pushed data reconstruction from serialized previous and current states
+  - Previous state restoration for pushed data, holes, and updates with proper binary format parsing
+  - Coordinated state management ensuring consistency between previous and current states
+- **Multi-layered state tracking**: Implemented complete historical state preservation allowing vectors to maintain references to both current and previous states for sophisticated rollback and debugging capabilities
+- **Enhanced debugging infrastructure**: Added comprehensive debug output patterns throughout examples to demonstrate state tracking capabilities and facilitate development debugging
+
+### Performance Implications
+- **Memory usage increase**: Previous state tracking requires additional memory to maintain historical state snapshots
+- **Enhanced rollback accuracy**: More precise rollback operations due to comprehensive state preservation
+- **Improved development experience**: Extensive debugging capabilities aid in understanding vector state transitions
+
+### Dependencies
+- Updated all workspace package versions from 0.2.4 to 0.2.5 across seqdb, vecdb, and vecdb_derive crates
+- Maintained external dependency stability while updating internal version references
+
+### Files Modified
+- [crates/vecdb/src/traits/generic.rs](https://github.com/seqdb/seqdb/blob/v0.2.5/crates/vecdb/src/traits/generic.rs): Comprehensive previous state tracking system and enhanced rollback deserialization
+- [crates/vecdb/examples/raw.rs](https://github.com/seqdb/seqdb/blob/v0.2.5/crates/vecdb/examples/raw.rs): Extensive debugging demonstrations and complex state management scenarios
+
+[View changes](https://github.com/seqdb/seqdb/compare/v0.2.4...v0.2.5)
+
+## [v0.2.4](https://github.com/seqdb/seqdb/releases/tag/v0.2.4) - 2025-08-19
+
+### Changed
+- **Enhanced truncation functionality**: Completely refactored [`truncate_if_needed_()` method](https://github.com/seqdb/seqdb/blob/v0.2.4/crates/vecdb/src/traits/generic.rs#L277-L311) in Generic trait to allow truncation even with pending changes, holes, or updates, enabling more flexible vector state management
+- **Intelligent data cleanup during truncation**: Enhanced truncation logic to automatically clean up holes and updates that would be affected by the truncation, maintaining data consistency while allowing operations previously blocked by the clean state requirement
+- **Improved rollback validation**: Added [`stamp comparison check`](https://github.com/seqdb/seqdb/blob/v0.2.4/crates/vecdb/src/traits/generic.rs#L443-L445) in `rollback_before()` method to prevent unnecessary rollback operations when the current stamp is already earlier than the target stamp
+
+### Removed
+- **Simplified RawVec implementation**: Removed redundant [`truncate_if_needed()` override](https://github.com/seqdb/seqdb/blob/v0.2.4/crates/vecdb/src/variants/raw/mod.rs#L436-L447) from RawVec variant, allowing it to inherit the improved generic implementation and reducing code duplication
+
+### Technical Implementation
+- **Smart truncation logic**: The enhanced truncation method now:
+  - Calculates total vector length including both stored and pushed data (`len = stored_len + pushed_len`)
+  - Returns early if truncation index is beyond current length (no-op case)
+  - Automatically filters holes to remove entries beyond truncation point using `retain(|&i| i < index)`
+  - Cleans up updates affecting indices beyond truncation using `retain(|&i, _| i < index)`
+  - Handles pushed data truncation intelligently - clearing all pushed data if truncating within stored range, or partially truncating pushed data if truncating within pushed range
+- **Optimized rollback efficiency**: Added early exit condition in `rollback_before()` to avoid unnecessary file system operations when the target stamp is already in the future relative to current vector state
+
+### Breaking Changes
+- **Truncation behavior**: `truncate_if_needed_()` no longer requires vectors to be in a clean/flushed state before truncation, potentially changing behavior for code that relied on the previous strict validation
+
+### Dependencies
+- Updated all workspace package versions from 0.2.3 to 0.2.4 across seqdb, vecdb, and vecdb_derive crates
+- Maintained external dependency stability while updating internal version references
+
+### Files Modified
+- [crates/vecdb/src/traits/generic.rs](https://github.com/seqdb/seqdb/blob/v0.2.4/crates/vecdb/src/traits/generic.rs#L277-L311): Enhanced truncation functionality and rollback validation
+- [crates/vecdb/src/variants/raw/mod.rs](https://github.com/seqdb/seqdb/blob/v0.2.4/crates/vecdb/src/variants/raw/mod.rs): Removed redundant truncate_if_needed() override
+
+[View changes](https://github.com/seqdb/seqdb/compare/v0.2.3...v0.2.4)
+
+## [v0.2.3](https://github.com/seqdb/seqdb/releases/tag/v0.2.3) - 2025-08-18
+
+### Changed
+- **Simplified FreeBSD API**: Renamed [`punch_hole2()` to `punch_hole()`](https://github.com/seqdb/seqdb/blob/v0.2.3/crates/seqdb/src/lib.rs#L626) in seqdb for FreeBSD platform, unifying the hole punching interface across all supported platforms for cleaner code organization and consistency
+
+### Technical Implementation
+- **Unified hole punching interface**: Consolidated FreeBSD-specific hole punching implementation to use the standard `punch_hole()` function name, eliminating the need for platform-specific function names while maintaining the same `fspacectl` system call functionality
+- **Cross-platform code simplification**: Reduced API surface complexity by standardizing function names across Linux, macOS, and FreeBSD platforms, making the codebase more maintainable and reducing conditional compilation complexity
+
+### Dependencies
+- Updated all workspace package versions from 0.2.2 to 0.2.3 across seqdb, vecdb, and vecdb_derive crates
+- Maintained external dependency stability while updating internal version references
+
+### Files Modified
+- [crates/seqdb/src/lib.rs](https://github.com/seqdb/seqdb/blob/v0.2.3/crates/seqdb/src/lib.rs#L626): Renamed punch_hole2() to punch_hole() for FreeBSD platform
+
+[View changes](https://github.com/seqdb/seqdb/compare/v0.2.2...v0.2.3)
+
+## [v0.2.2](https://github.com/seqdb/seqdb/releases/tag/v0.2.2) - 2025-08-18
+
+### Added
+- **Advanced rollback functionality**: Added [`rollback_before(stamp)` method](https://github.com/seqdb/seqdb/blob/v0.2.2/crates/vecdb/src/traits/generic.rs#L425-L451) in Generic trait with sophisticated file system-based rollback logic for rolling back to specific timestamps with automatic stamp validation
+
+### Changed
+- **Simplified rollback API**: Replaced complex `rollback_stamp(stamp)` with streamlined [`rollback()` method](https://github.com/seqdb/seqdb/blob/v0.2.2/crates/vecdb/src/traits/generic.rs#L453-L459) in Generic trait that automatically uses the current vector's stamp for easier usage and reduced API surface
+- **Enhanced rollback example demonstrations**: Completely updated [raw example](https://github.com/seqdb/seqdb/blob/v0.2.2/crates/vecdb/examples/raw.rs) to showcase the new simplified rollback API with comprehensive scenarios including multi-step rollback operations and complex state management
+
+### Technical Implementation
+- **Intelligent stamp-based rollback**: The `rollback_before(stamp)` method implements sophisticated directory traversal logic that:
+  - Scans the changes directory for all available stamp files
+  - Creates a ordered map of stamps to file paths using `BTreeMap<Stamp, PathBuf>`
+  - Iterates backwards through stamps using `range(..=self.stamp()).next_back()`
+  - Validates stamp consistency with current vector state before each rollback operation
+  - Returns the final stamp reached after rollback completion
+- **Simplified rollback operation**: The new `rollback()` method eliminates the need to specify stamps by automatically reading the change file corresponding to the current vector's stamp, making rollback operations more intuitive and less error-prone
+- **Robust error handling**: Enhanced stamp validation ensures that change files match expected vector stamps before performing rollback operations, preventing data corruption from mismatched state files
+
+### Breaking Changes
+- **Rollback method signature**: Changed from `rollback_stamp(stamp: Stamp) -> Result<()>` to `rollback() -> Result<()>` for the simple rollback case
+- **Enhanced rollback return type**: `rollback_before()` now returns `Result<Stamp>` instead of `Result<()>`, providing feedback on the final stamp state after rollback
+
+### Dependencies
+- Updated all workspace package versions from 0.2.1 to 0.2.2 across seqdb, vecdb, and vecdb_derive crates
+- Maintained external dependency stability while updating internal version references
+
+### Files Modified
+- [crates/vecdb/src/traits/generic.rs](https://github.com/seqdb/seqdb/blob/v0.2.2/crates/vecdb/src/traits/generic.rs#L425-L459): Simplified rollback API and added rollback_before functionality
+- [crates/vecdb/examples/raw.rs](https://github.com/seqdb/seqdb/blob/v0.2.2/crates/vecdb/examples/raw.rs): Updated examples to demonstrate new rollback API patterns
 
 [View changes](https://github.com/seqdb/seqdb/compare/v0.2.1...v0.2.2)
 
 ## [v0.2.1](https://github.com/seqdb/seqdb/releases/tag/v0.2.1) - 2025-08-18
 
 ### Added
-- **FreeBSD platform support**: Added [`punch_hole2()` function](https://github.com/seqdb/seqdb/blob/v0.2.1/crates/seqdb/src/lib.rs#L625-L650) for FreeBSD hole punching compatibility using `fspacectl`
-- **Triple input transformations**: Added [`compute_transform3()` method](https://github.com/seqdb/seqdb/blob/v0.2.1/crates/vecdb/src/variants/eager.rs#L204) to EagerVec for handling three input vector transformations
-- **Comprehensive documentation**: Complete rewrite of README files with practical examples:
-  - Enhanced seqdb README with K.I.S.S. approach and usage examples
-  - Improved vecdb README with storage variant explanations and code samples
+- **FreeBSD platform support**: Added [`punch_hole2()` function](https://github.com/seqdb/seqdb/blob/v0.2.1/crates/seqdb/src/lib.rs#L625-L650) for FreeBSD hole punching compatibility using `fspacectl` system call, extending cross-platform storage optimization support
+- **Comprehensive documentation overhaul**: Complete rewrite of README files for both seqdb and vecdb crates with practical, production-ready examples and clear architectural explanations:
+  - **seqdb README**: Transformed from technical architecture focus to K.I.S.S. (Keep It Simple, Stupid) approach with concrete usage examples, core type explanations, and storage model documentation
+  - **vecdb README**: Enhanced with detailed storage variant explanations, comprehensive code samples for all vector types, and practical usage patterns for different performance requirements
+- **Enhanced development planning**: Expanded TODO.md with additional feature requests including compression algorithm diversification (lz4, zstd support) and performance optimization strategies
+- **AI tooling integration**: Updated `.gitignore` to include `.claude` directory for development workflow improvements
 
 ### Changed
-- **Enhanced rollback functionality**: Improved rollback API and change tracking capabilities in Stored trait
-- **Project organization**: Updated TODO.md with reorganized development priorities and new feature requests
-- **Build configuration**: Updated `.gitignore` to include `.claude` directory for AI tooling
-- **Documentation quality**: Improved code examples in raw example with enhanced rollback demonstrations
+- **Documentation philosophy**: Shifted from technical implementation details to user-focused explanations emphasizing practical benefits and use cases
+- **Project development priorities**: Reorganized TODO.md structure moving mmap optimization strategies from seqdb-specific to vecdb-general section, reflecting broader applicability
+- **Developer experience improvements**: Enhanced README examples with more realistic scenarios and clearer API usage patterns
+
+### Technical Implementation
+- **FreeBSD system integration**: Implemented `spacectl_range` structure usage with proper `fspacectl` system call handling for platform-specific hole punching operations
+- **Cross-platform storage optimization**: Extended hole punching support to FreeBSD alongside existing Linux and macOS implementations
+- **Documentation architecture**: Restructured README files to follow progressive disclosure principle - starting with simple concepts and building to advanced usage patterns
 
 ### Dependencies
-- Updated all workspace versions from 0.2.0 to 0.2.1 in workspace manifests
+- Updated all workspace package versions from 0.2.0 to 0.2.1 across seqdb, vecdb, and vecdb_derive crates
+- Maintained external dependency stability while updating internal version references
+
+### Files Modified
+- [crates/seqdb/src/lib.rs](https://github.com/seqdb/seqdb/blob/v0.2.1/crates/seqdb/src/lib.rs#L625-L650): Added FreeBSD hole punching support
+- [crates/seqdb/README.md](https://github.com/seqdb/seqdb/blob/v0.2.1/crates/seqdb/README.md): Complete documentation rewrite with K.I.S.S. approach
+- [crates/vecdb/README.md](https://github.com/seqdb/seqdb/blob/v0.2.1/crates/vecdb/README.md): Comprehensive documentation overhaul with practical examples
+- [TODO.md](https://github.com/seqdb/seqdb/blob/v0.2.1/TODO.md): Enhanced project planning and feature roadmap
+- [.gitignore](https://github.com/seqdb/seqdb/blob/v0.2.1/.gitignore): Added AI tooling directory exclusion
 
 [View changes](https://github.com/seqdb/seqdb/compare/v0.2.0...v0.2.1)
 
 ## [v0.2.0](https://github.com/seqdb/seqdb/releases/tag/v0.2.0) - 2025-08-16
 
 ### Added
-- **New rollback functionality**: Implemented [`stamped_flush`](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/vecdb/src/traits/stored.rs) with change tracking and rollback capabilities in Stored trait
-- **ImportOptions struct**: Added [`ImportOptions`](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/vecdb/src/variants/raw/options.rs) for better configuration management
-- **Change serialization**: Added [`serialize_changes()` and `saved_stamped_changes()` methods](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/vecdb/src/traits/stored.rs) in Stored trait to support rollback functionality
-- **Enhanced generic traits**: Extended `unwrap_read_()` and `update_()` methods in Generic trait
-- **Compressed variant improvements**: Enhanced compressed vector handling in CompressedVec
+- **Complete rollback and change tracking system**: Implemented comprehensive rollback functionality with [`stamped_flush()` method](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/vecdb/src/traits/stored.rs#L38) in Stored trait, enabling time-travel capabilities for vectors with automatic change file management and cleanup
+- **Advanced change serialization**: Added [`serialize_changes()` and `saved_stamped_changes()` methods](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/vecdb/src/traits/stored.rs#L19) in Stored trait to support persistent rollback functionality with efficient binary serialization of vector state changes
+- **ImportOptions configuration system**: Implemented flexible import options architecture allowing vectors to be imported with customizable parameters including saved change history depth
+- **Enhanced Generic trait methods**: Added [`unwrap_read_()` method](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/vecdb/src/traits/generic.rs#L57) and refactored [`update_()` method](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/vecdb/src/traits/generic.rs#L227) for improved low-level data access and manipulation
+- **Sophisticated rollback deserialization**: Implemented [`deserialize_then_undo_changes()` method](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/vecdb/src/traits/generic.rs#L301) with complex binary format handling for restoring vector state from serialized changes
+- **Advanced data collection methods**: Added [`collect_holed()` and `collect_holed_range()` methods](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/vecdb/src/traits/generic.rs#L367) for extracting data with explicit hole representation, crucial for debugging and state inspection
+- **Database path access**: Added [`path()` method](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/seqdb/src/lib.rs#L632) to Database for accessing the underlying file path, enabling change file management
+- **Enhanced Stamp trait**: Added comprehensive trait implementations including `FromBytes`, `IntoBytes`, and `Immutable` for efficient serialization and zero-copy operations
 
 ### Changed
-- **Major refactoring**: Significant changes to core traits (Generic and Stored) and variants
-- **Improved raw variant**: Enhanced RawVec implementation with new options support
-- **Updated computed variant**: Substantial improvements to ComputedVec handling
-- **Enhanced eager variant**: Extended EagerVec functionality
-- **Stored trait expansion**: Added change tracking and rollback capabilities in StoredVec
+- **Major API modernization**: Transitioned from `forced_import()` to [`forced_import_with(options)` pattern](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/vecdb/examples/compressed.rs#L18) across all vector variants, providing flexible configuration through ImportOptions
+- **Improved truncation validation**: Enhanced [`truncate_if_needed_()` method](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/vecdb/src/traits/generic.rs#L276) with more precise state checking - replaced generic checks with specific validation for bad holes (`has_bad_hole`) and bad updates (`has_bad_update`) that would be affected by truncation
+- **Enhanced change tracking path management**: Added [`changes_path()` method](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/vecdb/src/traits/stored.rs#L41) to Stored trait for consistent change file location management across all vector variants
+- **Sophisticated example demonstrations**: Completely overhauled examples to showcase the new rollback functionality with complex scenarios including truncation, updates, holes, and multi-stamp rollback operations
+- **Type system improvements**: Enhanced CollectableVec trait with stricter Clone constraint for better type safety and consistency across the codebase
 
-### Removed
-- **Stamped variant**: Completely removed StampedVec implementation
+### Breaking Changes
+- **API method signatures**: All vector imports now require ImportOptions instead of direct parameters, changing from `forced_import(&database, "name", version)` to `forced_import_with(options)`
+- **Enhanced update method**: Split update functionality into `update()` and `update_()` methods for consistent index handling patterns
+
+### Technical Implementation
+- **Binary change serialization format**: Complex binary format for change persistence including stored length, truncated data, holes representation, and modified value mappings with efficient zerocopy deserialization
+- **Intelligent file cleanup**: Automated cleanup of outdated change files during stamped flush operations, maintaining only the specified number of saved changes while removing newer conflicting changes
+- **Coordinated state management**: Sophisticated coordination between holes, updates, and stored data during rollback operations ensuring data consistency and integrity
+- **Memory-efficient operations**: Leveraged zerocopy patterns for efficient serialization/deserialization of stamps and data structures
 
 ### Dependencies
-- Updated version dependencies from 0.1.2 to 0.2.0
-- Refreshed dependency lock file
+- **External dependency updates**: Updated rayon from 1.10.0 to 1.11.0, proc-macro2 from 1.0.96 to 1.0.97, syn from 2.0.104 to 2.0.106, and rayon-core from 1.12.1 to 1.13.0
+- Updated all workspace package versions from 0.1.2 to 0.2.0 across seqdb, vecdb, and vecdb_derive crates
+- Refreshed Cargo.lock with updated version dependencies
+
+### Files Modified
+- [crates/vecdb/src/traits/stored.rs](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/vecdb/src/traits/stored.rs): Complete rollback and change tracking implementation
+- [crates/vecdb/src/traits/generic.rs](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/vecdb/src/traits/generic.rs): Enhanced methods and rollback deserialization
+- [crates/vecdb/examples/raw.rs](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/vecdb/examples/raw.rs): Comprehensive rollback demonstration
+- [crates/vecdb/examples/compressed.rs](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/vecdb/examples/compressed.rs): Updated to use ImportOptions
+- [crates/seqdb/src/lib.rs](https://github.com/seqdb/seqdb/blob/v0.2.0/crates/seqdb/src/lib.rs): Added database path access method
 
 [View changes](https://github.com/seqdb/seqdb/compare/v0.1.2...v0.2.0)
 
 ## [v0.1.2](https://github.com/seqdb/seqdb/releases/tag/v0.1.2) - 2025-08-13
 
 ### Added
-- **New transformation method**: Added [`compute_transform2()` method](https://github.com/seqdb/seqdb/blob/v0.1.2/crates/vecdb/src/variants/eager.rs#L154) in EagerVec for handling dual input transformations
-- Support for transforming with two input vectors simultaneously
+- **Advanced dual-input transformation method**: Added [`compute_transform2()` method](https://github.com/seqdb/seqdb/blob/v0.1.2/crates/vecdb/src/variants/eager.rs#L154) in EagerVec for sophisticated transformations involving two input vectors simultaneously
+- **Multi-vector computational support**: Enhanced analytical capabilities by enabling transformations that can process data from two different vectors alongside the current vector's state
 
-### Changed
-- Enhanced EagerVec capabilities with dual-input transformation support
-- Updated version dependencies from 0.1.1 to 0.1.2
+### Technical Implementation
+- **Complex transformation function signature**: The `compute_transform2()` method accepts a closure with signature `FnMut((A, B, C, &Self)) -> (I, T)` where:
+  - `A` is the shared index type across vectors
+  - `B` and `C` are the data types from the two input vectors
+  - `&Self` provides access to the current eager vector's state
+  - Returns tuple `(I, T)` for target index and transformed value
+- **Version-based computation validation**: Implements sophisticated version tracking using `Version::ZERO + self.inner_version() + other1.version() + other2.version()` to ensure computational consistency across all involved vectors
+- **Intelligent iteration coordination**: Synchronizes iteration across multiple vectors using `iter_at(index)` with coordinated advancement, ensuring data alignment and proper handling of vector boundaries
+- **Generic constraint system**: Enforces type safety through comprehensive generic bounds ensuring `A: StoredIndex`, `B: StoredRaw`, `C: StoredRaw` for robust type checking at compile time
+- **Safe memory access patterns**: Uses `unwrap_get_inner(a)` and `into_owned()` for efficient and safe data access across the involved vectors during transformation
+
+### Performance Characteristics
+- **Optimized dual-vector processing**: Minimal overhead for coordinating iteration across two input vectors while maintaining memory safety
+- **Efficient version tracking**: Additive version computation provides fast change detection across multiple data sources
+- **Lazy evaluation support**: Transformation is only applied when explicitly requested, allowing for efficient pipeline construction
+
+### Dependencies
+- Updated all workspace package versions from 0.1.1 to 0.1.2 across seqdb, vecdb, and vecdb_derive crates
+- Refreshed Cargo.lock with updated version dependencies
+
+### Files Modified
+- [crates/vecdb/src/variants/eager.rs](https://github.com/seqdb/seqdb/blob/v0.1.2/crates/vecdb/src/variants/eager.rs#L154-L180): Added compute_transform2() method for dual-input transformations
 
 [View changes](https://github.com/seqdb/seqdb/compare/v0.1.1...v0.1.2)
 
 ## [v0.1.1](https://github.com/seqdb/seqdb/releases/tag/v0.1.1) - 2025-08-11
 
-### Changed
-- **Dependency management**: Updated workspace dependencies configuration
-- **Crate organization**: Improved crate-level dependency specifications in seqdb, vecdb, and vecdb_derive
-- **Project structure**: Enhanced TODO.md with additional project planning items
+### Added
+- **Rust version constraint**: Added `rust-version = "1.89"` specification to workspace configuration, ensuring compatibility requirements are clearly defined and enforced across all crates
+- **Enhanced development planning**: Expanded TODO.md with more detailed and structured development priorities, including improved task descriptions and new feature requests such as import options functionality
 
-### Fixed
-- Dependency version consistency across workspace crates
+### Changed
+- **Major dependency architecture refactoring**: Completely restructured workspace dependency management by moving from centralized workspace dependencies to individual crate-level dependency specifications, providing more granular control and clearer dependency relationships
+- **Simplified workspace configuration**: Removed extensive centralized dependency list from workspace root, keeping only essential cross-crate references (seqdb, vecdb, vecdb_derive) while moving specific dependencies directly into individual crate manifests
+- **Improved TODO organization**: Enhanced project planning documentation with better formatting, clearer task categorization, and more specific implementation details including durability improvements and mmap optimization strategies
+
+### Technical Implementation
+- **Individual crate dependency management**: Each crate now manages its own dependencies directly:
+  - **seqdb**: Manages libc 0.2.175, memmap2 0.9.7, and other core storage dependencies locally
+  - **vecdb**: Handles ctrlc, pco 0.4.6, serde ecosystem, and compression dependencies individually
+  - **vecdb_derive**: Maintains its own procedural macro dependencies
+- **Rust toolchain specification**: Added minimum supported Rust version (1.89) to ensure compatibility across development environments and CI/CD pipelines
+- **Cleaner project structure**: Reduced workspace configuration complexity while maintaining cross-crate version consistency through workspace references for internal packages
+
+### Dependencies
+- **External dependency updates**: Updated libc from 0.2.174 to 0.2.175, and proc-macro2 from 1.0.95 to 1.0.96
+- **Dependency architecture change**: Transitioned from workspace-centralized to crate-individual dependency management for better maintainability
+- Updated all internal package versions from 0.1.0 to 0.1.1 across seqdb, vecdb, and vecdb_derive
+
+### Files Modified
+- [Cargo.toml](https://github.com/seqdb/seqdb/blob/v0.1.1/Cargo.toml): Major workspace dependency architecture refactoring and added rust-version constraint
+- [crates/seqdb/Cargo.toml](https://github.com/seqdb/seqdb/blob/v0.1.1/crates/seqdb/Cargo.toml): Individual dependency management and rust-version specification
+- [crates/vecdb/Cargo.toml](https://github.com/seqdb/seqdb/blob/v0.1.1/crates/vecdb/Cargo.toml): Local dependency specifications and rust-version constraint
+- [crates/vecdb_derive/Cargo.toml](https://github.com/seqdb/seqdb/blob/v0.1.1/crates/vecdb_derive/Cargo.toml): Added rust-version specification
+- [TODO.md](https://github.com/seqdb/seqdb/blob/v0.1.1/TODO.md): Enhanced project planning with detailed task descriptions
 
 [View changes](https://github.com/seqdb/seqdb/compare/v0.1.0...v0.1.1)
 
 ## [v0.1.0](https://github.com/seqdb/seqdb/releases/tag/v0.1.0) - 2025-08-10
 
-### Changed
-- **Core library improvements**: Enhanced Generic trait implementation
-- **Library reorganization**: Improved vecdb module structure
-- **Project planning**: Updated TODO.md with development roadmap
-- **Dependency updates**: Version bumps and dependency management improvements
+### Added
+- **Enhanced module exports**: Extended vecdb library exports to include critical seqdb types - added `Error as SeqDBError`, `PAGE_SIZE`, and `Reader` to the public API, providing better integration between the storage engine and vector database layers
+- **Development roadmap expansion**: Added new development priorities to TODO.md including region identifier removal and region index storage optimization for improved performance
 
-### Fixed
-- Generic trait implementations for better type safety
+### Changed
+- **Improved error handling in Generic trait**: Enhanced the `truncate_if_needed_()` method with more granular condition checking, separating validation logic into distinct checks for new data (`has_new_data`), holes (`has_holes`), and updates (`has_updated`) for better code readability and maintainability
+- **Cleaner API surface**: Removed `pco::data_types::LatentType` from the main vecdb export list, simplifying the public interface and reducing API surface complexity
+- **Simplified documentation**: Streamlined module documentation structure by removing an unnecessary line break in the crate documentation
+
+### Technical Implementation
+- **Better state validation**: The truncation logic now uses three separate boolean variables to check different aspects of vector state, making the validation process more explicit and easier to debug
+- **Module organization**: Improved separation of concerns between seqdb and vecdb by making essential seqdb types directly available through vecdb's public interface
+
+### Dependencies
+- Updated all workspace package versions from 0.0.2 to 0.1.0 across seqdb, vecdb, and vecdb_derive crates
+- Refreshed Cargo.lock with updated version dependencies
+
+### Files Modified
+- [crates/vecdb/src/lib.rs](https://github.com/seqdb/seqdb/blob/v0.1.0/crates/vecdb/src/lib.rs): Enhanced module exports and API surface
+- [crates/vecdb/src/traits/generic.rs](https://github.com/seqdb/seqdb/blob/v0.1.0/crates/vecdb/src/traits/generic.rs): Improved truncation validation logic
+- [TODO.md](https://github.com/seqdb/seqdb/blob/v0.1.0/TODO.md): Added development priorities
 
 [View changes](https://github.com/seqdb/seqdb/compare/v0.0.2...v0.1.0)
 
 ## [v0.0.2](https://github.com/seqdb/seqdb/releases/tag/v0.0.2) - 2025-08-09
 
 ### Added
-- **Initial release**: First tagged release of seqdb
-- Core database functionality with sequence storage
-- Vector database (`vecdb`) with multiple storage variants:
-  - Raw vectors
-  - Compressed vectors
-  - Computed vectors
-  - Eager vectors
-  - Stamped vectors (later removed in v0.2.0)
-  - Stored vectors
-- **Traits system**: Comprehensive trait system for generic, collectable, and stored vectors
-- **Examples**: Raw and compressed vector usage examples
-- **Derive macros**: vecdb_derive crate for procedural macros
-- **Documentation**: Initial README files for all crates
+- **Complete project foundation**: Established the core seqdb database engine as a high-performance, memory-mapped sequential storage system for analytical workloads and columnar data storage
+- **Comprehensive documentation suite**: Added extensive README files for both root project and seqdb crate, detailing architecture, usage patterns, and performance characteristics
+- **SeqDB core engine**: Created the foundational storage engine with memory-mapped file management, dynamic region allocation with automatic growth and compaction, hole punching for space reclamation, page-aligned operations, and thread-safe concurrent access
+- **VecDB vector database**: Implemented high-level columnar storage with vector abstractions, supporting both raw (optimized for speed) and compressed (optimized for space) storage formats, advanced compression using pco (Pcodec), type-safe generics, iterator patterns, and versioning system for schema evolution
+- **Derive macro system**: Added vecdb_derive crate providing procedural macros for automatic trait implementations and transparent compression support
+- **Multi-variant architecture**: Implemented complete storage variant system including raw vectors, compressed vectors, computed vectors, eager vectors, stamped vectors, and stored vectors with their respective trait implementations
+- **Project infrastructure**: Established Rust 2024 edition workspace configuration with comprehensive dependency management, development tools setup, and build system configuration
+- **Example applications**: Created detailed usage examples demonstrating database operations, region management, memory mapping, data persistence, and error handling patterns
+- **Development toolkit**: Added TODO.md for project planning, comprehensive .gitignore configuration, and development workflow setup
+
+### Breaking Changes
+- **API naming**: Renamed primary database type from `SeqDB` to `Database` across all APIs and examples for better clarity and consistency
+- **Example reorganization**: Renamed `seqdb.rs` example to `db.rs` to better reflect the updated API naming conventions
+
+### Technical Implementation
+- **Memory-mapped I/O**: Zero-copy data access through memory-mapped files with automatic region management and space optimization
+- **Dynamic region system**: Variable-size data containers with automatic growth, compaction, and hole punching for efficient disk space utilization
+- **Concurrent architecture**: Thread-safe design using parking_lot for fine-grained locking and optimal concurrent access patterns
+- **Cross-platform support**: Primary support for Unix-like systems (Linux, macOS, BSD) on x86_64 and ARM64 architectures
+- **Performance optimization**: Page-aligned operations, reserved space management, and filesystem-optimized I/O patterns for analytical workload performance
 
 ### Dependencies
-- seqdb for sequence database functionality
-- parking_lot for synchronization
-- zerocopy for zero-copy operations
-- Core Rust workspace setup
+- **Core storage**: seqdb engine with libc integration for low-level operations
+- **Synchronization**: parking_lot for efficient thread-safe concurrent access
+- **Compression**: pco (Pcodec) for advanced numerical data compression
+- **Serialization**: serde ecosystem with JSON support and byte handling
+- **Zero-copy operations**: zerocopy and zerocopy-derive for memory-efficient data handling
+- **Parallel processing**: rayon for parallel computation support
+- **Development tools**: Complete workspace setup with cross-crate dependency management
+
+### Files Modified
+- [Cargo.toml](https://github.com/seqdb/seqdb/blob/v0.0.2/Cargo.toml): Established workspace configuration and dependency management
+- [README.md](https://github.com/seqdb/seqdb/blob/v0.0.2/README.md): Created comprehensive project documentation
+- [crates/seqdb/](https://github.com/seqdb/seqdb/blob/v0.0.2/crates/seqdb/): Complete seqdb crate implementation
+- [crates/seqdb/examples/db.rs](https://github.com/seqdb/seqdb/blob/v0.0.2/crates/seqdb/examples/db.rs): Database usage demonstration
