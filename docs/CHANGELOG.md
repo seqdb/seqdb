@@ -20,13 +20,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Enabled direct computation flow without intermediate type conversions
 - **Performance optimization**: Eliminated redundant type conversions in the multiplication loop, reducing computational overhead and memory allocations
 
-### Dependencies
-- Updated all workspace package versions from 0.2.13 to 0.2.14 across seqdb, vecdb, and vecdb_derive crates
-- Maintained external dependency stability while updating internal version references
-
-### Files Modified
-- [crates/vecdb/src/variants/eager.rs](https://github.com/seqdb/seqdb/blob/v0.2.14/crates/vecdb/src/variants/eager.rs#L370-L395): Simplified compute_multiply method signature and implementation
-
 [View changes](https://github.com/seqdb/seqdb/compare/v0.2.13...v0.2.14)
 
 ## [v0.2.13](https://github.com/seqdb/seqdb/releases/tag/v0.2.13) - 2025-09-11
@@ -54,21 +47,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Flexible default value exclusion with fallback to max value when excluding defaults
   - Comprehensive version validation ensuring data consistency across computations
 - **Performance optimizations**: Enhanced computational methods with optimized iteration patterns and minimal memory allocation
-
-### Dependencies
-- **External dependency updates**: Updated multiple core dependencies:
-  - bitflags: 2.9.1 → 2.9.4
-  - cfg-if: 1.0.1 → 1.0.3
-  - ctrlc: 3.4.7 → 3.5.0 (added dispatch dependency)
-  - log: 0.4.27 → 0.4.28
-  - memmap2: 0.9.7 → 0.9.8
-  - proc-macro2: 1.0.97 → 1.0.101
-  - serde_json: 1.0.142 → 1.0.143
-  - unicode-ident: 1.0.18 → 1.0.19
-  - windows-sys: 0.59.0 → 0.61.0 (added windows-link dependency)
-  - zerocopy: 0.8.26 → 0.8.27
-  - zerocopy-derive: 0.8.26 → 0.8.27
-- Updated all workspace package versions from 0.2.11 to 0.2.13 across seqdb, vecdb, and vecdb_derive crates
 
 ### Files Modified
 - [Cargo.toml](https://github.com/seqdb/seqdb/blob/v0.2.13/Cargo.toml): Added clippy profile and updated dependency versions

@@ -105,7 +105,8 @@ where
         let region_len = region.read().len() as usize;
         if region_len > 0
             && (region_len < HEADER_OFFSET
-                || (format.is_raw() && (region_len - HEADER_OFFSET) % Self::SIZE_OF_T != 0))
+                || (format.is_raw()
+                    && !(region_len - HEADER_OFFSET).is_multiple_of(Self::SIZE_OF_T)))
         {
             dbg!(region_len, region_len, HEADER_OFFSET);
             return Err(Error::Str("Region was saved incorrectly"));

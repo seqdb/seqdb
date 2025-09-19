@@ -8,7 +8,6 @@ use std::{
 use allocative::Allocative;
 use log::info;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use rayon::prelude::*;
 use seqdb::{Database, Reader, Region};
 
 use crate::{
@@ -286,6 +285,7 @@ where
 
         let truncate_at = if starting_page_index < pages_len {
             let len = stored_len % Self::PER_PAGE;
+
             if len != 0 {
                 let mut page_values = Self::decode_page_(
                     stored_len,
@@ -307,9 +307,8 @@ where
         values.append(&mut mem::take(self.inner.mut_pushed()));
 
         let compressed = values
-            .into_par_iter()
             .chunks(Self::PER_PAGE)
-            .map(|chunk| (Self::compress_page(chunk.as_slice()), chunk.len()))
+            .map(|chunk| (Self::compress_page(chunk), chunk.len()))
             .collect::<Vec<_>>();
 
         compressed.iter().enumerate().for_each(|(i, (bytes, len))| {

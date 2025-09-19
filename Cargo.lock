@@ -352,7 +352,6 @@ name = "seqdb"
 version = "0.2.14"
 dependencies = [
  "allocative",
- "allocative_derive",
  "libc",
  "log",
  "memmap2",
@@ -433,12 +432,10 @@ name = "vecdb"
 version = "0.2.14"
 dependencies = [
  "allocative",
- "allocative_derive",
  "ctrlc",
  "log",
  "parking_lot 0.12.4",
  "pco",
- "rayon",
  "seqdb",
  "serde",
  "serde_derive",

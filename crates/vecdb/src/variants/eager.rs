@@ -1254,7 +1254,7 @@ where
             Version::ZERO + self.inner_version() + percentage_returns.version(),
         )?;
 
-        if days % 365 != 0 {
+        if days == 0 || !days.is_multiple_of(365) {
             panic!("bad days");
         }
 

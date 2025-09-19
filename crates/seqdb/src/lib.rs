@@ -548,8 +548,8 @@ impl DatabaseInner {
     }
 
     fn approx_has_punchable_data(mmap: &MmapMut, start: u64, len: u64) -> bool {
-        assert!(start % PAGE_SIZE == 0);
-        assert!(len % PAGE_SIZE == 0);
+        assert!(start.is_multiple_of(PAGE_SIZE));
+        assert!(len.is_multiple_of(PAGE_SIZE));
 
         let min = start as usize;
         let max = (start + len) as usize;
