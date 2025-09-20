@@ -24,7 +24,7 @@ seqdb = { workspace = true }
 serde = "1.0.225"
 serde_derive = "1.0.225"
 serde_json = { version = "1.0.145", features = ["float_roundtrip"] }
-sonic-rs = "0.3.0"
+sonic-rs = "0.5.4"
 vecdb_derive = { workspace = true, optional = true }
 zerocopy = { workspace = true }
 zerocopy-derive = { workspace = true }

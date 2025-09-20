@@ -7,6 +7,75 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.2.16](https://github.com/seqdb/seqdb/releases/tag/v0.2.16) - 2025-09-20
+
+### Added
+- **High-performance JSON serialization**: Integrated [`sonic-rs` library](https://github.com/seqdb/seqdb/blob/v0.2.16/crates/vecdb/Cargo.toml#L27) for ultra-fast JSON operations, providing significant performance improvements over standard JSON serialization
+- **Comprehensive JSON collection methods**: Added new methods to [`CollectableVec` trait](https://github.com/seqdb/seqdb/blob/v0.2.16/crates/vecdb/src/traits/collectable.rs) for efficient JSON data extraction:
+  - [`collect_json_bytes()`](https://github.com/seqdb/seqdb/blob/v0.2.16/crates/vecdb/src/traits/collectable.rs#L46-L54) - serializes vector data directly to JSON bytes using sonic-rs
+  - [`collect_range_json_bytes()`](https://github.com/seqdb/seqdb/blob/v0.2.16/crates/vecdb/src/traits/collectable.rs#L56-L70) - serializes a specified range to JSON bytes with bounds checking
+  - [`collect_json_string()`](https://github.com/seqdb/seqdb/blob/v0.2.16/crates/vecdb/src/traits/collectable.rs#L72-L80) - converts vector data to JSON string format
+  - [`collect_range_json_string()`](https://github.com/seqdb/seqdb/blob/v0.2.16/crates/vecdb/src/traits/collectable.rs#L82-L96) - converts a range to JSON string with proper validation
+- **Enhanced error handling**: Added [`Error::Sonic` variant](https://github.com/seqdb/seqdb/blob/v0.2.16/crates/vecdb/src/error.rs#L19) with comprehensive sonic-rs error integration including proper error conversion and display formatting
+
+### Changed
+- **Dependency updates**: Updated serde ecosystem dependencies for improved stability and performance:
+  - serde: 1.0.219 → 1.0.225
+  - serde_derive: 1.0.219 → 1.0.225
+  - serde_json: 1.0.143 → 1.0.145
+- **Cleaner configuration**: Removed commented-out feature definitions from [`vecdb Cargo.toml`](https://github.com/seqdb/seqdb/blob/v0.2.16/crates/vecdb/Cargo.toml#L14-L18) for better maintainability
+
+### Technical Implementation
+- **Ultra-fast JSON processing**: sonic-rs provides:
+  - SIMD-accelerated JSON parsing and serialization
+  - Zero-copy string handling where possible
+  - Significantly faster performance compared to serde_json for large datasets
+  - Full compatibility with serde ecosystem while offering performance improvements
+- **Memory-efficient JSON collection**: The new collection methods:
+  - Use sonic-rs for optimal serialization performance
+  - Provide both byte-level and string-level JSON output options
+  - Include proper range validation with early bounds checking
+  - Support efficient iteration over vector data with minimal memory overhead
+- **Robust error propagation**: Enhanced error handling ensures proper error context preservation from sonic-rs operations through the entire vecdb error chain
+
+### Performance Impact
+- **JSON serialization speed**: sonic-rs typically provides 2-5x faster JSON serialization compared to serde_json
+- **Reduced memory allocation**: More efficient memory usage during JSON operations through zero-copy optimizations
+- **SIMD utilization**: Automatic SIMD instruction usage on supported hardware for maximum throughput
+
+### Dependencies
+- **New core dependency**: Added sonic-rs 0.3.0 for high-performance JSON operations
+- **Transitive dependencies**: Added supporting libraries including faststr, rkyv, and various optimization crates
+- Updated all workspace package versions from 0.2.15 to 0.2.16 across seqdb, vecdb, and vecdb_derive crates
+
+[View changes](https://github.com/seqdb/seqdb/compare/v0.2.15...v0.2.16)
+
+## [v0.2.15](https://github.com/seqdb/seqdb/releases/tag/v0.2.15) - 2025-09-20
+
+### Changed
+- **Modernized arithmetic validation**: Replaced modulo operator assertions with [`is_multiple_of()` method](https://github.com/seqdb/seqdb/blob/v0.2.15/crates/seqdb/src/lib.rs#L551-L552) throughout the codebase for improved readability and modern Rust idioms
+- **Enhanced days validation logic**: Improved [`yearly returns validation`](https://github.com/seqdb/seqdb/blob/v0.2.15/crates/vecdb/src/variants/eager.rs#L1257-L1259) to properly handle zero days case alongside existing 365-day multiple requirement
+- **Simplified compression processing**: Removed parallel processing from [`CompressedVec flush operation`](https://github.com/seqdb/seqdb/blob/v0.2.15/crates/vecdb/src/variants/compressed/mod.rs#L309-L313), switching from `into_par_iter()` to sequential processing for reduced complexity
+
+### Removed
+- **Unused dependency cleanup**: Removed `allocative_derive` dependency from seqdb crate and both `allocative_derive` and `rayon` dependencies from vecdb crate, reducing compilation overhead
+- **Eliminated redundant imports**: Removed unused `rayon::prelude::*` import from compressed vector implementation
+
+### Technical Implementation
+- **Assertion modernization**: Updated alignment and size validation across multiple modules:
+  - [`PAGE_SIZE alignment checks`](https://github.com/seqdb/seqdb/blob/v0.2.15/crates/seqdb/src/lib.rs#L551-L552) in memory mapping operations
+  - [`Region validation`](https://github.com/seqdb/seqdb/blob/v0.2.15/crates/seqdb/src/region.rs#L23-L25) for start position, reserved space, and size constraints
+  - [`Raw vector size validation`](https://github.com/seqdb/seqdb/blob/v0.2.15/crates/vecdb/src/variants/raw/mod.rs#L109) for proper element alignment
+- **Enhanced edge case handling**: Days validation now prevents both zero-day configurations and non-365-day-multiple configurations, ensuring valid yearly calculation parameters
+- **Build system optimization**: Added [`cargo-machete metadata`](https://github.com/seqdb/seqdb/blob/v0.2.15/crates/seqdb/Cargo.toml#L27-L28) to exclude intentionally unused `log` dependency from cleanup tools
+
+### Performance Impact
+- **Reduced parallel overhead**: Sequential compression processing eliminates rayon thread pool overhead for smaller datasets while maintaining the same compression functionality
+- **Faster compilation**: Removing unused dependencies reduces build time and improves development iteration speed
+- **Cleaner dependency tree**: Simplified dependency graph reduces potential version conflicts and maintenance burden
+
+[View changes](https://github.com/seqdb/seqdb/compare/v0.2.14...v0.2.15)
+
 ## [v0.2.14](https://github.com/seqdb/seqdb/releases/tag/v0.2.14) - 2025-09-13
 
 ### Changed
