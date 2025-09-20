@@ -16,6 +16,7 @@ pub enum Error {
     SerdeJson(serde_json::Error),
     PCO(pco::errors::PcoError),
     SeqDB(seqdb::Error),
+    Sonic(sonic_rs::Error),
 
     Str(&'static str),
     String(String),
@@ -38,6 +39,12 @@ impl From<time::SystemTimeError> for Error {
 impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self {
         Self::IO(value)
+    }
+}
+
+impl From<sonic_rs::Error> for Error {
+    fn from(value: sonic_rs::Error) -> Self {
+        Self::Sonic(value)
     }
 }
 
@@ -81,6 +88,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::IO(error) => Display::fmt(&error, f),
+            Error::Sonic(error) => Display::fmt(&error, f),
             Error::SeqDB(error) => Display::fmt(&error, f),
             Error::TryLockError(_) => write!(
                 f,

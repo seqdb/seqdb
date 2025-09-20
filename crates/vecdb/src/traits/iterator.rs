@@ -1,6 +1,6 @@
 use std::{borrow::Cow, iter::Skip};
 
-use super::{Printable, StoredIndex, StoredRaw};
+use super::{PrintableIndex, StoredIndex, StoredRaw};
 
 pub trait BaseVecIterator: Iterator {
     fn mut_index(&mut self) -> &mut usize;

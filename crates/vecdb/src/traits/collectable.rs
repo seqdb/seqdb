@@ -1,4 +1,4 @@
-use crate::{Error, Result, i64_to_usize};
+use crate::{Result, i64_to_usize};
 
 use super::{AnyIterableVec, AnyVec, StoredIndex, StoredRaw};
 
@@ -45,15 +45,17 @@ where
     }
 
     #[inline]
-    fn collect_range_serde_json(
-        &self,
-        from: Option<usize>,
-        to: Option<usize>,
-    ) -> Result<Vec<serde_json::Value>> {
-        self.collect_range(from, to)?
+    fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Result<Vec<u8>> {
+        Ok(sonic_rs::to_vec(&self.collect_range(from, to)?)?)
+    }
+
+    #[inline]
+    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Result<Vec<String>> {
+        Ok(self
+            .collect_range(from, to)?
             .into_iter()
-            .map(|v| serde_json::to_value(v).map_err(Error::from))
-            .collect::<Result<Vec<_>>>()
+            .map(|v| v.to_string())
+            .collect())
     }
 }
 
@@ -66,11 +68,8 @@ where
 }
 
 pub trait AnyCollectableVec: AnyVec {
-    fn collect_range_serde_json(
-        &self,
-        from: Option<usize>,
-        to: Option<usize>,
-    ) -> Result<Vec<serde_json::Value>>;
+    fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Result<Vec<u8>>;
+    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Result<Vec<String>>;
 
     fn range_count(&self, from: Option<i64>, to: Option<i64>) -> usize {
         let len = self.len();

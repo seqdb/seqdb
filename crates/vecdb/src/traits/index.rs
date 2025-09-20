@@ -2,7 +2,7 @@ use std::{fmt::Debug, ops::Add};
 
 use zerocopy::{Immutable, IntoBytes, KnownLayout, TryFromBytes};
 
-use crate::{Error, Printable, Result};
+use crate::{Error, PrintableIndex, Result};
 
 pub trait StoredIndex
 where
@@ -23,7 +23,7 @@ where
         + KnownLayout
         + Send
         + Sync
-        + Printable,
+        + PrintableIndex,
 {
     fn unwrap_to_usize(self) -> usize;
     fn to_usize(self) -> Result<usize>;
@@ -49,7 +49,7 @@ where
         + KnownLayout
         + Send
         + Sync
-        + Printable,
+        + PrintableIndex,
 {
     #[inline]
     fn unwrap_to_usize(self) -> usize {

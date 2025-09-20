@@ -1515,11 +1515,11 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    fn collect_range_serde_json(
-        &self,
-        from: Option<usize>,
-        to: Option<usize>,
-    ) -> Result<Vec<serde_json::Value>> {
-        CollectableVec::collect_range_serde_json(self, from, to)
+    fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Result<Vec<u8>> {
+        CollectableVec::collect_range_json_bytes(self, from, to)
+    }
+
+    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Result<Vec<String>> {
+        CollectableVec::collect_range_string(self, from, to)
     }
 }

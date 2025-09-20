@@ -1,9 +1,9 @@
-pub trait Printable {
+pub trait PrintableIndex {
     fn to_string() -> &'static str;
     fn to_possible_strings() -> &'static [&'static str];
 }
 
-impl Printable for usize {
+impl PrintableIndex for usize {
     fn to_string() -> &'static str {
         "usize"
     }

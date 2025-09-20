@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 use serde::Serialize;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
@@ -14,7 +14,8 @@ where
         + KnownLayout
         + Send
         + Sync
-        + Serialize,
+        + Serialize
+        + Display,
 {
 }
 
@@ -29,5 +30,6 @@ impl<T> StoredRaw for T where
         + Send
         + Sync
         + Serialize
+        + Display
 {
 }

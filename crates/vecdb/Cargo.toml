@@ -12,9 +12,6 @@ rust-version.workspace = true
 build = "build.rs"
 
 [features]
-# full = [
-#     "derive",
-# ]
 derive = ["vecdb_derive"]
 
 [dependencies]
@@ -24,9 +21,10 @@ log = { workspace = true }
 parking_lot = { workspace = true }
 pco = "0.4.6"
 seqdb = { workspace = true }
-serde = "1.0.219"
-serde_derive = "1.0.219"
-serde_json = { version = "1.0.143", features = ["float_roundtrip"] }
+serde = "1.0.225"
+serde_derive = "1.0.225"
+serde_json = { version = "1.0.145", features = ["float_roundtrip"] }
+sonic-rs = "0.3.0"
 vecdb_derive = { workspace = true, optional = true }
 zerocopy = { workspace = true }
 zerocopy-derive = { workspace = true }
