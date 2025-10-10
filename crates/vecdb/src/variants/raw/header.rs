@@ -3,8 +3,7 @@ use std::sync::Arc;
 use allocative::Allocative;
 use parking_lot::RwLock;
 use seqdb::Database;
-use zerocopy::{FromBytes, IntoBytes};
-use zerocopy_derive::{FromBytes, Immutable, IntoBytes, KnownLayout};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 use crate::{Error, Result, Stamp, Version};
 

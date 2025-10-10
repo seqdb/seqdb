@@ -13,13 +13,12 @@ build = "build.rs"
 
 [dependencies]
 allocative = { workspace = true }
-libc = "0.2.175"
+libc = "0.2.177"
 log = { workspace = true }
 memmap2 = "0.9.8"
 parking_lot = { workspace = true }
 rayon = { workspace = true }
 zerocopy = { workspace = true }
-zerocopy-derive = { workspace = true }
 
 [package.metadata.docs.rs]
 all-features = true

@@ -1,7 +1,7 @@
 use allocative::Allocative;
 use memmap2::MmapMut;
 use parking_lot::RwLockReadGuard;
-use zerocopy_derive::{FromBytes, Immutable, IntoBytes, KnownLayout};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 use super::{DatabaseInner, PAGE_SIZE, Reader};
 

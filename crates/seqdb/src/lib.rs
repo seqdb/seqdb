@@ -416,7 +416,7 @@ impl DatabaseInner {
     }
 
     pub fn retain_regions(&self, mut ids: HashSet<String>) -> Result<()> {
-        let ids_to_remove = self
+        let regions_to_remove = self
             .regions
             .read()
             .id_to_index()
@@ -425,10 +425,12 @@ impl DatabaseInner {
             .cloned()
             .collect::<Vec<String>>();
 
-        ids_to_remove.into_iter().try_for_each(|id| -> Result<()> {
-            self.remove_region(id.into())?;
-            Ok(())
-        })
+        regions_to_remove
+            .into_iter()
+            .try_for_each(|id| -> Result<()> {
+                self.remove_region(id.into())?;
+                Ok(())
+            })
     }
 
     fn create_mmap(file: &File) -> Result<MmapMut> {

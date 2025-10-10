@@ -7,8 +7,7 @@ use std::{
 };
 
 use allocative::Allocative;
-use zerocopy::{FromBytes, IntoBytes};
-use zerocopy_derive::{FromBytes, Immutable, IntoBytes, KnownLayout};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 use crate::{Error, Result};
 
