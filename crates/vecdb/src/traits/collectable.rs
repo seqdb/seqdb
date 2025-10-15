@@ -1,4 +1,6 @@
-use crate::{Result, i64_to_usize};
+use std::borrow::Cow;
+
+use crate::i64_to_usize;
 
 use super::{AnyIterableVec, AnyVec, StoredIndex, StoredRaw};
 
@@ -8,24 +10,54 @@ where
     I: StoredIndex,
     T: StoredRaw,
 {
-    fn collect(&self) -> Result<Vec<T>> {
-        self.collect_range(None, None)
-    }
-
-    fn collect_range(&self, from: Option<usize>, to: Option<usize>) -> Result<Vec<T>> {
+    fn iter_range(
+        &self,
+        from: Option<usize>,
+        to: Option<usize>,
+    ) -> impl Iterator<Item = Cow<'_, T>> {
         let len = self.len();
         let from = from.unwrap_or_default();
         let to = to.map_or(len, |to| to.min(len));
+        self.iter_at_(from).take(to - from).map(|(_, v)| v)
+    }
 
-        if from >= len || from >= to {
-            return Ok(vec![]);
-        }
+    fn iter_signed_range(
+        &self,
+        from: Option<i64>,
+        to: Option<i64>,
+    ) -> impl Iterator<Item = Cow<'_, T>> {
+        let from = from.map(|i| self.i64_to_usize(i));
+        let to = to.map(|i| self.i64_to_usize(i));
+        self.iter_range(from, to)
+    }
 
-        Ok(self
-            .iter_at_(from)
-            .take(to - from)
-            .map(|(_, v)| v.into_owned())
-            .collect::<Vec<_>>())
+    fn collect(&self) -> Vec<T> {
+        self.collect_range(None, None)
+    }
+
+    fn collect_range(&self, from: Option<usize>, to: Option<usize>) -> Vec<T> {
+        self.iter_range(from, to)
+            .map(|v| v.into_owned())
+            .collect::<Vec<_>>()
+    }
+
+    fn collect_signed_range(&self, from: Option<i64>, to: Option<i64>) -> Vec<T> {
+        let from = from.map(|i| self.i64_to_usize(i));
+        let to = to.map(|i| self.i64_to_usize(i));
+        self.collect_range(from, to)
+    }
+
+    #[inline]
+    fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Vec<u8> {
+        let cows = self.iter_range(from, to).collect::<Vec<_>>();
+        let mut bytes = Vec::with_capacity(self.len() * 21);
+        sonic_rs::to_writer(&mut bytes, &cows).unwrap();
+        bytes
+    }
+
+    #[inline]
+    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Vec<String> {
+        self.iter_range(from, to).map(|v| v.to_string()).collect()
     }
 
     #[inline]
@@ -37,39 +69,19 @@ where
             if v < 0 { 0 } else { v as usize }
         }
     }
-
-    fn collect_signed_range(&self, from: Option<i64>, to: Option<i64>) -> Result<Vec<T>> {
-        let from = from.map(|i| self.i64_to_usize(i));
-        let to = to.map(|i| self.i64_to_usize(i));
-        self.collect_range(from, to)
-    }
-
-    #[inline]
-    fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Result<Vec<u8>> {
-        Ok(sonic_rs::to_vec(&self.collect_range(from, to)?)?)
-    }
-
-    #[inline]
-    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Result<Vec<String>> {
-        Ok(self
-            .collect_range(from, to)?
-            .into_iter()
-            .map(|v| v.to_string())
-            .collect())
-    }
 }
 
 impl<I, T, V> CollectableVec<I, T> for V
 where
     V: AnyVec + AnyIterableVec<I, T> + Clone,
     I: StoredIndex,
-    T: StoredRaw,
+    T: StoredRaw + 'static,
 {
 }
 
 pub trait AnyCollectableVec: AnyVec {
-    fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Result<Vec<u8>>;
-    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Result<Vec<String>>;
+    fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Vec<u8>;
+    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Vec<String>;
 
     fn range_count(&self, from: Option<i64>, to: Option<i64>) -> usize {
         let len = self.len();

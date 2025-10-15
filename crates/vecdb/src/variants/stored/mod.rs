@@ -402,11 +402,11 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Result<Vec<u8>> {
+    fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Vec<u8> {
         CollectableVec::collect_range_json_bytes(self, from, to)
     }
 
-    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Result<Vec<String>> {
+    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Vec<String> {
         CollectableVec::collect_range_string(self, from, to)
     }
 }

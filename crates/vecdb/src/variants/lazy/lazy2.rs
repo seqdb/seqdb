@@ -4,7 +4,7 @@ use allocative::Allocative;
 
 use crate::{
     AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BaseVecIterator,
-    BoxedVecIterator, CollectableVec, Result, StoredIndex, StoredRaw, Version,
+    BoxedVecIterator, CollectableVec, StoredIndex, StoredRaw, Version,
 };
 
 pub type ComputeFrom2<I, T, S1I, S1T, S2I, S2T> = for<'a> fn(
@@ -234,11 +234,11 @@ where
     S2I: StoredIndex,
     S2T: StoredRaw,
 {
-    fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Result<Vec<u8>> {
+    fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Vec<u8> {
         CollectableVec::collect_range_json_bytes(self, from, to)
     }
 
-    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Result<Vec<String>> {
+    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Vec<String> {
         CollectableVec::collect_range_string(self, from, to)
     }
 }

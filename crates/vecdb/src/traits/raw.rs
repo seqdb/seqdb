@@ -15,7 +15,8 @@ where
         + Send
         + Sync
         + Serialize
-        + Display,
+        + Display
+        + 'static,
 {
 }
 
@@ -31,5 +32,6 @@ impl<T> StoredRaw for T where
         + Sync
         + Serialize
         + Display
+        + 'static
 {
 }

@@ -102,7 +102,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         drop(iter);
 
         assert_eq!(
-            vec.collect_signed_range(Some(-5), None)?,
+            vec.collect_signed_range(Some(-5), None),
             vec![9, 10, 11, 12, 13]
         );
 
@@ -195,7 +195,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut vec: VEC = RawVec::forced_import_with(options)?;
 
         assert_eq!(
-            vec.collect()?,
+            vec.collect(),
             vec![
                 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
             ]
@@ -244,7 +244,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let mut vec: VEC = RawVec::forced_import_with(options)?;
 
-        assert_eq!(vec.collect()?, vec![10, 1, 2, 5, 4]);
+        assert_eq!(vec.collect(), vec![10, 1, 2, 5, 4]);
 
         let reader = vec.create_static_reader();
         vec.take(0, &reader)?;
@@ -372,7 +372,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ));
 
         assert_eq!(
-            vec.collect()?,
+            vec.collect(),
             vec![
                 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
             ]
@@ -397,7 +397,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ));
 
         assert_eq!(
-            vec.collect()?,
+            vec.collect(),
             vec![
                 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
             ]
@@ -434,7 +434,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let mut vec: VEC = RawVec::forced_import_with(options)?;
 
-        assert_eq!(vec.collect()?, vec![10, 1, 2, 5, 4]);
+        assert_eq!(vec.collect(), vec![10, 1, 2, 5, 4]);
 
         let reader = vec.create_static_reader();
         vec.take(0, &reader)?;
@@ -493,7 +493,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec.rollback_before(Stamp::new(1))?;
 
         assert_eq!(
-            vec.collect()?,
+            vec.collect(),
             vec![
                 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
             ]
@@ -566,7 +566,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ));
 
         assert_eq!(
-            vec.collect()?,
+            vec.collect(),
             vec![
                 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
             ]
@@ -675,7 +675,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ));
 
         assert_eq!(
-            vec.collect()?,
+            vec.collect(),
             vec![
                 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
             ]
@@ -764,7 +764,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(vec.stamp(), Stamp::new(0));
 
         assert_eq!(
-            vec.collect()?,
+            vec.collect(),
             vec![
                 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
             ]
@@ -776,7 +776,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         dbg!(("0", vec.prev_holes(), vec.updated()));
 
         assert_eq!(
-            vec.collect()?,
+            vec.collect(),
             vec![
                 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
             ]
@@ -877,7 +877,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(vec.stamp(), Stamp::new(0));
 
         assert_eq!(
-            vec.collect()?,
+            vec.collect(),
             vec![
                 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
             ]
@@ -889,7 +889,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         dbg!(("0", vec.prev_holes(), vec.updated()));
 
         assert_eq!(
-            vec.collect()?,
+            vec.collect(),
             vec![
                 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
             ]
