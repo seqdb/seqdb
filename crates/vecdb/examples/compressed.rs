@@ -175,8 +175,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let reader = vec.create_static_reader();
         assert_eq!(vec.holes(), &BTreeSet::new());
-        assert_eq!(vec.get_or_read(0, &reader)?, Some(Cow::Borrowed(&0)));
-        assert_eq!(vec.get_or_read(10, &reader)?, Some(Cow::Borrowed(&10)));
+        assert_eq!(vec.get_any_or_read(0, &reader)?, Some(Cow::Borrowed(&0)));
+        assert_eq!(vec.get_any_or_read(10, &reader)?, Some(Cow::Borrowed(&10)));
         drop(reader);
 
         vec.flush()?;

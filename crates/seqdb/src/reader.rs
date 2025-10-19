@@ -1,4 +1,4 @@
-use memmap2::MmapMut;
+use memmap2::{Advice, MmapMut};
 use parking_lot::RwLockReadGuard;
 
 use super::Region;
@@ -15,6 +15,27 @@ impl<'a> Reader<'a> {
         region: RwLockReadGuard<'static, Region>,
     ) -> Self {
         Self { mmap, region }
+    }
+
+    pub fn with_advice(self, advice: Advice) -> Self {
+        self.advice(advice);
+        self
+    }
+
+    pub fn with_random_advice(self) -> Self {
+        self.advice(Advice::Random);
+        self
+    }
+
+    pub fn with_seq_advice(self) -> Self {
+        self.advice(Advice::Sequential);
+        self
+    }
+
+    pub fn advice(&self, advice: Advice) {
+        let offset = self.region().start() as usize;
+        let len = self.region().len() as usize;
+        let _ = self.mmap.advise_range(advice, offset, len);
     }
 
     pub fn read(&self, offset: u64, len: u64) -> &[u8] {

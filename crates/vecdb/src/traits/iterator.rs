@@ -38,7 +38,7 @@ pub trait VecIterator<'a>: BaseVecIterator<Item = (Self::I, Cow<'a, Self::T>)> {
 
     #[inline]
     fn set(&mut self, i: Self::I) {
-        self.set_(i.unwrap_to_usize())
+        self.set_(i.to_usize())
     }
 
     #[inline]
@@ -48,12 +48,12 @@ pub trait VecIterator<'a>: BaseVecIterator<Item = (Self::I, Cow<'a, Self::T>)> {
 
     #[inline]
     fn get(&mut self, i: Self::I) -> Option<Cow<'a, Self::T>> {
-        self.get_(i.unwrap_to_usize())
+        self.get_(i.to_usize())
     }
 
     #[inline]
     fn unwrap_get_inner(&mut self, i: Self::I) -> Self::T {
-        self.unwrap_get_inner_(i.unwrap_to_usize())
+        self.unwrap_get_inner_(i.to_usize())
     }
 
     #[inline]
@@ -68,7 +68,7 @@ pub trait VecIterator<'a>: BaseVecIterator<Item = (Self::I, Cow<'a, Self::T>)> {
 
     #[inline]
     fn get_inner(&mut self, i: Self::I) -> Option<Self::T> {
-        self.get_(i.unwrap_to_usize()).map(|v| v.into_owned())
+        self.get_(i.to_usize()).map(|v| v.into_owned())
     }
 
     fn last(mut self) -> Option<Self::Item>

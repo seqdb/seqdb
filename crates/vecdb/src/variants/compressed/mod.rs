@@ -7,7 +7,7 @@ use std::{
 
 use allocative::Allocative;
 use log::info;
-use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use parking_lot::{RwLock, RwLockReadGuard};
 use seqdb::{Database, Reader, Region};
 
 use crate::{
@@ -86,7 +86,7 @@ where
             pages: Arc::new(RwLock::new(pages)),
         };
 
-        *this.mut_stored_len() = this.real_stored_len();
+        this.update_stored_len(this.real_stored_len());
 
         Ok(this)
     }
@@ -150,7 +150,7 @@ where
 
     #[inline]
     pub fn iter_at(&self, i: I) -> CompressedVecIterator<'_, I, T> {
-        self.iter_at_(i.unwrap_to_usize())
+        self.iter_at_(i.to_usize())
     }
 
     #[inline]
@@ -333,11 +333,9 @@ where
 
         let db = self.db();
 
-        let mut mut_stored_len = self.mut_stored_len();
-
         db.truncate_write_all_to_region(self.region_index().into(), truncate_at, &buf)?;
 
-        *mut_stored_len += pushed_len;
+        self.update_stored_len(stored_len + pushed_len);
 
         pages.flush(db)?;
 
@@ -415,8 +413,9 @@ where
     }
 
     #[inline]
-    fn mut_stored_len(&'_ self) -> RwLockWriteGuard<'_, usize> {
-        self.inner.mut_stored_len()
+    #[doc(hidden)]
+    fn update_stored_len(&self, val: usize) {
+        self.inner.update_stored_len(val);
     }
     #[inline]
     fn prev_stored_len(&self) -> usize {

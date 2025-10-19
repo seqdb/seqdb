@@ -3,12 +3,15 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     marker::PhantomData,
     mem,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 use allocative::Allocative;
 use log::info;
-use parking_lot::{RwLock, RwLockWriteGuard};
+use parking_lot::RwLock;
 use seqdb::{Database, Reader, Region, RegionReader};
 use zerocopy::{FromBytes, IntoBytes};
 
@@ -43,7 +46,7 @@ pub struct RawVec<I, T> {
     updated: BTreeMap<usize, T>,
     prev_updated: BTreeMap<usize, T>,
     prev_stored_len: usize,
-    stored_len: Arc<RwLock<usize>>,
+    stored_len: Arc<AtomicUsize>,
     /// Default is 0
     saved_stamped_changes: u16,
 
@@ -131,7 +134,7 @@ where
             None
         };
 
-        let mut s = Self {
+        let mut this = Self {
             db: db.clone(),
             region: region.clone(),
             region_index,
@@ -146,15 +149,15 @@ where
             prev_updated: BTreeMap::new(),
             phantom: PhantomData,
             prev_stored_len: 0,
-            stored_len: Arc::new(RwLock::new(0)),
+            stored_len: Arc::new(AtomicUsize::new(0)),
             saved_stamped_changes,
         };
 
-        let len = s.real_stored_len();
-        s.prev_stored_len = len;
-        *s.stored_len.write() = len;
+        let len = this.real_stored_len();
+        *this.mut_prev_stored_len() = len;
+        this.update_stored_len(len);
 
-        Ok(s)
+        Ok(this)
     }
 
     #[inline]
@@ -164,7 +167,7 @@ where
 
     #[inline]
     pub fn iter_at(&self, i: I) -> RawVecIterator<'_, I, T> {
-        self.iter_at_(i.unwrap_to_usize())
+        self.iter_at_(i.to_usize())
     }
 
     #[inline]
@@ -272,7 +275,7 @@ where
 
     #[inline]
     fn stored_len(&self) -> usize {
-        *self.stored_len.read()
+        self.stored_len.load(Ordering::Acquire)
     }
 
     fn flush(&mut self) -> Result<()> {
@@ -308,33 +311,20 @@ where
         // self.prev_pushed = self.pushed.clone();
 
         if has_new_data {
-            let mut mut_stored_len = self.stored_len.write();
             self.db.truncate_write_all_to_region(
                 self.region_index.into(),
                 from,
                 mem::take(&mut self.pushed).as_bytes(),
             )?;
-            *mut_stored_len += pushed_len;
+            self.update_stored_len(stored_len + pushed_len);
         } else if truncated {
             self.db.truncate_region(self.region_index.into(), from)?;
         }
 
-        let reader = self.create_reader();
-        // let prev_values = self
-        //     .updated
-        //     .keys()
-        //     .map(|&i| (i, self.unwrap_read_(i, &reader)))
-        //     .collect::<BTreeMap<_, _>>();
-        drop(reader);
-        // dbg!(&self.updated);
-        // dbg!(&self.prev_updated);
-        // self.prev_updated = prev_values;
-        // dbg!(&self.prev_updated);
-
         if has_updated_data || has_prev_updated_data {
-            let mut u = mem::take(&mut self.updated);
-            u.append(&mut mem::take(&mut self.prev_updated));
-            u.into_iter().try_for_each(|(i, v)| -> Result<()> {
+            let mut updated = mem::take(&mut self.updated);
+            updated.append(&mut mem::take(&mut self.prev_updated));
+            updated.into_iter().try_for_each(|(i, v)| -> Result<()> {
                 let bytes = v.as_bytes();
                 let at = ((i * Self::SIZE_OF_T) + HEADER_OFFSET) as u64;
                 self.db
@@ -495,8 +485,8 @@ where
     fn mut_prev_stored_len(&mut self) -> &mut usize {
         &mut self.prev_stored_len
     }
-    fn mut_stored_len(&'_ self) -> RwLockWriteGuard<'_, usize> {
-        self.stored_len.write()
+    fn update_stored_len(&self, val: usize) {
+        self.stored_len.store(val, Ordering::Release);
     }
 
     #[inline]
@@ -561,7 +551,7 @@ where
 
         let opt = self
             .vec
-            .get_or_read_(index, &self.reader)
+            .get_any_or_read_(index, &self.reader)
             .unwrap()
             .map(|v| (I::from(index), v));
 

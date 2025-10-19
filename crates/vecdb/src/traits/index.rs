@@ -2,7 +2,7 @@ use std::{fmt::Debug, ops::Add};
 
 use zerocopy::{Immutable, IntoBytes, KnownLayout, TryFromBytes};
 
-use crate::{Error, PrintableIndex, Result};
+use crate::PrintableIndex;
 
 pub trait StoredIndex
 where
@@ -15,7 +15,7 @@ where
         + PartialOrd
         + Ord
         + From<usize>
-        + TryInto<usize>
+        + Into<usize>
         + Add<usize, Output = Self>
         + TryFromBytes
         + IntoBytes
@@ -25,13 +25,18 @@ where
         + Sync
         + PrintableIndex,
 {
-    fn unwrap_to_usize(self) -> usize;
-    fn to_usize(self) -> Result<usize>;
-    fn decremented(self) -> Option<Self>;
+    #[inline]
+    fn to_usize(self) -> usize {
+        self.into()
+    }
+
+    #[inline]
+    fn decremented(self) -> Option<Self> {
+        self.to_usize().checked_sub(1).map(Self::from)
+    }
 }
 
-impl<I> StoredIndex for I
-where
+impl<I> StoredIndex for I where
     I: Debug
         + Default
         + Copy
@@ -41,7 +46,7 @@ where
         + PartialOrd
         + Ord
         + From<usize>
-        + TryInto<usize>
+        + Into<usize>
         + Add<usize, Output = Self>
         + TryFromBytes
         + IntoBytes
@@ -49,20 +54,6 @@ where
         + KnownLayout
         + Send
         + Sync
-        + PrintableIndex,
+        + PrintableIndex
 {
-    #[inline]
-    fn unwrap_to_usize(self) -> usize {
-        self.to_usize().unwrap()
-    }
-
-    #[inline]
-    fn to_usize(self) -> Result<usize> {
-        self.try_into().map_err(|_| Error::FailedKeyTryIntoUsize)
-    }
-
-    #[inline]
-    fn decremented(self) -> Option<Self> {
-        self.unwrap_to_usize().checked_sub(1).map(Self::from)
-    }
 }

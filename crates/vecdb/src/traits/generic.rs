@@ -7,7 +7,6 @@ use std::{
 };
 
 use log::info;
-use parking_lot::RwLockWriteGuard;
 use seqdb::Reader;
 use zerocopy::FromBytes;
 
@@ -64,30 +63,20 @@ where
     }
     #[inline]
     fn read(&self, index: I, reader: &Reader) -> Result<T> {
-        self.read_(index.to_usize()?, reader)
+        self.read_(index.to_usize(), reader)
     }
     fn read_(&self, index: usize, reader: &Reader) -> Result<T>;
 
     #[inline]
-    fn get_or_read(&'_ self, index: I, reader: &Reader) -> Result<Option<Cow<'_, T>>> {
-        self.get_or_read_(index.to_usize()?, reader)
+    fn get_any_or_read(&'_ self, index: I, reader: &Reader) -> Result<Option<Cow<'_, T>>> {
+        self.get_any_or_read_(index.to_usize(), reader)
     }
     #[inline]
-    fn get_or_read_(&'_ self, index: usize, reader: &Reader) -> Result<Option<Cow<'_, T>>> {
+    fn get_any_or_read_(&'_ self, index: usize, reader: &Reader) -> Result<Option<Cow<'_, T>>> {
         let stored_len = self.stored_len();
 
-        let holes = self.holes();
-        if !holes.is_empty() && holes.contains(&index) {
-            return Ok(None);
-        }
-
         if index >= stored_len {
-            let pushed = self.pushed();
-            let j = index - stored_len;
-            if j >= pushed.len() {
-                return Ok(None);
-            }
-            return Ok(pushed.get(j).map(Cow::Borrowed));
+            return Ok(self.get_pushed(index, stored_len).map(Cow::Borrowed));
         }
 
         let updated = self.updated();
@@ -104,7 +93,37 @@ where
             return Ok(Some(Cow::Borrowed(prev)));
         }
 
+        // Was before pushed, not sure why and if it needs to be there
+        let holes = self.holes();
+        if !holes.is_empty() && holes.contains(&index) {
+            return Ok(None);
+        }
+
         Ok(Some(Cow::Owned(self.read_(index, reader)?)))
+    }
+    #[inline]
+    fn get_pushed_or_read(&'_ self, index: I, reader: &Reader) -> Result<Option<Cow<'_, T>>> {
+        self.get_pushed_or_read_(index.to_usize(), reader)
+    }
+    #[inline]
+    fn get_pushed_or_read_(&'_ self, index: usize, reader: &Reader) -> Result<Option<Cow<'_, T>>> {
+        let stored_len = self.stored_len();
+
+        if index >= stored_len {
+            return Ok(self.get_pushed(index, stored_len).map(Cow::Borrowed));
+        }
+
+        Ok(Some(Cow::Owned(self.read_(index, reader)?)))
+    }
+
+    #[inline]
+    fn get_pushed(&'_ self, index: usize, stored_len: usize) -> Option<&'_ T> {
+        let pushed = self.pushed();
+        let j = index - stored_len;
+        if j >= pushed.len() {
+            return None;
+        }
+        pushed.get(j)
     }
 
     #[inline]
@@ -127,27 +146,35 @@ where
 
     #[inline]
     fn push_if_needed(&mut self, index: I, value: T) -> Result<()> {
+        let index_usize = index.to_usize();
         let len = self.len();
-        match len.cmp(&index.to_usize()?) {
-            Ordering::Greater => {
-                // dbg!(len, index, &self.pathbuf);
-                // panic!();
-                Ok(())
-            }
-            Ordering::Equal => {
-                self.push(value);
-                Ok(())
-            }
-            Ordering::Less => {
-                dbg!(index, value, len, self.header(), self.region_index());
-                Err(Error::IndexTooHigh)
-            }
+
+        if index_usize == len {
+            self.push(value);
+            return Ok(());
         }
+
+        // Already pushed
+        if index_usize < len {
+            return Ok(());
+        }
+
+        // This should never happen in correct code
+        debug_assert!(
+            false,
+            "Index too high: idx={}, len={}, header={:?}, region={}",
+            index_usize,
+            len,
+            self.header(),
+            self.region_index()
+        );
+
+        Err(Error::IndexTooHigh)
     }
 
     #[inline]
     fn forced_push_at(&mut self, index: I, value: T, exit: &Exit) -> Result<()> {
-        match self.len().cmp(&index.to_usize()?) {
+        match self.len().cmp(&index.to_usize()) {
             Ordering::Less => {
                 return Err(Error::IndexTooHigh);
             }
@@ -171,7 +198,7 @@ where
     #[inline]
     fn update_or_push(&mut self, index: I, value: T) -> Result<()> {
         let len = self.len();
-        match len.cmp(&index.to_usize()?) {
+        match len.cmp(&index.to_usize()) {
             Ordering::Less => {
                 dbg!(index, value, len, self.header());
                 Err(Error::IndexTooHigh)
@@ -184,6 +211,7 @@ where
         }
     }
 
+    #[inline]
     fn get_first_empty_index(&self) -> I {
         self.holes()
             .first()
@@ -212,7 +240,7 @@ where
     fn mut_prev_holes(&mut self) -> &mut BTreeSet<usize>;
 
     fn take(&mut self, index: I, reader: &Reader) -> Result<Option<T>> {
-        let opt = self.get_or_read(index, reader)?.map(|v| v.into_owned());
+        let opt = self.get_any_or_read(index, reader)?.map(|v| v.into_owned());
         if opt.is_some() {
             self.unchecked_delete(index);
         }
@@ -221,14 +249,14 @@ where
 
     #[inline]
     fn delete(&mut self, index: I) {
-        if index.unwrap_to_usize() < self.len() {
+        if index.to_usize() < self.len() {
             self.unchecked_delete(index);
         }
     }
     #[inline]
     #[doc(hidden)]
     fn unchecked_delete(&mut self, index: I) {
-        let uindex = index.unwrap_to_usize();
+        let uindex = index.to_usize();
         let updated = self.mut_updated();
         if !updated.is_empty() {
             updated.remove(&uindex);
@@ -244,7 +272,7 @@ where
 
     #[inline]
     fn update(&mut self, index: I, value: T) -> Result<()> {
-        self.update_(index.unwrap_to_usize(), value)
+        self.update_(index.to_usize(), value)
     }
 
     #[inline]
@@ -302,8 +330,8 @@ where
     }
 
     #[inline]
-    fn has(&self, index: I) -> Result<bool> {
-        Ok(self.has_(index.to_usize()?))
+    fn has(&self, index: I) -> bool {
+        self.has_(index.to_usize())
     }
     #[inline]
     fn has_(&self, index: usize) -> bool {
@@ -313,10 +341,10 @@ where
     fn prev_stored_len(&self) -> usize;
     fn mut_prev_stored_len(&mut self) -> &mut usize;
     #[doc(hidden)]
-    fn mut_stored_len(&'_ self) -> RwLockWriteGuard<'_, usize>;
+    fn update_stored_len(&self, val: usize);
 
     fn truncate_if_needed(&mut self, index: I) -> Result<()> {
-        self.truncate_if_needed_(index.to_usize()?)
+        self.truncate_if_needed_(index.to_usize())
     }
     fn truncate_if_needed_(&mut self, index: usize) -> Result<()> {
         let stored_len = self.stored_len();
@@ -349,7 +377,7 @@ where
             return Ok(());
         }
 
-        *self.mut_stored_len() = index;
+        self.update_stored_len(index);
 
         Ok(())
     }
@@ -660,7 +688,7 @@ where
 
         (from..to)
             .map(|i| {
-                self.get_or_read_(i, &reader)
+                self.get_any_or_read_(i, &reader)
                     .map(|o| o.map(|c| c.into_owned()))
             })
             .collect::<Result<Vec<_>>>()

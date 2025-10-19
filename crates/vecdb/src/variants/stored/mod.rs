@@ -4,7 +4,7 @@ use std::{
 };
 
 use allocative::Allocative;
-use parking_lot::{RwLock, RwLockWriteGuard};
+use parking_lot::RwLock;
 use seqdb::{Database, Reader, Region};
 
 use crate::{
@@ -283,10 +283,12 @@ where
         }
     }
 
-    fn mut_stored_len(&'_ self) -> RwLockWriteGuard<'_, usize> {
+    #[inline]
+    #[doc(hidden)]
+    fn update_stored_len(&self, val: usize) {
         match self {
-            StoredVec::Raw(v) => v.mut_stored_len(),
-            StoredVec::Compressed(v) => v.mut_stored_len(),
+            StoredVec::Raw(v) => v.update_stored_len(val),
+            StoredVec::Compressed(v) => v.update_stored_len(val),
         }
     }
     fn prev_stored_len(&self) -> usize {

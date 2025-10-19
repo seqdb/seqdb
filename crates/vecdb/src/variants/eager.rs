@@ -9,7 +9,7 @@ use std::{
 };
 
 use allocative::Allocative;
-use parking_lot::{RwLock, RwLockWriteGuard};
+use parking_lot::RwLock;
 use seqdb::{Database, Reader, Region};
 
 use crate::{
@@ -60,13 +60,30 @@ where
     }
 
     #[inline]
-    pub fn get_or_read<'a, 'b>(&'a self, index: I, reader: &'b Reader) -> Result<Option<Cow<'b, T>>>
+    pub fn get_any_or_read<'a, 'b>(
+        &'a self,
+        index: I,
+        reader: &'b Reader,
+    ) -> Result<Option<Cow<'b, T>>>
     where
         'a: 'b,
     {
-        self.0.get_or_read(index, reader)
+        self.0.get_any_or_read(index, reader)
     }
 
+    #[inline]
+    pub fn get_pushed_or_read<'a, 'b>(
+        &'a self,
+        index: I,
+        reader: &'b Reader,
+    ) -> Result<Option<Cow<'b, T>>>
+    where
+        'a: 'b,
+    {
+        self.0.get_pushed_or_read(index, reader)
+    }
+
+    #[inline]
     pub fn inner_version(&self) -> Version {
         self.0.header().vec_version()
     }
@@ -85,7 +102,7 @@ where
         self.validate_computed_version_or_reset(Version::ZERO + self.inner_version() + version)?;
 
         let index = max_from.min(I::from(self.len()));
-        (index.to_usize()?..to).try_for_each(|i| {
+        (index.to_usize()..to).try_for_each(|i| {
             let (i, v) = t(I::from(i));
             self.forced_push_at(i, v, exit)
         })?;
@@ -295,7 +312,7 @@ where
 
         source.iter_at(index).try_for_each(|(i, v)| {
             if prev.is_none() {
-                let i = i.unwrap_to_usize();
+                let i = i.to_usize();
                 prev.replace(if i > 0 {
                     self.into_iter().unwrap_get_inner_(i - 1)
                 } else {
@@ -345,7 +362,7 @@ where
 
         source.iter_at(index).try_for_each(|(i, v)| {
             if prev.is_none() {
-                let i = i.unwrap_to_usize();
+                let i = i.to_usize();
                 prev.replace(if i > 0 {
                     self.into_iter().unwrap_get_inner_(i - 1)
                 } else {
@@ -550,7 +567,7 @@ where
         first_indexes
             .iter_at(index)
             .try_for_each(|(value, first_index)| {
-                let first_index = (first_index).to_usize()?;
+                let first_index = first_index.to_usize();
                 let count = usize::from(indexes_count_iter.unwrap_get_inner(value));
                 (first_index..first_index + count)
                     .try_for_each(|index| self.forced_push_at(I::from(index), value, exit))
@@ -646,10 +663,10 @@ where
             .try_for_each(|(i, first_index)| {
                 let end = other_iter
                     .get_inner(i + 1)
-                    .map(|v| v.unwrap_to_usize())
+                    .map(|v| v.to_usize())
                     .unwrap_or_else(|| other_to_else.len());
 
-                let range = first_index.unwrap_to_usize()..end;
+                let range = first_index.to_usize()..end;
                 let count = if let Some(filter) = filter.as_mut() {
                     range.into_iter().filter(|i| filter(T2::from(*i))).count()
                 } else {
@@ -711,11 +728,7 @@ where
         let index = max_from.min(I::from(self.len()));
         let mut prev = VecDeque::new();
         source
-            .iter_at_(
-                (index.unwrap_to_usize())
-                    .checked_sub(window)
-                    .unwrap_or_default(),
-            )
+            .iter_at_((index.to_usize()).checked_sub(window).unwrap_or_default())
             .try_for_each(|(i, value)| {
                 let value = value.into_owned();
 
@@ -758,11 +771,7 @@ where
         let index = max_from.min(I::from(self.len()));
         let mut prev = VecDeque::new();
         source
-            .iter_at_(
-                (index.unwrap_to_usize())
-                    .checked_sub(window)
-                    .unwrap_or_default(),
-            )
+            .iter_at_((index.to_usize()).checked_sub(window).unwrap_or_default())
             .try_for_each(|(i, value)| {
                 let value = value.into_owned();
 
@@ -809,7 +818,7 @@ where
             let value = T::from(value.into_owned());
 
             if prev.is_none() {
-                let i = i.unwrap_to_usize();
+                let i = i.to_usize();
                 prev.replace(if i > 0 {
                     self.into_iter().unwrap_get_inner_(i - 1)
                 } else {
@@ -817,14 +826,13 @@ where
                 });
             }
 
-            let processed_values_count = i.unwrap_to_usize() + 1;
+            let processed_values_count = i.to_usize() + 1;
             let len = (processed_values_count).min(window);
 
             let sum = if processed_values_count > len {
                 let prev_sum = prev.unwrap();
-                let value_to_subtract = T::from(
-                    other_iter.unwrap_get_inner_(i.unwrap_to_usize().checked_sub(len).unwrap()),
-                );
+                let value_to_subtract =
+                    T::from(other_iter.unwrap_get_inner_(i.to_usize().checked_sub(len).unwrap()));
                 prev_sum.checked_sub(value_to_subtract).unwrap() + value
             } else {
                 prev.unwrap() + value
@@ -865,7 +873,7 @@ where
             .iter_at(index)
             .try_for_each(|(i, first_index)| {
                 let count = usize::from(indexes_count_iter.unwrap_get_inner(i));
-                let first_index = first_index.unwrap_to_usize();
+                let first_index = first_index.to_usize();
                 let range = first_index..first_index + count;
                 let mut sum = T::from(0_usize);
                 range.into_iter().for_each(|i| {
@@ -1020,14 +1028,14 @@ where
 
         let index = max_from.min(I::from(self.len()));
         let mut prev = None;
-        let min_prev_i = min_i.unwrap_or_default().unwrap_to_usize();
+        let min_prev_i = min_i.unwrap_or_default().to_usize();
         let mut other_iter = source.iter();
         source.iter_at(index).try_for_each(|(i, value)| {
             let value = value.into_owned();
 
             if min_i.is_none() || min_i.is_some_and(|min_i| min_i <= i) {
                 if prev.is_none() {
-                    let i = i.unwrap_to_usize();
+                    let i = i.to_usize();
                     prev.replace(if i > min_prev_i {
                         self.into_iter().unwrap_get_inner_(i - 1)
                     } else {
@@ -1035,7 +1043,7 @@ where
                     });
                 }
 
-                let processed_values_count = i.unwrap_to_usize() - min_prev_i + 1;
+                let processed_values_count = i.to_usize() - min_prev_i + 1;
                 let len = (processed_values_count).min(sma);
 
                 let value = f32::from(value);
@@ -1043,7 +1051,7 @@ where
                 let sma = T::from(if processed_values_count > sma {
                     let prev_sum = f32::from(prev.unwrap()) * len as f32;
                     let value_to_subtract = f32::from(
-                        other_iter.unwrap_get_inner_(i.unwrap_to_usize().checked_sub(sma).unwrap()),
+                        other_iter.unwrap_get_inner_(i.to_usize().checked_sub(sma).unwrap()),
                     );
                     (prev_sum - value_to_subtract + value) / len as f32
                 } else {
@@ -1098,12 +1106,12 @@ where
 
         let index = max_from.min(I::from(self.len()));
         let mut prev = None;
-        let min_prev_i = min_i.unwrap_or_default().unwrap_to_usize();
+        let min_prev_i = min_i.unwrap_or_default().to_usize();
         source.iter_at(index).try_for_each(|(index, value)| {
             let value = value.into_owned();
 
             if min_i.is_none() || min_i.is_some_and(|min_i| min_i <= index) {
-                let i = index.unwrap_to_usize();
+                let i = index.to_usize();
 
                 if prev.is_none() {
                     prev.replace(if i > min_prev_i {
@@ -1156,7 +1164,7 @@ where
 
         let index = max_from.min(I::from(self.len()));
         let mut source_iter = source.iter();
-        (index.to_usize()?..source.len()).try_for_each(|i| {
+        (index.to_usize()..source.len()).try_for_each(|i| {
             let i = I::from(i);
 
             let previous_value = i
@@ -1459,10 +1467,10 @@ where
     }
 
     #[inline]
-    fn mut_stored_len(&'_ self) -> RwLockWriteGuard<'_, usize> {
-        self.0.mut_stored_len()
+    #[doc(hidden)]
+    fn update_stored_len(&self, val: usize) {
+        self.0.update_stored_len(val);
     }
-
     #[inline]
     fn prev_stored_len(&self) -> usize {
         self.0.prev_stored_len()
