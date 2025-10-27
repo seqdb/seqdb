@@ -170,13 +170,22 @@ impl Layout {
     }
 
     pub fn find_smallest_adequate_hole(&self, reserved: u64) -> Option<u64> {
-        self.start_to_hole
-            .iter()
-            .filter(|(_, gap)| **gap >= reserved)
-            .map(|(start, gap)| (gap, start))
-            .collect::<BTreeMap<_, _>>()
-            .pop_first()
-            .map(|(_, s)| *s)
+        let mut best_gap = None;
+
+        for (&start, &gap) in &self.start_to_hole {
+            if gap >= reserved {
+                match best_gap {
+                    None => best_gap = Some((gap, start)),
+                    Some((best_gap_val, best_start)) => {
+                        if gap < best_gap_val || (gap == best_gap_val && start < best_start) {
+                            best_gap = Some((gap, start));
+                        }
+                    }
+                }
+            }
+        }
+
+        best_gap.map(|(_, s)| s)
     }
 
     pub fn remove_or_compress_hole(&mut self, start: u64, compress_by: u64) {

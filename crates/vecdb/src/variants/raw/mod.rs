@@ -549,10 +549,43 @@ where
     const SIZE_OF_T: usize = size_of::<T>();
     const PER_PAGE: usize = VEC_PAGE_SIZE / Self::SIZE_OF_T;
 
-    // Compute bit shift amounts for fast division/modulo (assumes power-of-2 sizes)
+    // Check if we can use bit shift optimizations
+    const IS_SIZE_POW2: bool =
+        Self::SIZE_OF_T > 0 && (Self::SIZE_OF_T & (Self::SIZE_OF_T - 1)) == 0;
+    const IS_PER_PAGE_POW2: bool =
+        Self::PER_PAGE > 0 && (Self::PER_PAGE & (Self::PER_PAGE - 1)) == 0;
+
+    // Bit shift amounts (only valid when power-of-2)
     const PAGE_SHIFT: u32 = Self::PER_PAGE.trailing_zeros();
     const SIZE_SHIFT: u32 = Self::SIZE_OF_T.trailing_zeros();
     const PAGE_MASK: usize = Self::PER_PAGE - 1;
+
+    #[inline(always)]
+    fn index_to_page(index: usize) -> usize {
+        if Self::IS_PER_PAGE_POW2 {
+            index >> Self::PAGE_SHIFT
+        } else {
+            index / Self::PER_PAGE
+        }
+    }
+
+    #[inline(always)]
+    fn index_in_page(index: usize) -> usize {
+        if Self::IS_PER_PAGE_POW2 {
+            index & Self::PAGE_MASK
+        } else {
+            index % Self::PER_PAGE
+        }
+    }
+
+    #[inline(always)]
+    fn mul_size(n: usize) -> usize {
+        if Self::IS_SIZE_POW2 {
+            n << Self::SIZE_SHIFT
+        } else {
+            n * Self::SIZE_OF_T
+        }
+    }
 }
 
 impl<I, T> BaseVecIterator for RawVecIterator<'_, I, T>
@@ -584,17 +617,15 @@ where
     /// Load page if needed and read value at index from stored data
     #[inline(always)]
     fn read_stored(&mut self, index: usize) -> T {
-        // Use bit shifts for fast page calculation
-        let page_index = index >> Self::PAGE_SHIFT;
-        let buffer_index = (index & Self::PAGE_MASK) << Self::SIZE_SHIFT;
+        let page_index = Self::index_to_page(index);
+        let buffer_index = Self::mul_size(Self::index_in_page(index));
 
         if unlikely(page_index != self.current_page) {
             let remaining = self.stored_len - index;
-            let new_len = remaining.min(Self::PER_PAGE) << Self::SIZE_SHIFT;
+            let new_len = Self::mul_size(remaining.min(Self::PER_PAGE));
 
             if unlikely(self.cursor_page != page_index) {
-                let offset = self.region_start
-                    + ((page_index << Self::PAGE_SHIFT) << Self::SIZE_SHIFT) as u64;
+                let offset = self.region_start + Self::mul_size(page_index * Self::PER_PAGE) as u64;
                 // Safety: seek position is always valid (within file bounds)
                 unsafe {
                     self.seq_file
@@ -622,7 +653,7 @@ where
 
     /// Core iteration logic - returns just the value
     #[inline(always)]
-    fn next_value_impl(&mut self) -> Option<T> {
+    pub fn next_value(&mut self) -> Option<T> {
         let index = self.index;
         self.index += 1;
 
@@ -654,12 +685,6 @@ where
 
         Some(self.read_stored(index))
     }
-
-    /// Get next value without index (for values() iterator)
-    #[inline(always)]
-    pub fn next_value(&mut self) -> Option<T> {
-        self.next_value_impl()
-    }
 }
 
 /// Iterator adapter that yields only values (no indices)
@@ -689,9 +714,9 @@ where
 
     #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
-        // Get current index before increment happens in next_value_impl
+        // Get current index before increment happens
         let index = self.index;
-        let value = self.next_value_impl()?;
+        let value = self.next_value()?;
         Some((I::from(index), value))
     }
 }
