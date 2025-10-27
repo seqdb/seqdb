@@ -784,10 +784,11 @@ where
     fn next(&mut self) -> Option<T> {
         // Fast path: read from current buffer
         if likely(self.buffer_pos + Self::SIZE_OF_T <= self.buffer_len) {
-            self.buffer_pos += Self::SIZE_OF_T;
-            return Some(unsafe {
+            let value = unsafe {
                 std::ptr::read_unaligned(self.buffer.as_ptr().add(self.buffer_pos) as *const T)
-            });
+            };
+            self.buffer_pos += Self::SIZE_OF_T;
+            return Some(value);
         }
 
         // Slow path: refill buffer and read
