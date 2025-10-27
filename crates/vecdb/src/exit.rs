@@ -11,6 +11,11 @@ impl Exit {
         Self(Arc::new(RwLock::new(())))
     }
 
+    ///
+    /// Only one handler throughout the program (and among all crates) can be set at once
+    ///
+    /// Make sure that no other crate sets one
+    ///
     pub fn set_ctrlc_handler(&self) {
         let copy = self.0.clone();
 
