@@ -538,7 +538,7 @@ pub struct RawVecIterator<'a, I, T> {
 
     // COLD: only accessed in slow path or for lifetimes
     vec: &'a RawVec<I, T>,
-    _reader: Reader<'a>,  // Holds locks, must stay alive
+    _reader: Reader<'a>, // Holds locks, must stay alive
 }
 
 impl<I, T> RawVecIterator<'_, I, T>
@@ -553,12 +553,6 @@ where
     const PAGE_SHIFT: u32 = Self::PER_PAGE.trailing_zeros();
     const SIZE_SHIFT: u32 = Self::SIZE_OF_T.trailing_zeros();
     const PAGE_MASK: usize = Self::PER_PAGE - 1;
-}
-
-impl<I, T> Drop for RawVecIterator<'_, I, T> {
-    fn drop(&mut self) {
-        // No cleanup needed - seq_file will be closed automatically
-    }
 }
 
 impl<I, T> BaseVecIterator for RawVecIterator<'_, I, T>
@@ -587,24 +581,43 @@ where
     I: StoredIndex,
     T: StoredRaw,
 {
-    /// Load a page into buffer
+    /// Load page if needed and read value at index from stored data
     #[inline(always)]
-    fn load_page_unchecked(&mut self, index: usize, page_index: usize) {
-        let remaining = self.stored_len - index;
-        let new_len = remaining.min(Self::PER_PAGE) << Self::SIZE_SHIFT;
+    fn read_stored(&mut self, index: usize) -> T {
+        // Use bit shifts for fast page calculation
+        let page_index = index >> Self::PAGE_SHIFT;
+        let buffer_index = (index & Self::PAGE_MASK) << Self::SIZE_SHIFT;
 
-        if self.cursor_page != page_index {
-            let offset = self.region_start
-                + ((page_index << Self::PAGE_SHIFT) << Self::SIZE_SHIFT) as u64;
-            // Safety: seek position is always valid (within file bounds)
-            unsafe { self.seq_file.seek(SeekFrom::Start(offset)).unwrap_unchecked() };
+        if unlikely(page_index != self.current_page) {
+            let remaining = self.stored_len - index;
+            let new_len = remaining.min(Self::PER_PAGE) << Self::SIZE_SHIFT;
+
+            if unlikely(self.cursor_page != page_index) {
+                let offset = self.region_start
+                    + ((page_index << Self::PAGE_SHIFT) << Self::SIZE_SHIFT) as u64;
+                // Safety: seek position is always valid (within file bounds)
+                unsafe {
+                    self.seq_file
+                        .seek(SeekFrom::Start(offset))
+                        .unwrap_unchecked()
+                };
+            }
+
+            // Read into buffer
+            // Safety: buffer is correctly sized and file has enough data
+            unsafe {
+                self.seq_file
+                    .read_exact(&mut self.buffer[..new_len])
+                    .unwrap_unchecked()
+            };
+            self.current_page = page_index;
+            self.cursor_page = page_index + 1;
         }
 
-        // Read into buffer
-        // Safety: buffer is correctly sized and file has enough data
-        unsafe { self.seq_file.read_exact(&mut self.buffer[..new_len]).unwrap_unchecked() };
-        self.current_page = page_index;
-        self.cursor_page = page_index + 1;
+        // Safety: buffer_index is guaranteed to be in bounds by page logic
+        // and properly aligned since buffer_index is always a multiple of SIZE_OF_T
+        // and Vec allocator provides proper alignment
+        unsafe { std::ptr::read_unaligned(self.buffer.as_ptr().add(buffer_index) as *const T) }
     }
 
     /// Core iteration logic - returns just the value
@@ -619,52 +632,27 @@ where
                 return None;
             }
 
-            // Use bit shifts for fast page calculation
-            let page_index = index >> Self::PAGE_SHIFT;
-            let buffer_index = (index & Self::PAGE_MASK) << Self::SIZE_SHIFT;
-
-            if unlikely(page_index != self.current_page) {
-                self.load_page_unchecked(index, page_index);
-            }
-
-            // Safety: buffer_index is guaranteed to be in bounds by page logic
-            // and properly aligned since buffer_index is always a multiple of SIZE_OF_T
-            // and Vec allocator provides proper alignment
-            return Some(unsafe {
-                std::ptr::read_unaligned(self.buffer.as_ptr().add(buffer_index) as *const T)
-            });
+            return Some(self.read_stored(index));
         }
 
         // Slow path: handle dirty data (holes/updates/pushed items)
         let stored_len = self.stored_len;
 
-        let res = if self.holes && self.vec.holes().contains(&index) {
-            Some(None)
-        } else if index >= stored_len {
-            Some(self.vec.get_pushed(index, stored_len))
-        } else if self.updated
+        if self.holes && self.vec.holes().contains(&index) {
+            return None;
+        }
+
+        if index >= stored_len {
+            return self.vec.get_pushed(index, stored_len).cloned();
+        }
+
+        if self.updated
             && let Some(updated) = self.vec.updated().get(&index)
         {
-            Some(Some(updated))
-        } else {
-            None
-        };
-
-        if let Some(res) = res {
-            return res.cloned();
+            return Some(updated.clone());
         }
 
-        // Use bit shifts for fast page calculation
-        let page_index = index >> Self::PAGE_SHIFT;
-        let buffer_index = (index & Self::PAGE_MASK) << Self::SIZE_SHIFT;
-
-        if page_index != self.current_page {
-            self.load_page_unchecked(index, page_index);
-        }
-
-        Some(unsafe {
-            std::ptr::read_unaligned(self.buffer.as_ptr().add(buffer_index) as *const T)
-        })
+        Some(self.read_stored(index))
     }
 
     /// Get next value without index (for values() iterator)
