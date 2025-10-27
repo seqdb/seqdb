@@ -29,3 +29,6 @@ pub use variants::{
     EagerVec, Format, ImportOptions, LazyVecFrom1, LazyVecFrom2, LazyVecFrom3, RawVec, StoredVec,
 };
 pub use version::*;
+
+const ONE_KIB: usize = 1024;
+const VEC_PAGE_SIZE: usize = 16 * ONE_KIB;

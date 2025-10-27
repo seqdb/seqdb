@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use seqdb::{Database, PAGE_SIZE, Result};
+use seqdb::{Database, PAGE_SIZE, RegionReader, Result};
 
 fn main() -> Result<()> {
     let _ = fs::remove_dir_all("vecs");
@@ -17,8 +17,11 @@ fn main() -> Result<()> {
 
     {
         let layout = database.layout();
+
         assert!(layout.start_to_index().len() == 1);
+
         assert!(layout.start_to_index().first_key_value() == Some((&0, &0)));
+
         assert!(layout.start_to_hole().is_empty());
 
         let regions = database.regions();
@@ -29,8 +32,11 @@ fn main() -> Result<()> {
         );
 
         let region = database.get_region(region1_i.into())?;
+
         assert!(region.start() == 0);
+
         assert!(region.len() == 0);
+
         assert!(region.reserved() == PAGE_SIZE);
     }
 
@@ -38,22 +44,30 @@ fn main() -> Result<()> {
 
     {
         let region = database.get_region(region1_i.into())?;
+
         assert!(region.start() == 0);
+
         assert!(region.len() == 5);
+
         assert!(region.reserved() == PAGE_SIZE);
 
-        assert!(database.mmap()[0..10] == [0, 1, 2, 3, 4, 0, 0, 0, 0, 0]);
+        let reader = region.create_reader(&database);
+        assert!(reader.read(0, 5)? == [0, 1, 2, 3, 4]);
     }
 
     database.write_all_to_region(region1_i.into(), &[5, 6, 7, 8, 9])?;
 
     {
         let region = database.get_region(region1_i.into())?;
+
         assert!(region.start() == 0);
+
         assert!(region.len() == 10);
+
         assert!(region.reserved() == PAGE_SIZE);
 
-        assert!(database.mmap()[0..10] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        let reader = region.create_reader(&database);
+        assert!(reader.read(0, 10)? == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
     }
 
     database.write_all_to_region_at(region1_i.into(), &[1, 2], 0)?;
@@ -64,7 +78,8 @@ fn main() -> Result<()> {
         assert!(region.len() == 10);
         assert!(region.reserved() == PAGE_SIZE);
 
-        assert!(database.mmap()[0..10] == [1, 2, 2, 3, 4, 5, 6, 7, 8, 9]);
+        let reader = region.create_reader(&database);
+        assert!(reader.read(0, 10)? == [1, 2, 2, 3, 4, 5, 6, 7, 8, 9]);
     }
 
     database.write_all_to_region_at(region1_i.into(), &[10, 11, 12, 13, 14, 15, 16, 17, 18], 4)?;
@@ -75,12 +90,8 @@ fn main() -> Result<()> {
         assert!(region.len() == 13);
         assert!(region.reserved() == PAGE_SIZE);
 
-        assert!(
-            database.mmap()[0..20]
-                == [
-                    1, 2, 2, 3, 10, 11, 12, 13, 14, 15, 16, 17, 18, 0, 0, 0, 0, 0, 0, 0
-                ]
-        );
+        let reader = region.create_reader(&database);
+        assert!(reader.read(0, 13)? == [1, 2, 2, 3, 10, 11, 12, 13, 14, 15, 16, 17, 18]);
     }
 
     database.write_all_to_region_at(region1_i.into(), &[0, 0, 0, 0, 0, 1], 13)?;
@@ -91,10 +102,13 @@ fn main() -> Result<()> {
         assert!(region.len() == 19);
         assert!(region.reserved() == PAGE_SIZE);
 
+        dbg!(1);
+
+        let reader = region.create_reader(&database);
         assert!(
-            database.mmap()[0..20]
+            reader.read(0, 19)?
                 == [
-                    1, 2, 2, 3, 10, 11, 12, 13, 14, 15, 16, 17, 18, 0, 0, 0, 0, 0, 1, 0
+                    1, 2, 2, 3, 10, 11, 12, 13, 14, 15, 16, 17, 18, 0, 0, 0, 0, 0, 1
                 ]
         );
     }
@@ -109,8 +123,10 @@ fn main() -> Result<()> {
         assert!(region.len() == 8000);
         assert!(region.reserved() == PAGE_SIZE * 2);
 
-        assert!(database.mmap()[0..8000] == [1; 8000]);
-        assert!(database.mmap()[8000..8001] == [0]);
+        let reader = region.create_reader(&database);
+        assert!(reader.read(0, 8000)? == [1; 8000]);
+        assert!(reader.read(7999, 1).is_ok());
+        assert!(reader.read(8000, 1).is_err());
     }
 
     println!("Disk usage - pre sync: {}", database.disk_usage());
@@ -128,7 +144,8 @@ fn main() -> Result<()> {
         // We only punch a hole in whole pages (4096 bytes)
         // Thus the last byte of the page where the is still data wasn't overwritten when truncating
         // And the first byte of the punched page was set to 0
-        assert!(database.mmap()[4095..=4096] == [1, 0]);
+        let reader = region.create_reader(&database);
+        assert!(reader.read(4095, 2).is_err());
     }
 
     database.flush()?;

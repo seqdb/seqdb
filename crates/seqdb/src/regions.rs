@@ -3,12 +3,15 @@ use std::{
     fs::{self, File, OpenOptions},
     io::{Cursor, Read},
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use allocative::Allocative;
-use memmap2::MmapMut;
 use parking_lot::{RwLock, RwLockWriteGuard};
+use std::os::unix::fs::FileExt;
 use zerocopy::{FromBytes, IntoBytes};
 
 use crate::{Error, Result};
@@ -25,8 +28,9 @@ pub struct Regions {
     index_to_region: Vec<Option<Arc<RwLock<Region>>>>,
     #[allocative(skip)]
     index_to_region_file: File,
+    index_to_region_file_len: u64,
     #[allocative(skip)]
-    index_to_region_mmap: MmapMut,
+    id_to_index_dirty: AtomicBool,
 }
 
 impl Regions {
@@ -48,16 +52,17 @@ impl Regions {
             .open(path.join("index_to_region"))?;
         index_to_region_file.try_lock()?;
 
-        let index_to_region_mmap = unsafe { MmapMut::map_mut(&index_to_region_file)? };
+        let index_to_region_file_len = index_to_region_file.metadata()?.len();
 
         let mut index_to_region: Vec<Option<Arc<RwLock<Region>>>> = vec![];
 
         id_to_index
             .iter()
             .try_for_each(|(_, &index)| -> Result<()> {
-                let start = index * SIZE_OF_REGION;
-                let end = start + SIZE_OF_REGION;
-                let region = Region::read_from_bytes(&index_to_region_mmap[start..end])?;
+                let start = (index * SIZE_OF_REGION) as u64;
+                let mut buffer = crate::uninit_vec(SIZE_OF_REGION);
+                index_to_region_file.read_exact_at(&mut buffer, start)?;
+                let region = Region::read_from_bytes(&buffer)?;
                 if index_to_region.len() < index + 1 {
                     index_to_region.resize_with(index + 1, Default::default);
                 }
@@ -75,14 +80,15 @@ impl Regions {
             id_to_index_path,
             index_to_region,
             index_to_region_file,
-            index_to_region_mmap,
+            index_to_region_file_len,
+            id_to_index_dirty: AtomicBool::new(false),
         })
     }
 
     pub fn set_min_len(&mut self, len: u64) -> Result<()> {
-        if self.index_to_region_mmap.len() < len as usize {
+        if self.index_to_region_file_len < len {
             self.index_to_region_file.set_len(len)?;
-            self.index_to_region_mmap = unsafe { MmapMut::map_mut(&self.index_to_region_file)? };
+            self.index_to_region_file_len = len;
         }
         Ok(())
     }
@@ -106,7 +112,7 @@ impl Regions {
 
         let region_lock = RwLock::new(region);
 
-        self.write_to_mmap(&region_lock.write(), index);
+        self.write_region(&region_lock.write(), index)?;
 
         let region_arc = Arc::new(region_lock);
 
@@ -115,20 +121,15 @@ impl Regions {
             self.index_to_region[index] = region_opt
         } else {
             self.index_to_region.push(region_opt);
-            self.index_to_region_mmap.flush()?;
         }
 
         if self.id_to_index.insert(id, index).is_some() {
             return Err(Error::Str("Already exists"));
         }
-        self.flush_id_to_index()?;
+
+        self.id_to_index_dirty.store(true, Ordering::Release);
 
         Ok((index, region_arc))
-    }
-
-    fn flush_id_to_index(&mut self) -> Result<()> {
-        fs::write(&self.id_to_index_path, Self::serialize(&self.id_to_index))?;
-        Ok(())
     }
 
     #[inline]
@@ -205,32 +206,29 @@ impl Regions {
             return Ok(None);
         };
 
-        self.index_to_region_mmap.flush()?;
-
         self.id_to_index
             .remove(&self.find_id_from_index(index).unwrap().to_owned());
 
-        self.flush_id_to_index()?;
+        self.id_to_index_dirty.store(true, Ordering::Release);
 
         Ok(Some(region))
     }
 
-    pub fn write_to_mmap(&self, region: &RwLockWriteGuard<Region>, index: usize) {
-        let mmap = &self.index_to_region_mmap;
-        let start = index * SIZE_OF_REGION;
-        let end = start + SIZE_OF_REGION;
-
-        if end > mmap.len() {
-            unreachable!("Trying to write beyond mmap")
-        }
-
-        let slice = unsafe { std::slice::from_raw_parts_mut(mmap.as_ptr() as *mut u8, mmap.len()) };
-
-        slice[start..end].copy_from_slice(region.as_bytes());
+    pub fn write_region(&self, region: &RwLockWriteGuard<Region>, index: usize) -> Result<()> {
+        let start = (index * SIZE_OF_REGION) as u64;
+        self.index_to_region_file
+            .write_all_at(region.as_bytes(), start)?;
+        Ok(())
     }
 
     pub fn flush(&self) -> Result<()> {
-        self.index_to_region_mmap.flush().map_err(|e| e.into())
+        self.index_to_region_file.sync_data()?;
+
+        if self.id_to_index_dirty.swap(false, Ordering::Acquire) {
+            fs::write(&self.id_to_index_path, Self::serialize(&self.id_to_index))?;
+        }
+
+        Ok(())
     }
 
     fn serialize(map: &HashMap<String, usize>) -> Vec<u8> {

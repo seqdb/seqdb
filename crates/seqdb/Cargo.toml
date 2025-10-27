@@ -15,7 +15,6 @@ build = "build.rs"
 allocative = { workspace = true }
 libc = "0.2.177"
 log = { workspace = true }
-memmap2 = "0.9.8"
 parking_lot = { workspace = true }
 rayon = { workspace = true }
 zerocopy = { workspace = true }

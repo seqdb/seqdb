@@ -1,5 +1,6 @@
+use std::fs::File;
+
 use allocative::Allocative;
-use memmap2::MmapMut;
 use parking_lot::RwLockReadGuard;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
@@ -33,25 +34,30 @@ impl Region {
         }
     }
 
+    #[inline]
     pub fn start(&self) -> u64 {
         self.start
     }
 
+    #[inline]
     pub fn set_start(&mut self, start: u64) {
         assert!(start.is_multiple_of(PAGE_SIZE));
         self.start = start
     }
 
     #[allow(clippy::len_without_is_empty)]
+    #[inline]
     pub fn len(&self) -> u64 {
         self.len
     }
 
+    #[inline]
     pub fn set_len(&mut self, len: u64) {
         assert!(len <= self.reserved());
         self.len = len
     }
 
+    #[inline]
     pub fn reserved(&self) -> u64 {
         self.reserved
     }
@@ -64,6 +70,7 @@ impl Region {
         self.reserved = reserved;
     }
 
+    #[inline]
     pub fn left(&self) -> u64 {
         self.reserved - self.len
     }
@@ -76,8 +83,7 @@ pub trait RegionReader {
 impl<'a> RegionReader for RwLockReadGuard<'a, Region> {
     fn create_reader(self, db: &DatabaseInner) -> Reader<'static> {
         let region: RwLockReadGuard<'static, Region> = unsafe { std::mem::transmute(self) };
-        let mmap: RwLockReadGuard<'static, MmapMut> =
-            unsafe { std::mem::transmute(db.mmap.read()) };
-        Reader::new(mmap, region)
+        let file: RwLockReadGuard<'static, File> = unsafe { std::mem::transmute(db.file.read()) };
+        Reader::new(file, region)
     }
 }

@@ -27,7 +27,7 @@ impl Pages {
         let vec = _region
             .read()
             .create_reader(file)
-            .read_all()
+            .read_all()?
             .chunks(Self::SIZE_OF_PAGE)
             .map(|b| Page::read_from_bytes(b).map_err(|e| e.into()))
             .collect::<Result<_>>()?;

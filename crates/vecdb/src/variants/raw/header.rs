@@ -134,8 +134,8 @@ impl HeaderInner {
         }
 
         let reader = db.create_region_reader(region_index.into())?;
-        let slice = reader.read(0, HEADER_OFFSET as u64);
-        let header = HeaderInner::read_from_bytes(slice)?;
+        let vec = reader.read(0, HEADER_OFFSET as u64)?;
+        let header = HeaderInner::read_from_bytes(&vec)?;
 
         if header.header_version != HEADER_VERSION {
             return Err(Error::DifferentVersion {

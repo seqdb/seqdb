@@ -17,7 +17,8 @@ use zerocopy::{FromBytes, IntoBytes};
 
 use crate::{
     AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, BaseVecIterator, BoxedVecIterator,
-    CollectableVec, Error, GenericStoredVec, Result, StoredIndex, StoredRaw, Version,
+    CollectableVec, Error, GenericStoredVec, Result, StoredIndex, StoredRaw, VEC_PAGE_SIZE,
+    Version,
 };
 
 use super::Format;
@@ -125,7 +126,7 @@ where
             Some(
                 holes
                     .create_reader(db)
-                    .read_all()
+                    .read_all()?
                     .chunks(size_of::<usize>())
                     .map(|b| -> Result<usize> { usize::read_from_bytes(b).map_err(|e| e.into()) })
                     .collect::<Result<BTreeSet<usize>>>()?,
@@ -440,7 +441,7 @@ where
 {
     #[inline]
     fn read_(&self, index: usize, reader: &Reader) -> Result<T> {
-        T::read_from_prefix(reader.prefixed((index * Self::SIZE_OF_T + HEADER_OFFSET) as u64))
+        T::read_from_prefix(&reader.prefixed((index * Self::SIZE_OF_T + HEADER_OFFSET) as u64)?)
             .map(|(v, _)| v)
             .map_err(Error::from)
     }
@@ -516,6 +517,28 @@ pub struct RawVecIterator<'a, I, T> {
     vec: &'a RawVec<I, T>,
     reader: Reader<'a>,
     index: usize,
+    stored_len: usize,
+    dirty: bool,
+    holes: bool,
+    updated: bool,
+    buffer: Vec<u8>,
+    current_page: usize,
+}
+
+impl<I, T> RawVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredRaw,
+{
+    const SIZE_OF_T: usize = size_of::<T>();
+    const PER_PAGE: usize = VEC_PAGE_SIZE / Self::SIZE_OF_T;
+}
+
+impl<I, T> Drop for RawVecIterator<'_, I, T> {
+    fn drop(&mut self) {
+        // Revert advisory back to normal access pattern
+        let _ = self.reader.advise_normal();
+    }
 }
 
 impl<I, T> BaseVecIterator for RawVecIterator<'_, I, T>
@@ -548,18 +571,52 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         let index = self.index;
+        self.index += 1;
 
-        let opt = self
-            .vec
-            .get_any_or_read_(index, &self.reader)
-            .unwrap()
-            .map(|v| (I::from(index), v));
+        let stored_len = self.stored_len;
 
-        if opt.is_some() || self.vec.holes.contains(&index) {
-            self.index += 1;
-        }
+        let res = if self.dirty {
+            if self.holes && self.vec.holes().contains(&index) {
+                Some(None)
+            } else if index >= stored_len {
+                Some(self.vec.get_pushed(index, stored_len))
+            } else if self.updated
+                && let Some(updated) = self.vec.updated().get(&index)
+            {
+                Some(Some(updated))
+            } else {
+                None
+            }
+        } else if index >= stored_len {
+            Some(None)
+        } else {
+            None
+        };
 
-        opt
+        let res = if let Some(res) = res {
+            res.map(|v| Cow::Borrowed(v))
+        } else {
+            let buffer = &mut self.buffer;
+            let page_index = index / Self::PER_PAGE;
+            let buffer_index = (index % Self::PER_PAGE) * Self::SIZE_OF_T;
+
+            if page_index != self.current_page {
+                let new_len = (self.stored_len - index).min(Self::PER_PAGE) * Self::SIZE_OF_T;
+                if buffer.len() != new_len {
+                    buffer.resize(new_len, 0);
+                }
+                let offset = (page_index * Self::PER_PAGE * Self::SIZE_OF_T) as u64;
+                self.reader.read_into(offset, buffer).ok()?;
+                self.current_page = page_index;
+            }
+            Some(Cow::Owned(
+                T::read_from_prefix(&buffer[buffer_index..buffer_index + Self::SIZE_OF_T])
+                    .ok()?
+                    .0,
+            ))
+        };
+
+        res.map(|v| (I::from(index), v))
     }
 }
 
@@ -572,10 +629,25 @@ where
     type IntoIter = RawVecIterator<'a, I, T>;
 
     fn into_iter(self) -> Self::IntoIter {
+        let pushed = !self.pushed.is_empty();
+        let holes = !self.holes.is_empty();
+        let updated = !self.updated.is_empty();
+        let stored_len = self.stored_len();
+
+        let reader = self.create_static_reader();
+        // Advise kernel for aggressive sequential readahead
+        let _ = reader.advise_sequential();
+
         RawVecIterator {
             vec: self,
-            reader: self.create_static_reader(),
+            reader,
             index: 0,
+            stored_len,
+            dirty: pushed || holes || updated,
+            holes,
+            updated,
+            buffer: vec![0; VEC_PAGE_SIZE],
+            current_page: usize::MAX,
         }
     }
 }

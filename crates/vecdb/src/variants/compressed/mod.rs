@@ -13,7 +13,7 @@ use seqdb::{Database, Reader, Region};
 use crate::{
     AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, AsInnerSlice, BaseVecIterator,
     BoxedVecIterator, CollectableVec, Error, Format, FromInnerSlice, GenericStoredVec,
-    HEADER_OFFSET, Header, RawVec, Result, StoredCompressed, StoredIndex, Version,
+    HEADER_OFFSET, Header, RawVec, Result, StoredCompressed, StoredIndex, VEC_PAGE_SIZE, Version,
     variants::ImportOptions,
 };
 
@@ -23,9 +23,8 @@ mod pages;
 use page::*;
 use pages::*;
 
-const ONE_KIB: usize = 1024;
-const MAX_PAGE_SIZE: usize = 16 * ONE_KIB;
 const PCO_COMPRESSION_LEVEL: usize = 4;
+pub const MAX_COMPRESSED_PAGE_SIZE: usize = VEC_PAGE_SIZE;
 
 const VERSION: Version = Version::TWO;
 
@@ -40,7 +39,7 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    const PER_PAGE: usize = MAX_PAGE_SIZE / Self::SIZE_OF_T;
+    const PER_PAGE: usize = MAX_COMPRESSED_PAGE_SIZE / Self::SIZE_OF_T;
 
     /// Same as import but will reset the vec under certain errors, so be careful !
     pub fn forced_import(db: &Database, name: &str, version: Version) -> Result<Self> {
@@ -111,9 +110,9 @@ where
         let len = page.bytes as u64;
         let offset = page.start;
 
-        let slice = reader.read(offset, len);
+        let vec = reader.read(offset, len)?;
 
-        let vec: Vec<T::NumberType> = pco::standalone::simple_decompress(slice)?;
+        let vec: Vec<T::NumberType> = pco::standalone::simple_decompress(&vec)?;
         let vec = T::from_inner_slice(vec);
 
         if vec.len() != page.values as usize {
@@ -448,7 +447,14 @@ where
     T: StoredCompressed,
 {
     const SIZE_OF_T: usize = size_of::<T>();
-    const PER_PAGE: usize = MAX_PAGE_SIZE / Self::SIZE_OF_T;
+    const PER_PAGE: usize = MAX_COMPRESSED_PAGE_SIZE / Self::SIZE_OF_T;
+}
+
+impl<I, T> Drop for CompressedVecIterator<'_, I, T> {
+    fn drop(&mut self) {
+        // Revert advisory back to normal access pattern
+        let _ = self.reader.advise_normal();
+    }
 }
 
 impl<I, T> BaseVecIterator for CompressedVecIterator<'_, I, T>
@@ -484,13 +490,8 @@ where
         let stored_len = self.stored_len;
 
         let result = if i >= stored_len {
-            let j = i - stored_len;
-            if j >= self.vec.pushed_len() {
-                return None;
-            }
             self.vec
-                .pushed()
-                .get(j)
+                .get_pushed(i, stored_len)
                 .map(|v| (I::from(i), Cow::Borrowed(v)))
         } else {
             let page_index = i / Self::PER_PAGE;
@@ -532,9 +533,13 @@ where
         let pages = self.pages.read();
         let stored_len = self.stored_len();
 
+        let reader = self.create_static_reader();
+        // Advise kernel for aggressive sequential readahead
+        let _ = reader.advise_sequential();
+
         CompressedVecIterator {
             vec: self,
-            reader: self.create_static_reader(),
+            reader,
             decoded: None,
             pages,
             index: 0,
