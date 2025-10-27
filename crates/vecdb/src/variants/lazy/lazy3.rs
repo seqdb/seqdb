@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use allocative::Allocative;
 
 use crate::{
@@ -9,9 +7,9 @@ use crate::{
 
 pub type ComputeFrom3<I, T, S1I, S1T, S2I, S2T, S3I, S3T> = for<'a> fn(
     I,
-    &mut dyn BaseVecIterator<Item = (S1I, Cow<'a, S1T>)>,
-    &mut dyn BaseVecIterator<Item = (S2I, Cow<'a, S2T>)>,
-    &mut dyn BaseVecIterator<Item = (S3I, Cow<'a, S3T>)>,
+    &mut dyn BaseVecIterator<Item = (S1I, S1T)>,
+    &mut dyn BaseVecIterator<Item = (S2I, S2T)>,
+    &mut dyn BaseVecIterator<Item = (S3I, S3T)>,
 ) -> Option<T>;
 
 #[derive(Clone, Allocative)]
@@ -105,7 +103,7 @@ where
     S3I: StoredIndex,
     S3T: StoredRaw,
 {
-    type Item = (I, Cow<'a, T>);
+    type Item = (I, T);
 
     fn next(&mut self) -> Option<Self::Item> {
         let index = I::from(self.index);
@@ -115,7 +113,7 @@ where
             &mut *self.source2,
             &mut *self.source3,
         )
-        .map(|v| (index, Cow::Owned(v)));
+        .map(|v| (index, v));
         if opt.is_some() {
             self.index += 1;
         }
@@ -178,7 +176,7 @@ where
     S3I: StoredIndex,
     S3T: StoredRaw,
 {
-    type Item = (I, Cow<'a, T>);
+    type Item = (I, T);
     type IntoIter = LazyVecFrom3Iterator<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -257,10 +255,7 @@ where
     S3I: StoredIndex,
     S3T: StoredRaw,
 {
-    fn boxed_iter<'a>(&'a self) -> BoxedVecIterator<'a, I, T>
-    where
-        T: 'a,
-    {
+    fn boxed_iter(&self) -> BoxedVecIterator<'_, I, T> {
         Box::new(self.into_iter())
     }
 }

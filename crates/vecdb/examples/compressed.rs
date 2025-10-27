@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::BTreeSet, fs, path::Path};
+use std::{collections::BTreeSet, fs, path::Path};
 
 use vecdb::{
     AnyStoredVec, AnyVec, CollectableVec, CompressedVec, Database, GenericStoredVec, Stamp,
@@ -25,10 +25,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
 
         let mut iter = vec.into_iter();
-        assert_eq!(iter.get(0), Some(Cow::Borrowed(&0)));
-        assert_eq!(iter.get(1), Some(Cow::Borrowed(&1)));
-        assert_eq!(iter.get(2), Some(Cow::Borrowed(&2)));
-        assert_eq!(iter.get(20), Some(Cow::Borrowed(&20)));
+        assert_eq!(iter.get(0), Some(0));
+        assert_eq!(iter.get(1), Some(1));
+        assert_eq!(iter.get(2), Some(2));
+        assert_eq!(iter.get(20), Some(20));
         assert_eq!(iter.get(21), None);
         drop(iter);
 
@@ -45,15 +45,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         assert!(vec.header().stamp() == Stamp::new(100));
 
         let mut iter = vec.into_iter();
-        assert_eq!(iter.get(0), Some(Cow::Borrowed(&0)));
-        assert_eq!(iter.get(1), Some(Cow::Borrowed(&1)));
-        assert_eq!(iter.get(2), Some(Cow::Borrowed(&2)));
-        assert_eq!(iter.get(3), Some(Cow::Borrowed(&3)));
-        assert_eq!(iter.get(4), Some(Cow::Borrowed(&4)));
-        assert_eq!(iter.get(5), Some(Cow::Borrowed(&5)));
-        assert_eq!(iter.get(20), Some(Cow::Borrowed(&20)));
-        assert_eq!(iter.get(20), Some(Cow::Borrowed(&20)));
-        assert_eq!(iter.get(0), Some(Cow::Borrowed(&0)));
+        assert_eq!(iter.get(0), Some(0));
+        assert_eq!(iter.get(1), Some(1));
+        assert_eq!(iter.get(2), Some(2));
+        assert_eq!(iter.get(3), Some(3));
+        assert_eq!(iter.get(4), Some(4));
+        assert_eq!(iter.get(5), Some(5));
+        assert_eq!(iter.get(20), Some(20));
+        assert_eq!(iter.get(20), Some(20));
+        assert_eq!(iter.get(0), Some(0));
         drop(iter);
 
         vec.push(21);
@@ -64,9 +64,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(vec.len(), 23);
 
         let mut iter = vec.into_iter();
-        assert_eq!(iter.get(20), Some(Cow::Borrowed(&20)));
-        assert_eq!(iter.get(21), Some(Cow::Borrowed(&21)));
-        assert_eq!(iter.get(22), Some(Cow::Borrowed(&22)));
+        assert_eq!(iter.get(20), Some(20));
+        assert_eq!(iter.get(21), Some(21));
+        assert_eq!(iter.get(22), Some(22));
         assert_eq!(iter.get(23), None);
         drop(iter);
 
@@ -83,10 +83,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(vec.len(), 23);
 
         let mut iter = vec.into_iter();
-        assert_eq!(iter.get(0), Some(Cow::Borrowed(&0)));
-        assert_eq!(iter.get(20), Some(Cow::Borrowed(&20)));
-        assert_eq!(iter.get(21), Some(Cow::Borrowed(&21)));
-        assert_eq!(iter.get(22), Some(Cow::Borrowed(&22)));
+        assert_eq!(iter.get(0), Some(0));
+        assert_eq!(iter.get(20), Some(20));
+        assert_eq!(iter.get(21), Some(21));
+        assert_eq!(iter.get(22), Some(22));
         drop(iter);
 
         vec.truncate_if_needed(14)?;
@@ -96,8 +96,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(vec.len(), 14);
 
         let mut iter = vec.into_iter();
-        assert_eq!(iter.get(0), Some(Cow::Borrowed(&0)));
-        assert_eq!(iter.get(5), Some(Cow::Borrowed(&5)));
+        assert_eq!(iter.get(0), Some(0));
+        assert_eq!(iter.get(5), Some(5));
         assert_eq!(iter.get(20), None);
         drop(iter);
 
@@ -107,17 +107,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
 
         vec.push(vec.len() as u32);
-        assert_eq!(
-            VecIterator::last(vec.into_iter()),
-            Some((14, Cow::Borrowed(&14)))
-        );
+        assert_eq!(VecIterator::last(vec.into_iter()), Some((14, 14)));
 
         vec.flush()?;
 
         assert_eq!(
-            vec.into_iter()
-                .map(|(_, v)| v.into_owned())
-                .collect::<Vec<_>>(),
+            vec.into_iter().map(|(_, v)| v).collect::<Vec<_>>(),
             vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
         );
     }
@@ -126,15 +121,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut vec: VEC = CompressedVec::forced_import_with(options)?;
 
         assert_eq!(
-            vec.into_iter()
-                .map(|(_, v)| v.into_owned())
-                .collect::<Vec<_>>(),
+            vec.into_iter().map(|(_, v)| v).collect::<Vec<_>>(),
             vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
         );
 
         let mut iter = vec.into_iter();
-        assert_eq!(iter.get(0), Some(Cow::Borrowed(&0)));
-        assert_eq!(iter.get(5), Some(Cow::Borrowed(&5)));
+        assert_eq!(iter.get(0), Some(0));
+        assert_eq!(iter.get(5), Some(5));
         assert_eq!(iter.get(20), None);
         drop(iter);
 
@@ -158,8 +151,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(vec.len(), 21);
 
         let mut iter = vec.into_iter();
-        assert_eq!(iter.get(0), Some(Cow::Borrowed(&0)));
-        assert_eq!(iter.get(20), Some(Cow::Borrowed(&20)));
+        assert_eq!(iter.get(0), Some(0));
+        assert_eq!(iter.get(20), Some(20));
         assert_eq!(iter.get(21), None);
         drop(iter);
 
@@ -175,8 +168,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let reader = vec.create_static_reader();
         assert_eq!(vec.holes(), &BTreeSet::new());
-        assert_eq!(vec.get_any_or_read(0, &reader)?, Some(Cow::Borrowed(&0)));
-        assert_eq!(vec.get_any_or_read(10, &reader)?, Some(Cow::Borrowed(&10)));
+        assert_eq!(vec.get_any_or_read(0, &reader)?, Some(0));
+        assert_eq!(vec.get_any_or_read(10, &reader)?, Some(10));
         drop(reader);
 
         vec.flush()?;

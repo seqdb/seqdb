@@ -2,33 +2,33 @@ use crate::{AnyStoredVec, AnyVec, BoxedVecIterator, StoredIndex, StoredRaw};
 
 pub trait AnyIterableVec<I, T>: AnyVec {
     #[allow(clippy::wrong_self_convention)]
-    fn boxed_iter<'a>(&'a self) -> BoxedVecIterator<'a, I, T>
+    fn boxed_iter(&self) -> BoxedVecIterator<'_, I, T>
     where
         I: StoredIndex,
-        T: StoredRaw + 'a;
+        T: StoredRaw;
 
-    fn iter<'a>(&'a self) -> BoxedVecIterator<'a, I, T>
+    fn iter(&self) -> BoxedVecIterator<'_, I, T>
     where
         I: StoredIndex,
-        T: StoredRaw + 'a,
+        T: StoredRaw,
     {
         self.boxed_iter()
     }
 
-    fn iter_at<'a>(&'a self, i: I) -> BoxedVecIterator<'a, I, T>
+    fn iter_at(&self, i: I) -> BoxedVecIterator<'_, I, T>
     where
         I: StoredIndex,
-        T: StoredRaw + 'a,
+        T: StoredRaw,
     {
         let mut iter = self.boxed_iter();
         iter.set(i);
         iter
     }
 
-    fn iter_at_<'a>(&'a self, i: usize) -> BoxedVecIterator<'a, I, T>
+    fn iter_at_(&self, i: usize) -> BoxedVecIterator<'_, I, T>
     where
         I: StoredIndex,
-        T: StoredRaw + 'a,
+        T: StoredRaw,
     {
         let mut iter = self.boxed_iter();
         iter.set_(i);

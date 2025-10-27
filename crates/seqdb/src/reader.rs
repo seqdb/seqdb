@@ -25,7 +25,7 @@ const F_RDADVISE: libc::c_int = 44;
 
 #[cfg(target_os = "macos")]
 #[repr(C)]
-struct radvisory {
+struct Radvisory {
     ra_offset: libc::off_t,
     ra_count: libc::c_int,
 }
@@ -110,7 +110,7 @@ impl<'a> Reader<'a> {
         let fd = self.file.as_raw_fd();
         let start = self.region.start() + offset;
 
-        let advisory = radvisory {
+        let advisory = Radvisory {
             ra_offset: start as libc::off_t,
             ra_count: len as libc::c_int,
         };

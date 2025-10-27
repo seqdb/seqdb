@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use crate::i64_to_usize;
 
 use super::{AnyIterableVec, AnyVec, StoredIndex, StoredRaw};
@@ -10,22 +8,14 @@ where
     I: StoredIndex,
     T: StoredRaw,
 {
-    fn iter_range(
-        &self,
-        from: Option<usize>,
-        to: Option<usize>,
-    ) -> impl Iterator<Item = Cow<'_, T>> {
+    fn iter_range(&self, from: Option<usize>, to: Option<usize>) -> impl Iterator<Item = T> {
         let len = self.len();
         let from = from.unwrap_or_default();
         let to = to.map_or(len, |to| to.min(len));
         self.iter_at_(from).take(to - from).map(|(_, v)| v)
     }
 
-    fn iter_signed_range(
-        &self,
-        from: Option<i64>,
-        to: Option<i64>,
-    ) -> impl Iterator<Item = Cow<'_, T>> {
+    fn iter_signed_range(&self, from: Option<i64>, to: Option<i64>) -> impl Iterator<Item = T> {
         let from = from.map(|i| self.i64_to_usize(i));
         let to = to.map(|i| self.i64_to_usize(i));
         self.iter_range(from, to)
@@ -36,9 +26,7 @@ where
     }
 
     fn collect_range(&self, from: Option<usize>, to: Option<usize>) -> Vec<T> {
-        self.iter_range(from, to)
-            .map(|v| v.into_owned())
-            .collect::<Vec<_>>()
+        self.iter_range(from, to).collect::<Vec<_>>()
     }
 
     fn collect_signed_range(&self, from: Option<i64>, to: Option<i64>) -> Vec<T> {
@@ -49,9 +37,9 @@ where
 
     #[inline]
     fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Vec<u8> {
-        let cows = self.iter_range(from, to).collect::<Vec<_>>();
+        let vec = self.iter_range(from, to).collect::<Vec<_>>();
         let mut bytes = Vec::with_capacity(self.len() * 21);
-        sonic_rs::to_writer(&mut bytes, &cows).unwrap();
+        sonic_rs::to_writer(&mut bytes, &vec).unwrap();
         bytes
     }
 

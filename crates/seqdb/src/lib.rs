@@ -447,6 +447,13 @@ impl DatabaseInner {
         path.join("data")
     }
 
+    /// Open a dedicated file handle for sequential reading
+    /// This enables optimal kernel readahead for iteration
+    #[inline]
+    pub fn open_sequential_reader(&self) -> Result<File> {
+        File::open(self.data_path()).map_err(Error::from)
+    }
+
     pub fn disk_usage(&self) -> String {
         let path = self.data_path();
 

@@ -1,6 +1,7 @@
 use std::{
-    borrow::Cow,
     collections::{BTreeMap, BTreeSet},
+    fs::File,
+    io::{Read, Seek, SeekFrom},
     marker::PhantomData,
     mem,
     sync::{
@@ -18,7 +19,7 @@ use zerocopy::{FromBytes, IntoBytes};
 use crate::{
     AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, BaseVecIterator, BoxedVecIterator,
     CollectableVec, Error, GenericStoredVec, Result, StoredIndex, StoredRaw, VEC_PAGE_SIZE,
-    Version,
+    Version, likely, unlikely,
 };
 
 use super::Format;
@@ -176,6 +177,14 @@ where
         let mut iter = self.into_iter();
         iter.set_(i);
         iter
+    }
+
+    /// Iterator over values only (no indices) for maximum performance
+    #[inline]
+    pub fn values(&self) -> RawVecValues<'_, I, T> {
+        RawVecValues {
+            inner: self.into_iter(),
+        }
     }
 
     pub fn write_header_if_needed(&mut self) -> Result<()> {
@@ -512,17 +521,24 @@ where
     }
 }
 
-#[derive(Debug)]
 pub struct RawVecIterator<'a, I, T> {
-    vec: &'a RawVec<I, T>,
-    reader: Reader<'a>,
+    // HOT: accessed every iteration (first cache line)
     index: usize,
     stored_len: usize,
+    current_page: usize,
+    cursor_page: usize,
     dirty: bool,
     holes: bool,
     updated: bool,
+
+    // WARM: accessed per page
+    seq_file: File,
+    region_start: u64,
     buffer: Vec<u8>,
-    current_page: usize,
+
+    // COLD: only accessed in slow path or for lifetimes
+    vec: &'a RawVec<I, T>,
+    _reader: Reader<'a>,  // Holds locks, must stay alive
 }
 
 impl<I, T> RawVecIterator<'_, I, T>
@@ -532,12 +548,16 @@ where
 {
     const SIZE_OF_T: usize = size_of::<T>();
     const PER_PAGE: usize = VEC_PAGE_SIZE / Self::SIZE_OF_T;
+
+    // Compute bit shift amounts for fast division/modulo (assumes power-of-2 sizes)
+    const PAGE_SHIFT: u32 = Self::PER_PAGE.trailing_zeros();
+    const SIZE_SHIFT: u32 = Self::SIZE_OF_T.trailing_zeros();
+    const PAGE_MASK: usize = Self::PER_PAGE - 1;
 }
 
 impl<I, T> Drop for RawVecIterator<'_, I, T> {
     fn drop(&mut self) {
-        // Revert advisory back to normal access pattern
-        let _ = self.reader.advise_normal();
+        // No cleanup needed - seq_file will be closed automatically
     }
 }
 
@@ -562,61 +582,129 @@ where
     }
 }
 
+impl<'a, I, T> RawVecIterator<'a, I, T>
+where
+    I: StoredIndex,
+    T: StoredRaw,
+{
+    /// Load a page into buffer
+    #[inline(always)]
+    fn load_page_unchecked(&mut self, index: usize, page_index: usize) {
+        let remaining = self.stored_len - index;
+        let new_len = remaining.min(Self::PER_PAGE) << Self::SIZE_SHIFT;
+
+        if self.cursor_page != page_index {
+            let offset = self.region_start
+                + ((page_index << Self::PAGE_SHIFT) << Self::SIZE_SHIFT) as u64;
+            // Safety: seek position is always valid (within file bounds)
+            unsafe { self.seq_file.seek(SeekFrom::Start(offset)).unwrap_unchecked() };
+        }
+
+        // Read into buffer
+        // Safety: buffer is correctly sized and file has enough data
+        unsafe { self.seq_file.read_exact(&mut self.buffer[..new_len]).unwrap_unchecked() };
+        self.current_page = page_index;
+        self.cursor_page = page_index + 1;
+    }
+
+    /// Core iteration logic - returns just the value
+    #[inline(always)]
+    fn next_value_impl(&mut self) -> Option<T> {
+        let index = self.index;
+        self.index += 1;
+
+        // Fast path: clean vec (no dirty data)
+        if likely(!self.dirty) {
+            if unlikely(index >= self.stored_len) {
+                return None;
+            }
+
+            // Use bit shifts for fast page calculation
+            let page_index = index >> Self::PAGE_SHIFT;
+            let buffer_index = (index & Self::PAGE_MASK) << Self::SIZE_SHIFT;
+
+            if unlikely(page_index != self.current_page) {
+                self.load_page_unchecked(index, page_index);
+            }
+
+            // Safety: buffer_index is guaranteed to be in bounds by page logic
+            // and properly aligned since buffer_index is always a multiple of SIZE_OF_T
+            // and Vec allocator provides proper alignment
+            return Some(unsafe {
+                std::ptr::read_unaligned(self.buffer.as_ptr().add(buffer_index) as *const T)
+            });
+        }
+
+        // Slow path: handle dirty data (holes/updates/pushed items)
+        let stored_len = self.stored_len;
+
+        let res = if self.holes && self.vec.holes().contains(&index) {
+            Some(None)
+        } else if index >= stored_len {
+            Some(self.vec.get_pushed(index, stored_len))
+        } else if self.updated
+            && let Some(updated) = self.vec.updated().get(&index)
+        {
+            Some(Some(updated))
+        } else {
+            None
+        };
+
+        if let Some(res) = res {
+            return res.cloned();
+        }
+
+        // Use bit shifts for fast page calculation
+        let page_index = index >> Self::PAGE_SHIFT;
+        let buffer_index = (index & Self::PAGE_MASK) << Self::SIZE_SHIFT;
+
+        if page_index != self.current_page {
+            self.load_page_unchecked(index, page_index);
+        }
+
+        Some(unsafe {
+            std::ptr::read_unaligned(self.buffer.as_ptr().add(buffer_index) as *const T)
+        })
+    }
+
+    /// Get next value without index (for values() iterator)
+    #[inline(always)]
+    pub fn next_value(&mut self) -> Option<T> {
+        self.next_value_impl()
+    }
+}
+
+/// Iterator adapter that yields only values (no indices)
+pub struct RawVecValues<'a, I, T> {
+    inner: RawVecIterator<'a, I, T>,
+}
+
+impl<I, T> Iterator for RawVecValues<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredRaw,
+{
+    type Item = T;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next_value()
+    }
+}
+
 impl<'a, I, T> Iterator for RawVecIterator<'a, I, T>
 where
     I: StoredIndex,
     T: StoredRaw,
 {
-    type Item = (I, Cow<'a, T>);
+    type Item = (I, T);
 
+    #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
+        // Get current index before increment happens in next_value_impl
         let index = self.index;
-        self.index += 1;
-
-        let stored_len = self.stored_len;
-
-        let res = if self.dirty {
-            if self.holes && self.vec.holes().contains(&index) {
-                Some(None)
-            } else if index >= stored_len {
-                Some(self.vec.get_pushed(index, stored_len))
-            } else if self.updated
-                && let Some(updated) = self.vec.updated().get(&index)
-            {
-                Some(Some(updated))
-            } else {
-                None
-            }
-        } else if index >= stored_len {
-            Some(None)
-        } else {
-            None
-        };
-
-        let res = if let Some(res) = res {
-            res.map(|v| Cow::Borrowed(v))
-        } else {
-            let buffer = &mut self.buffer;
-            let page_index = index / Self::PER_PAGE;
-            let buffer_index = (index % Self::PER_PAGE) * Self::SIZE_OF_T;
-
-            if page_index != self.current_page {
-                let new_len = (self.stored_len - index).min(Self::PER_PAGE) * Self::SIZE_OF_T;
-                if buffer.len() != new_len {
-                    buffer.resize(new_len, 0);
-                }
-                let offset = (page_index * Self::PER_PAGE * Self::SIZE_OF_T) as u64;
-                self.reader.read_into(offset, buffer).ok()?;
-                self.current_page = page_index;
-            }
-            Some(Cow::Owned(
-                T::read_from_prefix(&buffer[buffer_index..buffer_index + Self::SIZE_OF_T])
-                    .ok()?
-                    .0,
-            ))
-        };
-
-        res.map(|v| (I::from(index), v))
+        let value = self.next_value_impl()?;
+        Some((I::from(index), value))
     }
 }
 
@@ -625,7 +713,7 @@ where
     I: StoredIndex,
     T: StoredRaw,
 {
-    type Item = (I, Cow<'a, T>);
+    type Item = (I, T);
     type IntoIter = RawVecIterator<'a, I, T>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -634,20 +722,33 @@ where
         let updated = !self.updated.is_empty();
         let stored_len = self.stored_len();
 
-        let reader = self.create_static_reader();
-        // Advise kernel for aggressive sequential readahead
-        let _ = reader.advise_sequential();
+        let _reader = self.create_static_reader();
+        let region_start = self.region.read().start();
+
+        // Open dedicated file handle for optimal sequential readahead
+        let seq_file = self
+            .db
+            .open_sequential_reader()
+            .expect("Failed to open sequential reader");
 
         RawVecIterator {
-            vec: self,
-            reader,
+            // HOT fields first
             index: 0,
             stored_len,
+            current_page: usize::MAX,
+            cursor_page: usize::MAX,
             dirty: pushed || holes || updated,
             holes,
             updated,
+
+            // WARM fields
+            seq_file,
+            region_start,
             buffer: vec![0; VEC_PAGE_SIZE],
-            current_page: usize::MAX,
+
+            // COLD fields
+            vec: self,
+            _reader,
         }
     }
 }
@@ -657,10 +758,7 @@ where
     I: StoredIndex,
     T: StoredRaw,
 {
-    fn boxed_iter<'a>(&'a self) -> BoxedVecIterator<'a, I, T>
-    where
-        T: 'a,
-    {
+    fn boxed_iter(&self) -> BoxedVecIterator<'_, I, T> {
         Box::new(self.into_iter())
     }
 }

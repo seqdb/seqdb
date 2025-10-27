@@ -1,5 +1,4 @@
 use std::{
-    borrow::Cow,
     collections::{BTreeMap, BTreeSet},
     mem,
     sync::Arc,
@@ -450,13 +449,6 @@ where
     const PER_PAGE: usize = MAX_COMPRESSED_PAGE_SIZE / Self::SIZE_OF_T;
 }
 
-impl<I, T> Drop for CompressedVecIterator<'_, I, T> {
-    fn drop(&mut self) {
-        // Revert advisory back to normal access pattern
-        let _ = self.reader.advise_normal();
-    }
-}
-
 impl<I, T> BaseVecIterator for CompressedVecIterator<'_, I, T>
 where
     I: StoredIndex,
@@ -483,16 +475,14 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    type Item = (I, Cow<'a, T>);
+    type Item = (I, T);
 
     fn next(&mut self) -> Option<Self::Item> {
         let i = self.index;
         let stored_len = self.stored_len;
 
         let result = if i >= stored_len {
-            self.vec
-                .get_pushed(i, stored_len)
-                .map(|v| (I::from(i), Cow::Borrowed(v)))
+            self.vec.get_pushed(i, stored_len).map(|v| (I::from(i), *v))
         } else {
             let page_index = i / Self::PER_PAGE;
 
@@ -512,7 +502,7 @@ where
                 .unwrap()
                 .1
                 .get(i % Self::PER_PAGE)
-                .map(|v| (I::from(i), Cow::Owned(*v)))
+                .map(|v| (I::from(i), *v))
         };
 
         self.index += 1;
@@ -526,20 +516,16 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    type Item = (I, Cow<'a, T>);
+    type Item = (I, T);
     type IntoIter = CompressedVecIterator<'a, I, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         let pages = self.pages.read();
         let stored_len = self.stored_len();
 
-        let reader = self.create_static_reader();
-        // Advise kernel for aggressive sequential readahead
-        let _ = reader.advise_sequential();
-
         CompressedVecIterator {
             vec: self,
-            reader,
+            reader: self.create_static_reader(),
             decoded: None,
             pages,
             index: 0,
@@ -553,10 +539,7 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    fn boxed_iter<'a>(&'a self) -> BoxedVecIterator<'a, I, T>
-    where
-        T: 'a,
-    {
+    fn boxed_iter(&self) -> BoxedVecIterator<'_, I, T> {
         Box::new(self.into_iter())
     }
 }

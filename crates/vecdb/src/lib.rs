@@ -31,4 +31,25 @@ pub use variants::{
 pub use version::*;
 
 const ONE_KIB: usize = 1024;
-const VEC_PAGE_SIZE: usize = 16 * ONE_KIB;
+const VEC_PAGE_SIZE: usize = 256 * ONE_KIB;
+
+// Branch prediction hints
+#[inline(always)]
+#[cold]
+pub fn cold() {}
+
+#[inline(always)]
+pub fn likely(b: bool) -> bool {
+    if !b {
+        cold();
+    }
+    b
+}
+
+#[inline(always)]
+pub fn unlikely(b: bool) -> bool {
+    if b {
+        cold();
+    }
+    b
+}

@@ -1,4 +1,4 @@
-use std::{borrow::Cow, iter::Skip};
+use std::iter::Skip;
 
 use super::{PrintableIndex, StoredIndex, StoredRaw};
 
@@ -32,9 +32,9 @@ pub trait BaseVecIterator: Iterator {
     }
 }
 
-pub trait VecIterator<'a>: BaseVecIterator<Item = (Self::I, Cow<'a, Self::T>)> {
+pub trait VecIterator: BaseVecIterator<Item = (Self::I, Self::T)> {
     type I: StoredIndex;
-    type T: StoredRaw + 'a;
+    type T: StoredRaw;
 
     #[inline]
     fn set(&mut self, i: Self::I) {
@@ -42,12 +42,12 @@ pub trait VecIterator<'a>: BaseVecIterator<Item = (Self::I, Cow<'a, Self::T>)> {
     }
 
     #[inline]
-    fn get_(&mut self, i: usize) -> Option<Cow<'a, Self::T>> {
+    fn get_(&mut self, i: usize) -> Option<Self::T> {
         self.next_at(i).map(|(_, v)| v)
     }
 
     #[inline]
-    fn get(&mut self, i: Self::I) -> Option<Cow<'a, Self::T>> {
+    fn get(&mut self, i: Self::I) -> Option<Self::T> {
         self.get_(i.to_usize())
     }
 
@@ -58,17 +58,15 @@ pub trait VecIterator<'a>: BaseVecIterator<Item = (Self::I, Cow<'a, Self::T>)> {
 
     #[inline]
     fn unwrap_get_inner_(&mut self, i: usize) -> Self::T {
-        self.get_(i)
-            .unwrap_or_else(|| {
-                dbg!(self.name(), i, self.len(), std::any::type_name::<Self::I>());
-                panic!("unwrap_get_inner_")
-            })
-            .into_owned()
+        self.get_(i).unwrap_or_else(|| {
+            dbg!(self.name(), i, self.len(), std::any::type_name::<Self::I>());
+            panic!("unwrap_get_inner_")
+        })
     }
 
     #[inline]
     fn get_inner(&mut self, i: Self::I) -> Option<Self::T> {
-        self.get_(i.to_usize()).map(|v| v.into_owned())
+        self.get_(i.to_usize())
     }
 
     fn last(mut self) -> Option<Self::Item>
@@ -89,15 +87,14 @@ pub trait VecIterator<'a>: BaseVecIterator<Item = (Self::I, Cow<'a, Self::T>)> {
     }
 }
 
-impl<'a, I, T, Iter> VecIterator<'a> for Iter
+impl<I, T, Iter> VecIterator for Iter
 where
-    Iter: BaseVecIterator<Item = (I, Cow<'a, T>)>,
+    Iter: BaseVecIterator<Item = (I, T)>,
     I: StoredIndex,
-    T: StoredRaw + 'a,
+    T: StoredRaw,
 {
     type I = I;
     type T = T;
 }
 
-pub type BoxedVecIterator<'a, I, T> =
-    Box<dyn VecIterator<'a, I = I, T = T, Item = (I, Cow<'a, T>)> + 'a>;
+pub type BoxedVecIterator<'a, I, T> = Box<dyn VecIterator<I = I, T = T, Item = (I, T)> + 'a>;

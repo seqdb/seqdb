@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use crate::{
     AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BaseVecIterator,
     BoxedVecIterator, CollectableVec, Exit, Format, Result, StoredCompressed, StoredIndex,
@@ -339,7 +337,7 @@ where
     S3I: StoredIndex,
     S3T: StoredRaw,
 {
-    type Item = (I, Cow<'a, T>);
+    type Item = (I, T);
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Eager(i) => i.next(),
@@ -404,7 +402,7 @@ where
     S3I: StoredIndex,
     S3T: StoredRaw,
 {
-    type Item = (I, Cow<'a, T>);
+    type Item = (I, T);
     type IntoIter = ComputedVecIterator<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -429,10 +427,7 @@ where
     S3I: StoredIndex,
     S3T: StoredRaw,
 {
-    fn boxed_iter<'a>(&'a self) -> BoxedVecIterator<'a, I, T>
-    where
-        T: 'a,
-    {
+    fn boxed_iter(&self) -> BoxedVecIterator<'_, I, T> {
         Box::new(self.into_iter())
     }
 }

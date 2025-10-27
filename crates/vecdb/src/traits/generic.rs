@@ -1,5 +1,4 @@
 use std::{
-    borrow::Cow,
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet},
     fs,
@@ -68,29 +67,29 @@ where
     fn read_(&self, index: usize, reader: &Reader) -> Result<T>;
 
     #[inline]
-    fn get_any_or_read(&'_ self, index: I, reader: &Reader) -> Result<Option<Cow<'_, T>>> {
+    fn get_any_or_read(&'_ self, index: I, reader: &Reader) -> Result<Option<T>> {
         self.get_any_or_read_(index.to_usize(), reader)
     }
     #[inline]
-    fn get_any_or_read_(&'_ self, index: usize, reader: &Reader) -> Result<Option<Cow<'_, T>>> {
+    fn get_any_or_read_(&'_ self, index: usize, reader: &Reader) -> Result<Option<T>> {
         let stored_len = self.stored_len();
 
         if index >= stored_len {
-            return Ok(self.get_pushed(index, stored_len).map(Cow::Borrowed));
+            return Ok(self.get_pushed(index, stored_len).cloned());
         }
 
         let updated = self.updated();
         if !updated.is_empty()
             && let Some(updated) = updated.get(&index)
         {
-            return Ok(Some(Cow::Borrowed(updated)));
+            return Ok(Some(updated.clone()));
         }
 
         let prev_updated = self.prev_updated();
         if !prev_updated.is_empty()
             && let Some(prev) = prev_updated.get(&index)
         {
-            return Ok(Some(Cow::Borrowed(prev)));
+            return Ok(Some(prev.clone()));
         }
 
         // Was before pushed, not sure why and if it needs to be there
@@ -99,21 +98,21 @@ where
             return Ok(None);
         }
 
-        Ok(Some(Cow::Owned(self.read_(index, reader)?)))
+        Ok(Some(self.read_(index, reader)?))
     }
     #[inline]
-    fn get_pushed_or_read(&'_ self, index: I, reader: &Reader) -> Result<Option<Cow<'_, T>>> {
+    fn get_pushed_or_read(&'_ self, index: I, reader: &Reader) -> Result<Option<T>> {
         self.get_pushed_or_read_(index.to_usize(), reader)
     }
     #[inline]
-    fn get_pushed_or_read_(&'_ self, index: usize, reader: &Reader) -> Result<Option<Cow<'_, T>>> {
+    fn get_pushed_or_read_(&'_ self, index: usize, reader: &Reader) -> Result<Option<T>> {
         let stored_len = self.stored_len();
 
         if index >= stored_len {
-            return Ok(self.get_pushed(index, stored_len).map(Cow::Borrowed));
+            return Ok(self.get_pushed(index, stored_len).cloned());
         }
 
-        Ok(Some(Cow::Owned(self.read_(index, reader)?)))
+        Ok(Some(self.read_(index, reader)?))
     }
 
     #[inline]
@@ -240,7 +239,7 @@ where
     fn mut_prev_holes(&mut self) -> &mut BTreeSet<usize>;
 
     fn take(&mut self, index: I, reader: &Reader) -> Result<Option<T>> {
-        let opt = self.get_any_or_read(index, reader)?.map(|v| v.into_owned());
+        let opt = self.get_any_or_read(index, reader)?;
         if opt.is_some() {
             self.unchecked_delete(index);
         }
@@ -687,10 +686,7 @@ where
         let reader = self.create_reader();
 
         (from..to)
-            .map(|i| {
-                self.get_any_or_read_(i, &reader)
-                    .map(|o| o.map(|c| c.into_owned()))
-            })
+            .map(|i| self.get_any_or_read_(i, &reader))
             .collect::<Result<Vec<_>>>()
     }
 

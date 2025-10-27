@@ -1,7 +1,4 @@
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, BTreeSet},
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 use allocative::Allocative;
 use parking_lot::RwLock;
@@ -321,7 +318,7 @@ where
     }
 }
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub enum StoredVecIterator<'a, I, T> {
     Raw(RawVecIterator<'a, I, T>),
     Compressed(CompressedVecIterator<'a, I, T>),
@@ -332,12 +329,14 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    type Item = (I, Cow<'a, T>);
+    type Item = (I, T);
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            Self::Compressed(i) => i.next(),
-            Self::Raw(i) => i.next(),
-        }
+        todo!()
+        // match self {
+        //     Self::Compressed(i) => i.next(),
+        //     Self::Raw(i) => i.next(),
+        // }
     }
 }
 
@@ -375,7 +374,7 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    type Item = (I, Cow<'a, T>);
+    type Item = (I, T);
     type IntoIter = StoredVecIterator<'a, I, T>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -391,10 +390,7 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    fn boxed_iter<'a>(&'a self) -> BoxedVecIterator<'a, I, T>
-    where
-        T: 'a,
-    {
+    fn boxed_iter(&self) -> BoxedVecIterator<'_, I, T> {
         Box::new(self.into_iter())
     }
 }

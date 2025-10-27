@@ -1,6 +1,5 @@
 use core::error;
 use std::{
-    borrow::Cow,
     collections::{BTreeMap, BTreeSet, VecDeque},
     f32,
     fmt::Debug,
@@ -60,26 +59,12 @@ where
     }
 
     #[inline]
-    pub fn get_any_or_read<'a, 'b>(
-        &'a self,
-        index: I,
-        reader: &'b Reader,
-    ) -> Result<Option<Cow<'b, T>>>
-    where
-        'a: 'b,
-    {
+    pub fn get_any_or_read(&self, index: I, reader: &Reader) -> Result<Option<T>> {
         self.0.get_any_or_read(index, reader)
     }
 
     #[inline]
-    pub fn get_pushed_or_read<'a, 'b>(
-        &'a self,
-        index: I,
-        reader: &'b Reader,
-    ) -> Result<Option<Cow<'b, T>>>
-    where
-        'a: 'b,
-    {
+    pub fn get_pushed_or_read(&self, index: I, reader: &Reader) -> Result<Option<T>> {
         self.0.get_pushed_or_read(index, reader)
     }
 
@@ -161,7 +146,7 @@ where
 
         let index = max_from.min(A::from(self.len()));
         other.iter_at(index).try_for_each(|(a, b)| {
-            let (i, v) = t((a, b.into_owned(), self));
+            let (i, v) = t((a, b, self));
             self.forced_push_at(i, v, exit)
         })?;
 
@@ -189,7 +174,7 @@ where
         let index = max_from.min(A::from(self.len()));
         let mut iter2 = other2.iter_at(index);
         other1.iter_at(index).try_for_each(|(a, b)| {
-            let (i, v) = t((a, b.into_owned(), iter2.unwrap_get_inner(a), self));
+            let (i, v) = t((a, b, iter2.unwrap_get_inner(a), self));
             self.forced_push_at(i, v, exit)
         })?;
 
@@ -226,7 +211,7 @@ where
         other1.iter_at(index).try_for_each(|(a, b)| {
             let (i, v) = t((
                 a,
-                b.into_owned(),
+                b,
                 iter2.unwrap_get_inner(a),
                 iter3.unwrap_get_inner(a),
                 self,
@@ -255,7 +240,7 @@ where
         let mut adder_iter = adder.iter();
 
         added.iter_at(index).try_for_each(|(i, v)| {
-            let v = v.into_owned() + adder_iter.unwrap_get_inner(i);
+            let v = v + adder_iter.unwrap_get_inner(i);
 
             self.forced_push_at(i, v, exit)
         })?;
@@ -281,10 +266,7 @@ where
         let mut subtracter_iter = subtracter.iter();
 
         subtracted.iter_at(index).try_for_each(|(i, v)| {
-            let v = v
-                .into_owned()
-                .checked_sub(subtracter_iter.unwrap_get_inner(i))
-                .unwrap();
+            let v = v.checked_sub(subtracter_iter.unwrap_get_inner(i)).unwrap();
 
             self.forced_push_at(i, v, exit)
         })?;
@@ -319,7 +301,7 @@ where
                     T::from(source.iter().unwrap_get_inner_(0))
                 });
             }
-            let max = prev.unwrap().max(T::from(v.into_owned()));
+            let max = prev.unwrap().max(T::from(v));
             prev.replace(max);
 
             self.forced_push_at(i, max, exit)
@@ -369,7 +351,7 @@ where
                     T::from(source.iter().unwrap_get_inner_(0))
                 });
             }
-            let v = T::from(v.into_owned());
+            let v = T::from(v);
             let min = prev.unwrap().min(v);
 
             prev.replace(if !exclude_default || min != T::default() {
@@ -404,7 +386,7 @@ where
         let mut multiplier_iter = multiplier.iter();
 
         multiplied.iter_at(index).try_for_each(|(i, v)| {
-            let multiplied = T::from(v.into_owned());
+            let multiplied = T::from(v);
             let multiplier = multiplier_iter.unwrap_get_inner(i);
             let result = multiplied * multiplier;
             self.forced_push_at(i, result, exit)
@@ -433,7 +415,7 @@ where
 
         let mut divider_iter = divider.iter();
         divided.iter_at(index).try_for_each(|(i, divided)| {
-            let divided = T::from(divided.into_owned());
+            let divided = T::from(divided);
             let divider = divider_iter.unwrap_get_inner(i);
             self.forced_push_at(i, divided / divider, exit)
         })?;
@@ -493,7 +475,7 @@ where
 
         let mut divider_iter = divider.iter();
         divided.iter_at(index).try_for_each(|(i, divided)| {
-            let divided = T::from(divided.into_owned());
+            let divided = T::from(divided);
             let divider = T::from(divider_iter.unwrap_get_inner(i));
 
             let v = divided * multiplier;
@@ -522,12 +504,10 @@ where
             Version::ZERO + self.inner_version() + other.version(),
         )?;
 
-        let index = max_from.min(
-            VecIterator::last(self.into_iter()).map_or_else(T::default, |(_, v)| v.into_owned()),
-        );
+        let index =
+            max_from.min(VecIterator::last(self.into_iter()).map_or_else(T::default, |(_, v)| v));
         let mut prev_i = None;
         other.iter_at(index).try_for_each(|(v, i)| -> Result<()> {
-            let i = i.into_owned();
             if prev_i.is_some_and(|prev_i| prev_i == i) {
                 return Ok(());
             }
@@ -702,7 +682,7 @@ where
         self_to_other.iter_at(index).try_for_each(|(i, other)| {
             self.forced_push_at(
                 i,
-                T::from(other_to_self_iter.unwrap_get_inner(other.into_owned()) == i),
+                T::from(other_to_self_iter.unwrap_get_inner(other) == i),
                 exit,
             )
         })?;
@@ -730,7 +710,7 @@ where
         source
             .iter_at_((index.to_usize()).checked_sub(window).unwrap_or_default())
             .try_for_each(|(i, value)| {
-                let value = value.into_owned();
+                let value = value;
 
                 let len = prev.len();
                 if len > window {
@@ -773,7 +753,7 @@ where
         source
             .iter_at_((index.to_usize()).checked_sub(window).unwrap_or_default())
             .try_for_each(|(i, value)| {
-                let value = value.into_owned();
+                let value = value;
 
                 let len = prev.len();
                 if len > window {
@@ -815,7 +795,7 @@ where
         let mut prev = None;
         let mut other_iter = source.iter();
         source.iter_at(index).try_for_each(|(i, value)| {
-            let value = T::from(value.into_owned());
+            let value = T::from(value);
 
             if prev.is_none() {
                 let i = i.to_usize();
@@ -910,7 +890,7 @@ where
             .unwrap()
             .iter_at(index)
             .try_for_each(|(i, v)| {
-                let mut sum = v.into_owned();
+                let mut sum = v;
                 others_iter.iter_mut().for_each(|iter| {
                     sum = sum + iter.unwrap_get_inner(i);
                 });
@@ -945,7 +925,7 @@ where
             .unwrap()
             .iter_at(index)
             .try_for_each(|(i, v)| {
-                let min = v.into_owned();
+                let min = v;
                 let min = others_iter
                     .iter_mut()
                     .map(|iter| iter.unwrap_get_inner(i))
@@ -982,7 +962,7 @@ where
             .unwrap()
             .iter_at(index)
             .try_for_each(|(i, v)| {
-                let max = v.into_owned();
+                let max = v;
                 let max = others_iter
                     .iter_mut()
                     .map(|iter| iter.unwrap_get_inner(i))
@@ -1031,7 +1011,7 @@ where
         let min_prev_i = min_i.unwrap_or_default().to_usize();
         let mut other_iter = source.iter();
         source.iter_at(index).try_for_each(|(i, value)| {
-            let value = value.into_owned();
+            let value = value;
 
             if min_i.is_none() || min_i.is_some_and(|min_i| min_i <= i) {
                 if prev.is_none() {
@@ -1108,7 +1088,7 @@ where
         let mut prev = None;
         let min_prev_i = min_i.unwrap_or_default().to_usize();
         source.iter_at(index).try_for_each(|(index, value)| {
-            let value = value.into_owned();
+            let value = value;
 
             if min_i.is_none() || min_i.is_some_and(|min_i| min_i <= index) {
                 let i = index.to_usize();
@@ -1196,8 +1176,6 @@ where
         let index = max_from.min(I::from(self.len()));
         let mut source_iter = source.iter();
         source.iter_at(index).try_for_each(|(i, current)| {
-            let current = current.into_owned();
-
             let prev = i
                 .checked_sub(I::from(len))
                 .map(|prev_i| source_iter.unwrap_get_inner(prev_i))
@@ -1235,7 +1213,7 @@ where
                     .unwrap_or_default(),
             );
 
-            let last_value = f32::from(b.into_owned());
+            let last_value = f32::from(b);
 
             let percentage_change = ((last_value / previous_value) - 1.0) * 100.0;
 
@@ -1271,7 +1249,7 @@ where
         percentage_returns
             .iter_at(index)
             .try_for_each(|(i, percentage)| {
-                let percentage = percentage.into_owned();
+                let percentage = percentage;
 
                 let cagr = (((f32::from(percentage) / 100.0 + 1.0).powf(1.0 / years as f32)) - 1.0)
                     * 100.0;
@@ -1496,7 +1474,7 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    type Item = (I, Cow<'a, T>);
+    type Item = (I, T);
     type IntoIter = StoredVecIterator<'a, I, T>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -1509,10 +1487,10 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    fn boxed_iter<'a>(&'a self) -> BoxedVecIterator<'a, I, T>
+    fn boxed_iter(&self) -> BoxedVecIterator<'_, I, T>
     where
         I: StoredIndex,
-        T: StoredRaw + 'a,
+        T: StoredRaw,
     {
         Box::new(self.0.into_iter())
     }
