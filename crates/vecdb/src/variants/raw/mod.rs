@@ -182,8 +182,58 @@ where
     /// Iterator over values only (no indices) for maximum performance
     #[inline]
     pub fn values(&self) -> RawVecValues<'_, I, T> {
-        RawVecValues {
-            inner: self.into_iter(),
+        RawVecValues(self.into_iter())
+    }
+
+    /// Streaming iterator for maximum throughput (no indices, no holes/updates support)
+    #[inline]
+    pub fn stream(&self) -> RawStreamIterator<'_, I, T> {
+        self.stream_at_(0)
+    }
+
+    /// Streaming iterator starting at index
+    #[inline]
+    pub fn stream_at(&self, i: I) -> RawStreamIterator<'_, I, T> {
+        self.stream_at_(i.to_usize())
+    }
+
+    /// Streaming iterator starting at index
+    #[inline]
+    pub fn stream_at_(&self, i: usize) -> RawStreamIterator<'_, I, T> {
+        let _reader = self.create_static_reader();
+        let region_start = self.region.read().start();
+
+        let mut seq_file = self
+            .db
+            .open_sequential_reader()
+            .expect("Failed to open sequential reader");
+
+        // Use stored_len which is the actual length including what's on disk
+        // The regular iterator handles pushed/holes/updates separately
+        let stored_len = self.stored_len();
+        let start_index = i.min(stored_len);
+        let start_offset =
+            region_start + HEADER_OFFSET as u64 + (start_index * size_of::<T>()) as u64;
+        let total_bytes = (stored_len * size_of::<T>()) as u64;
+
+        // Seek to starting position
+        seq_file
+            .seek(SeekFrom::Start(start_offset))
+            .expect("Failed to seek to start position");
+
+        // Round buffer size down to multiple of SIZE_OF_T to ensure no partial values
+        let size_of_t = size_of::<T>();
+        let buffer_size = (VEC_PAGE_SIZE / size_of_t) * size_of_t;
+
+        RawStreamIterator {
+            seq_file,
+            buffer: vec![0; buffer_size],
+            buffer_pos: 0,
+            buffer_len: 0,
+            file_offset: start_offset,
+            end_offset: region_start + HEADER_OFFSET as u64 + total_bytes,
+            _reader,
+            _marker: PhantomData,
         }
     }
 
@@ -688,9 +738,7 @@ where
 }
 
 /// Iterator adapter that yields only values (no indices)
-pub struct RawVecValues<'a, I, T> {
-    inner: RawVecIterator<'a, I, T>,
-}
+pub struct RawVecValues<'a, I, T>(RawVecIterator<'a, I, T>);
 
 impl<I, T> Iterator for RawVecValues<'_, I, T>
 where
@@ -701,7 +749,68 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next_value()
+        self.0.next_value()
+    }
+}
+
+/// Streaming iterator for maximum throughput - no state tracking, just raw sequential reads
+pub struct RawStreamIterator<'a, I, T> {
+    seq_file: File,
+    buffer: Vec<u8>,
+    buffer_pos: usize,
+    buffer_len: usize,
+    file_offset: u64,
+    end_offset: u64,
+    _reader: Reader<'a>,
+    _marker: PhantomData<(I, T)>,
+}
+
+impl<I, T> RawStreamIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredRaw,
+{
+    const SIZE_OF_T: usize = size_of::<T>();
+}
+
+impl<I, T> Iterator for RawStreamIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredRaw,
+{
+    type Item = T;
+
+    #[inline(always)]
+    fn next(&mut self) -> Option<T> {
+        // Fast path: read from current buffer
+        if likely(self.buffer_pos + Self::SIZE_OF_T <= self.buffer_len) {
+            self.buffer_pos += Self::SIZE_OF_T;
+            return Some(unsafe {
+                std::ptr::read_unaligned(self.buffer.as_ptr().add(self.buffer_pos) as *const T)
+            });
+        }
+
+        // Slow path: refill buffer and read
+        if unlikely(self.file_offset >= self.end_offset) {
+            return None;
+        }
+
+        // Read fresh buffer
+        let remaining = (self.end_offset - self.file_offset) as usize;
+        let to_read = remaining.min(self.buffer.len());
+
+        // Safety: we're within file bounds, read should succeed
+        unsafe {
+            self.seq_file
+                .read_exact(&mut self.buffer[..to_read])
+                .unwrap_unchecked()
+        };
+
+        self.file_offset += to_read as u64;
+        self.buffer_len = to_read;
+        self.buffer_pos = Self::SIZE_OF_T;
+
+        Some(unsafe { std::ptr::read_unaligned(self.buffer.as_ptr() as *const T) })
     }
 }
 
@@ -736,13 +845,17 @@ where
         let stored_len = self.stored_len();
 
         let _reader = self.create_static_reader();
-        let region_start = self.region.read().start();
+        let region_start = self.region.read().start() + HEADER_OFFSET as u64;
 
         // Open dedicated file handle for optimal sequential readahead
         let seq_file = self
             .db
             .open_sequential_reader()
             .expect("Failed to open sequential reader");
+
+        // Round buffer size down to multiple of SIZE_OF_T to ensure no partial values
+        let size_of_t = size_of::<T>();
+        let buffer_size = (VEC_PAGE_SIZE / size_of_t) * size_of_t;
 
         RawVecIterator {
             // HOT fields first
@@ -757,7 +870,7 @@ where
             // WARM fields
             seq_file,
             region_start,
-            buffer: vec![0; VEC_PAGE_SIZE],
+            buffer: vec![0; buffer_size],
 
             // COLD fields
             vec: self,
