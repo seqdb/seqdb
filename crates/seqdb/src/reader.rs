@@ -33,7 +33,7 @@ impl<'a> Reader<'a> {
         Ok(())
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn read(&self, offset: u64, len: u64) -> Result<Vec<u8>> {
         let mut buffer = uninit_vec(len as usize);
         self.read_into(offset, &mut buffer)?;
@@ -49,11 +49,5 @@ impl<'a> Reader<'a> {
     #[inline]
     pub fn region(&self) -> &Region {
         &self.region
-    }
-
-    #[inline]
-    pub fn prefixed(&self, offset: u64) -> Result<Vec<u8>> {
-        let remaining_len = self.region.len() - offset;
-        self.read(offset, remaining_len)
     }
 }

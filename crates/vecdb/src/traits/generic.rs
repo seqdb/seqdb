@@ -115,7 +115,7 @@ where
         Ok(Some(self.read_(index, reader)?))
     }
 
-    #[inline]
+    #[inline(always)]
     fn get_pushed(&'_ self, index: usize, stored_len: usize) -> Option<&'_ T> {
         let pushed = self.pushed();
         let j = index - stored_len;

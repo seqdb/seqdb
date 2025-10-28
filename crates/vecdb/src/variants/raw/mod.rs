@@ -219,19 +219,20 @@ where
         Ok(())
     }
 
+    #[inline]
     pub fn prev_holes(&self) -> &BTreeSet<usize> {
         &self.prev_holes
     }
 
+    #[inline]
     pub fn is_dirty(&self) -> bool {
         !self.is_pushed_empty() || !self.holes.is_empty() || !self.updated.is_empty()
     }
 
     /// Calculate optimal buffer size aligned to SIZE_OF_T
     #[inline]
-    fn aligned_buffer_size() -> usize {
-        let size_of_t = size_of::<T>();
-        (VEC_PAGE_SIZE / size_of_t) * size_of_t
+    const fn aligned_buffer_size() -> usize {
+        (VEC_PAGE_SIZE / Self::SIZE_OF_T) * Self::SIZE_OF_T
     }
 }
 
@@ -486,9 +487,12 @@ where
 {
     #[inline]
     fn read_(&self, index: usize, reader: &Reader) -> Result<T> {
-        T::read_from_prefix(&reader.prefixed((index * Self::SIZE_OF_T + HEADER_OFFSET) as u64)?)
-            .map(|(v, _)| v)
-            .map_err(Error::from)
+        T::read_from_prefix(&reader.read(
+            (index * Self::SIZE_OF_T + HEADER_OFFSET) as u64,
+            Self::SIZE_OF_T as u64,
+        )?)
+        .map(|(v, _)| v)
+        .map_err(Error::from)
     }
 
     #[inline]
@@ -508,7 +512,7 @@ where
         &mut self.prev_pushed
     }
 
-    #[inline]
+    #[inline(always)]
     fn holes(&self) -> &BTreeSet<usize> {
         &self.holes
     }
@@ -535,7 +539,7 @@ where
         self.stored_len.store(val, Ordering::Release);
     }
 
-    #[inline]
+    #[inline(always)]
     fn updated(&self) -> &BTreeMap<usize, T> {
         &self.updated
     }

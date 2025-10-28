@@ -16,9 +16,11 @@ use crate::{
     variants::ImportOptions,
 };
 
+mod iterators;
 mod page;
 mod pages;
 
+use iterators::*;
 use page::*;
 use pages::*;
 
@@ -163,6 +165,11 @@ where
     }
     fn pages_region_name_(name: &str) -> String {
         format!("{}_pages", Self::vec_region_name_(name))
+    }
+
+    #[inline]
+    pub fn is_dirty(&self) -> bool {
+        !self.is_pushed_empty()
     }
 }
 

@@ -65,6 +65,7 @@ where
     T: StoredRaw,
 {
     const SIZE_OF_T: usize = size_of::<T>();
+    const NORMAL_BUFFER_SIZE: usize = RawVec::<I, T>::aligned_buffer_size();
 
     pub fn new(vec: &'a RawVec<I, T>) -> Result<Self> {
         Self::new_at(vec, 0)
@@ -85,7 +86,7 @@ where
 
         Ok(Self {
             file,
-            buffer: vec![0; RawVec::<I, T>::aligned_buffer_size()],
+            buffer: vec![0; Self::NORMAL_BUFFER_SIZE],
             buffer_pos: 0,
             buffer_len: 0,
             file_offset: start_offset,
@@ -118,7 +119,7 @@ where
     #[inline(always)]
     pub(crate) fn refill_buffer(&mut self) {
         let remaining = (self.end_offset - self.file_offset) as usize;
-        let to_read = remaining.min(self.buffer.len());
+        let to_read = remaining.min(Self::NORMAL_BUFFER_SIZE);
 
         // Safety: we're within file bounds, read should succeed
         unsafe {
