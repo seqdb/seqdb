@@ -68,7 +68,7 @@ pub struct DirtyRawVecValues<'a, I, T> {
 
     // COLD: only accessed in slow path or for lifetimes
     pub vec: &'a RawVec<I, T>,
-    _region_lock: RwLockReadGuard<'static, Region>,
+    _lock: RwLockReadGuard<'a, Region>,
 }
 
 impl<'a, I, T> DirtyRawVecValues<'a, I, T>
@@ -100,9 +100,8 @@ where
 
         // Use full-featured iterator for dirty vecs
         let stored_len = vec.stored_len();
-        let region_lock: RwLockReadGuard<'static, Region> =
-            unsafe { std::mem::transmute(vec.region.read()) };
-        let region_start = region_lock.start() + HEADER_OFFSET as u64;
+        let region = vec.region.read();
+        let region_start = region.start() + HEADER_OFFSET as u64;
 
         let file = vec
             .db
@@ -120,7 +119,7 @@ where
             region_start,
             buffer: vec![0; RawVec::<I, T>::aligned_buffer_size()],
             vec,
-            _region_lock: region_lock,
+            _lock: region,
         })
     }
 
@@ -151,27 +150,6 @@ where
         }
     }
 }
-
-// impl<I, T> BaseVecIterator for DirtyRawVecValues<'_, I, T>
-// where
-//     I: StoredIndex,
-//     T: StoredRaw,
-// {
-//     #[inline]
-//     fn mut_index(&mut self) -> &mut usize {
-//         &mut self.index
-//     }
-
-//     #[inline]
-//     fn len(&self) -> usize {
-//         self.vec.len()
-//     }
-
-//     #[inline]
-//     fn name(&self) -> &str {
-//         self.vec.name()
-//     }
-// }
 
 impl<I, T> Iterator for DirtyRawVecValues<'_, I, T>
 where
@@ -233,3 +211,24 @@ where
         })
     }
 }
+
+// impl<I, T> BaseVecIterator for DirtyRawVecValues<'_, I, T>
+// where
+//     I: StoredIndex,
+//     T: StoredRaw,
+// {
+//     #[inline]
+//     fn mut_index(&mut self) -> &mut usize {
+//         &mut self.index
+//     }
+
+//     #[inline]
+//     fn len(&self) -> usize {
+//         self.vec.len()
+//     }
+
+//     #[inline]
+//     fn name(&self) -> &str {
+//         self.vec.name()
+//     }
+// }

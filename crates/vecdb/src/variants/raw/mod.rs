@@ -576,7 +576,7 @@ where
     T: StoredRaw,
 {
     fn boxed_iter(&self) -> BoxedVecIterator<'_, I, T> {
-        Box::new(self.into_iter())
+        Box::new(self.iter())
     }
 }
 

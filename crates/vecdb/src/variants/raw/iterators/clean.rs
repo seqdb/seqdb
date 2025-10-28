@@ -55,8 +55,8 @@ pub struct CleanRawVecValues<'a, I, T> {
     buffer_len: usize,
     file_offset: u64,
     end_offset: u64,
-    vec: &'a RawVec<I, T>,
-    _region_lock: RwLockReadGuard<'static, Region>,
+    _vec: &'a RawVec<I, T>,
+    _lock: RwLockReadGuard<'a, Region>,
 }
 
 impl<'a, I, T> CleanRawVecValues<'a, I, T>
@@ -71,23 +71,15 @@ where
     }
 
     pub fn new_at(vec: &'a RawVec<I, T>, index: usize) -> Result<Self> {
-        // Lock region for the lifetime of the iterator
-        let region_lock: RwLockReadGuard<'static, Region> =
-            unsafe { std::mem::transmute(vec.region.read()) };
-        let region_start = region_lock.start();
-        let region_len = region_lock.len();
+        let region = vec.region.read();
+
+        let region_start = region.start();
+        let region_len = region.len();
 
         let mut file = vec.db.open_read_only_file()?;
 
-        // Use stored_len which is the actual length including what's on disk
-        // The regular iterator handles pushed/holes/updates separately
-        // let stored_len = self.stored_len();
-        // let start_index = i.min(stored_len);
         let start_offset = region_start + HEADER_OFFSET as u64 + (index * size_of::<T>()) as u64;
-        // region_start + HEADER_OFFSET as u64 + (start_index * size_of::<T>()) as u64;
-        // let total_bytes = (stored_len * size_of::<T>()) as u64;
 
-        // Seek to starting position
         file.seek(SeekFrom::Start(start_offset))
             .expect("Failed to seek to start position");
 
@@ -97,9 +89,9 @@ where
             buffer_pos: 0,
             buffer_len: 0,
             file_offset: start_offset,
-            end_offset: region_start + region_len, // end_offset: region_start + HEADER_OFFSET as u64 + total_bytes,
-            vec,
-            _region_lock: region_lock,
+            end_offset: region_start + region_len,
+            _vec: vec,
+            _lock: region,
         })
     }
 }
