@@ -1,12 +1,11 @@
 # seqdb
 
-A K.I.S.S. (Keep It Simple, Stupid) sequential storage engine that provides memory-mapped file-based storage with dynamic region management.
+A K.I.S.S. (Keep It Simple, Stupid) sequential storage engine that provides storage with dynamic region management.
 
 ## What is seqdb?
 
 seqdb is a lightweight storage engine designed for applications that need to store and retrieve data in named regions on disk. It provides:
 
-- **Memory-mapped file access** for fast I/O operations
 - **Dynamic region management** with automatic resizing and defragmentation
 - **Sequential writes** optimized for append-heavy workloads
 - **Hole punching** to reclaim unused disk space
@@ -16,7 +15,6 @@ seqdb is a lightweight storage engine designed for applications that need to sto
 
 - **Named regions**: Store data in logical regions identified by strings or numbers
 - **Automatic space management**: Regions grow dynamically and can be moved/defragmented
-- **Memory efficiency**: Uses memory mapping for zero-copy reads
 - **Cross-platform hole punching**: Supports Linux, macOS, and FreeBSD
 - **Thread-safe**: Concurrent access using RwLocks
 
@@ -62,7 +60,7 @@ fn main() -> Result<()> {
 
 ## Storage Model
 
-seqdb organizes data into regions within a single memory-mapped file. Each region has:
+seqdb organizes data into regions within a single file. Each region has:
 - **Start offset**: Position in the file (page-aligned)
 - **Length**: Current data size
 - **Reserved space**: Allocated space (≥ length, page-aligned)

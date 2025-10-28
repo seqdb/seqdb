@@ -208,7 +208,6 @@ match vec.get_or_read(index, &reader) {
 ## Integration
 
 Built on [seqdb](../seqdb) for:
-- Memory-mapped file access
 - Page-aligned storage
 - Cross-platform file locking
 - Dynamic space management

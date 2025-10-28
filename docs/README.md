@@ -18,14 +18,13 @@ VecDB (High-level vectors)
          │
          ▼
 SeqDB (Low-level storage)
-├─ Memory-mapped file
 ├─ Region management
 └─ Space optimization
 ```
 
 ### Core Crates
 
-- **[`seqdb`](crates/seqdb/)** - The foundational storage engine providing memory-mapped file management, dynamic regions, and efficient space utilization
+- **[`seqdb`](crates/seqdb/)** - The foundational storage engine providing file management, dynamic regions, and efficient space utilization
 - **[`vecdb`](crates/vecdb/)** - High-level columnar storage with vector abstractions, compression support, and analytical operations
 - **[`vecdb_derive`](crates/vecdb_derive/)** - Procedural macros for automatic trait implementations and transparent compression support
 
@@ -33,7 +32,6 @@ SeqDB (Low-level storage)
 
 ### Storage Engine (SeqDB)
 
-- **Memory-mapped I/O** for zero-copy data access
 - **Dynamic region allocation** with automatic growth and compaction
 - **Hole punching** to reclaim disk space efficiently
 - **Page-aligned operations** optimized for filesystem performance
@@ -103,7 +101,6 @@ compressed.flush()?;
 
 - **Raw vectors**: Optimized for latency-critical applications
 - **Compressed vectors**: 2-10x space savings with modest CPU overhead
-- **Memory-mapped access**: Direct memory access without syscall overhead
 - **Concurrent access**: Multiple readers and writers with minimal contention
 - **Space efficiency**: Automatic hole punching and region compaction
 
