@@ -349,14 +349,20 @@ where
     fn mut_index(&mut self) -> &mut usize {
         match self {
             Self::Compressed(iter) => iter.mut_index(),
-            Self::Raw(iter) => iter.mut_index(),
+            Self::Raw(iter) => {
+                todo!();
+                // iter.mut_index()
+            }
         }
     }
 
     fn len(&self) -> usize {
         match self {
             Self::Compressed(i) => i.len(),
-            Self::Raw(i) => i.len(),
+            Self::Raw(i) => {
+                todo!();
+                // i.len()
+            }
         }
     }
 
@@ -364,7 +370,10 @@ where
     fn name(&self) -> &str {
         match self {
             Self::Compressed(i) => i.name(),
-            Self::Raw(i) => i.name(),
+            Self::Raw(i) => {
+                todo!()
+                // i.name()
+            }
         }
     }
 }

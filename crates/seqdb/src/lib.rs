@@ -450,7 +450,7 @@ impl DatabaseInner {
     /// Open a dedicated file handle for sequential reading
     /// This enables optimal kernel readahead for iteration
     #[inline]
-    pub fn open_sequential_reader(&self) -> Result<File> {
+    pub fn open_read_only_file(&self) -> Result<File> {
         File::open(self.data_path()).map_err(Error::from)
     }
 
