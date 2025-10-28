@@ -5,8 +5,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-pub const WRITE_COUNT: u64 = 100_000_000;
-pub const RANDOM_READ_COUNT: usize = 10_000_000;
+pub const WRITE_COUNT: u64 = 10_000_000;
+pub const RANDOM_READ_COUNT: usize = 1_000_000;
 pub const RANDOM_SEED: u64 = 42;
 pub const NUM_ITERATIONS: usize = 5;
 
@@ -114,7 +114,6 @@ impl BenchmarkRunner {
     pub fn prepare_database<DB: DatabaseBenchmark>(&self) -> Result<Duration> {
         let name = DB::name();
         print!("  {} ... ", name);
-        std::io::Write::flush(&mut std::io::stdout()).ok();
 
         // Clean and prepare
         self.clean_path(name)?;

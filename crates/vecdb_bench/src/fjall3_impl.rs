@@ -1,54 +1,47 @@
 use crate::database::DatabaseBenchmark;
 use anyhow::Result;
-use fjall3::{Config, Keyspace, PartitionCreateOptions};
+use fjall3::{Config, Database, Keyspace, KeyspaceCreateOptions, PersistMode};
 use std::path::Path;
 
-pub struct FjallBench {
+pub struct Fjall3Bench {
+    database: Database,
     keyspace: Keyspace,
-    partition: fjall::PartitionHandle,
 }
 
-impl DatabaseBenchmark for FjallBench {
+impl DatabaseBenchmark for Fjall3Bench {
     fn name() -> &'static str {
         "fjall3"
     }
 
     fn create(path: &Path) -> Result<Self> {
-        let keyspace = Config::new(path).open()?;
-        let partition = keyspace.open_partition("bench", PartitionCreateOptions::default())?;
-        Ok(Self {
-            keyspace,
-            partition,
-        })
+        let database = Database::open(Config::new(path))?;
+        let keyspace = database.keyspace("bench", KeyspaceCreateOptions::default())?;
+        Ok(Self { database, keyspace })
     }
 
     fn open(path: &Path) -> Result<Self> {
-        let keyspace = Config::new(path).open()?;
-        let partition = keyspace.open_partition("bench", PartitionCreateOptions::default())?;
-        Ok(Self {
-            keyspace,
-            partition,
-        })
+        let database = Database::open(Config::new(path))?;
+        let keyspace = database.keyspace("bench", KeyspaceCreateOptions::default())?;
+        Ok(Self { database, keyspace })
     }
 
     fn write_sequential(&mut self, count: u64) -> Result<()> {
-        for i in 0..count {
-            let key = i.to_be_bytes();
-            let value = i.to_be_bytes();
-            self.partition.insert(key, value)?;
-        }
+        self.keyspace.ingest((0..count).map(|i| {
+            let b = i.to_be_bytes();
+            (b, b)
+        }))?;
         Ok(())
     }
 
     fn len(&self) -> Result<u64> {
-        Ok(self.partition.len()? as u64)
+        Ok(self.keyspace.len()? as u64)
     }
 
     fn read_sequential(&self) -> Result<u64> {
         let mut sum = 0u64;
 
-        for item in self.partition.iter() {
-            let (_, value) = item?;
+        for item in self.keyspace.iter() {
+            let value = item.value()?;
             let val = u64::from_be_bytes(value.as_ref().try_into()?);
             sum = sum.wrapping_add(val);
         }
@@ -61,7 +54,7 @@ impl DatabaseBenchmark for FjallBench {
 
         for &idx in indices {
             let key = idx.to_be_bytes();
-            if let Some(value) = self.partition.get(key)? {
+            if let Some(value) = self.keyspace.get(key)? {
                 let val = u64::from_be_bytes(value.as_ref().try_into()?);
                 sum = sum.wrapping_add(val);
             }
@@ -71,7 +64,7 @@ impl DatabaseBenchmark for FjallBench {
     }
 
     fn flush(&mut self) -> Result<()> {
-        self.keyspace.persist(fjall::PersistMode::SyncAll)?;
+        self.database.persist(PersistMode::SyncAll)?;
         Ok(())
     }
 

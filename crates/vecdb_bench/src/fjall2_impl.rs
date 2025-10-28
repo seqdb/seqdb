@@ -3,12 +3,12 @@ use anyhow::Result;
 use fjall2::{Config, Keyspace, PartitionCreateOptions, PartitionHandle, PersistMode};
 use std::path::Path;
 
-pub struct FjallBench {
+pub struct Fjall2Bench {
     keyspace: Keyspace,
     partition: PartitionHandle,
 }
 
-impl DatabaseBenchmark for FjallBench {
+impl DatabaseBenchmark for Fjall2Bench {
     fn name() -> &'static str {
         "fjall2"
     }
@@ -32,11 +32,10 @@ impl DatabaseBenchmark for FjallBench {
     }
 
     fn write_sequential(&mut self, count: u64) -> Result<()> {
-        for i in 0..count {
-            let key = i.to_be_bytes();
-            let value = i.to_be_bytes();
-            self.partition.insert(key, value)?;
-        }
+        self.partition.ingest((0..count).map(|i| {
+            let b = i.to_be_bytes();
+            (b, b)
+        }))?;
         Ok(())
     }
 

@@ -14,7 +14,7 @@ seqdb = { workspace = true }
 
 # Database implementations
 fjall2 = { version = "2.11.2", package = "fjall" }
-# fjall3 = { version = "3.0.0-pre.0", package = "fjall" }
+fjall3 = { version = "3.0.0-pre.2", package = "fjall" }
 redb = "3.1.0"
 heed = "0.22.0"
 
