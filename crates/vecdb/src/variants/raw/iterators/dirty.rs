@@ -1,14 +1,9 @@
-use std::{
-    fs::File,
-    io::{Read, Seek, SeekFrom},
-};
-
 use parking_lot::RwLockReadGuard;
 use seqdb::Region;
 
 use crate::{
-    AnyStoredVec, GenericStoredVec, RawVec, Result, StoredIndex, StoredRaw, VEC_PAGE_SIZE,
-    unlikely, variants::HEADER_OFFSET,
+    AnyStoredVec, GenericStoredVec, RawVec, Result, StoredIndex, StoredRaw, likely, unlikely,
+    variants::CleanRawVecValues,
 };
 
 pub struct DirtyRawVecIterator<'a, I, T> {
@@ -53,21 +48,11 @@ where
 
 /// Dirty vec iterator - full-featured with holes/updates/pushed support
 pub struct DirtyRawVecValues<'a, I, T> {
-    // HOT: accessed every iteration (first cache line)
+    inner: CleanRawVecValues<'a, I, T>,
     index: usize,
     stored_len: usize,
-    current_page: usize,
-    cursor_page: usize,
     holes: bool,
     updated: bool,
-
-    // WARM: accessed per page
-    file: File,
-    region_start: u64,
-    buffer: Vec<u8>,
-
-    // COLD: only accessed in slow path or for lifetimes
-    pub vec: &'a RawVec<I, T>,
     _lock: RwLockReadGuard<'a, Region>,
 }
 
@@ -77,18 +62,6 @@ where
     T: StoredRaw,
 {
     const SIZE_OF_T: usize = size_of::<T>();
-    const PER_PAGE: usize = VEC_PAGE_SIZE / Self::SIZE_OF_T;
-
-    // Check if we can use bit shift optimizations
-    const IS_SIZE_POW2: bool =
-        Self::SIZE_OF_T > 0 && (Self::SIZE_OF_T & (Self::SIZE_OF_T - 1)) == 0;
-    const IS_PER_PAGE_POW2: bool =
-        Self::PER_PAGE > 0 && (Self::PER_PAGE & (Self::PER_PAGE - 1)) == 0;
-
-    // Bit shift amounts (only valid when power-of-2)
-    const PAGE_SHIFT: u32 = Self::PER_PAGE.trailing_zeros();
-    const SIZE_SHIFT: u32 = Self::SIZE_OF_T.trailing_zeros();
-    const PAGE_MASK: usize = Self::PER_PAGE - 1;
 
     pub fn new(vec: &'a RawVec<I, T>) -> Result<Self> {
         Self::new_at(vec, 0)
@@ -98,55 +71,26 @@ where
         let holes = !vec.holes.is_empty();
         let updated = !vec.updated.is_empty();
 
-        // Use full-featured iterator for dirty vecs
         let stored_len = vec.stored_len();
         let region = vec.region.read();
-        let region_start = region.start() + HEADER_OFFSET as u64;
-
-        let file = vec
-            .db
-            .open_read_only_file()
-            .expect("Failed to open read only file");
 
         Ok(Self {
+            inner: CleanRawVecValues::new_at(vec, index)?,
             index,
             stored_len,
-            current_page: usize::MAX,
-            cursor_page: usize::MAX,
             holes,
             updated,
-            file,
-            region_start,
-            buffer: vec![0; RawVec::<I, T>::aligned_buffer_size()],
-            vec,
             _lock: region,
         })
     }
 
+    /// Skip one element in the inner iterator's buffer, seeking forward if needed
     #[inline(always)]
-    fn index_to_page(index: usize) -> usize {
-        if Self::IS_PER_PAGE_POW2 {
-            index >> Self::PAGE_SHIFT
-        } else {
-            index / Self::PER_PAGE
-        }
-    }
+    fn skip_element(&mut self) {
+        self.inner.buffer_pos += Self::SIZE_OF_T;
 
-    #[inline(always)]
-    fn index_in_page(index: usize) -> usize {
-        if Self::IS_PER_PAGE_POW2 {
-            index & Self::PAGE_MASK
-        } else {
-            index % Self::PER_PAGE
-        }
-    }
-
-    #[inline(always)]
-    fn mul_size(n: usize) -> usize {
-        if Self::IS_SIZE_POW2 {
-            n << Self::SIZE_SHIFT
-        } else {
-            n * Self::SIZE_OF_T
+        if unlikely(self.inner.cant_read_buffer()) && likely(self.inner.can_read_file()) {
+            self.inner.refill_buffer();
         }
     }
 }
@@ -165,70 +109,22 @@ where
 
         let stored_len = self.stored_len;
 
-        if self.holes && self.vec.holes().contains(&index) {
+        if unlikely(self.holes) && self.inner._vec.holes().contains(&index) {
+            self.skip_element();
             return None;
         }
 
-        if index >= stored_len {
-            return self.vec.get_pushed(index, stored_len).cloned();
+        if index >= self.stored_len {
+            return self.inner._vec.get_pushed(index, stored_len).cloned();
         }
 
-        if self.updated
-            && let Some(updated) = self.vec.updated().get(&index)
+        if unlikely(self.updated)
+            && let Some(updated) = self.inner._vec.updated().get(&index)
         {
+            self.skip_element();
             return Some(updated.clone());
         }
 
-        let page_index = Self::index_to_page(index);
-        let buffer_index = Self::mul_size(Self::index_in_page(index));
-
-        if unlikely(page_index != self.current_page) {
-            let remaining = self.stored_len - index;
-            let new_len = Self::mul_size(remaining.min(Self::PER_PAGE));
-
-            if unlikely(self.cursor_page != page_index) {
-                let offset = self.region_start + Self::mul_size(page_index * Self::PER_PAGE) as u64;
-                // Safety: seek position is always valid (within file bounds)
-                unsafe { self.file.seek(SeekFrom::Start(offset)).unwrap_unchecked() };
-            }
-
-            // Read into buffer
-            // Safety: buffer is correctly sized and file has enough data
-            unsafe {
-                self.file
-                    .read_exact(&mut self.buffer[..new_len])
-                    .unwrap_unchecked()
-            };
-            self.current_page = page_index;
-            self.cursor_page = page_index + 1;
-        }
-
-        // Safety: buffer_index is guaranteed to be in bounds by page logic
-        // and properly aligned since buffer_index is always a multiple of SIZE_OF_T
-        // and Vec allocator provides proper alignment
-        Some(unsafe {
-            std::ptr::read_unaligned(self.buffer.as_ptr().add(buffer_index) as *const T)
-        })
+        self.inner.next()
     }
 }
-
-// impl<I, T> BaseVecIterator for DirtyRawVecValues<'_, I, T>
-// where
-//     I: StoredIndex,
-//     T: StoredRaw,
-// {
-//     #[inline]
-//     fn mut_index(&mut self) -> &mut usize {
-//         &mut self.index
-//     }
-
-//     #[inline]
-//     fn len(&self) -> usize {
-//         self.vec.len()
-//     }
-
-//     #[inline]
-//     fn name(&self) -> &str {
-//         self.vec.name()
-//     }
-// }

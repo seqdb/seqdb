@@ -9,8 +9,8 @@ use seqdb::Region;
 use crate::{RawVec, Result, StoredIndex, StoredRaw, likely, unlikely, variants::HEADER_OFFSET};
 
 pub struct CleanRawVecIterator<'a, I, T> {
-    index: usize,
-    values: CleanRawVecValues<'a, I, T>,
+    pub(crate) index: usize,
+    pub(crate) values: CleanRawVecValues<'a, I, T>,
 }
 
 impl<'a, I, T> CleanRawVecIterator<'a, I, T>
@@ -49,13 +49,13 @@ where
 }
 
 pub struct CleanRawVecValues<'a, I, T> {
-    file: File,
+    pub(crate) file: File,
     buffer: Vec<u8>,
-    buffer_pos: usize,
-    buffer_len: usize,
-    file_offset: u64,
+    pub(crate) buffer_pos: usize,
+    pub(crate) buffer_len: usize,
+    pub(crate) file_offset: u64,
     end_offset: u64,
-    _vec: &'a RawVec<I, T>,
+    pub(crate) _vec: &'a RawVec<I, T>,
     _lock: RwLockReadGuard<'a, Region>,
 }
 
@@ -94,32 +94,29 @@ where
             _lock: region,
         })
     }
-}
-
-impl<I, T> Iterator for CleanRawVecValues<'_, I, T>
-where
-    I: StoredIndex,
-    T: StoredRaw,
-{
-    type Item = T;
 
     #[inline(always)]
-    fn next(&mut self) -> Option<T> {
-        // Fast path: read from current buffer
-        if likely(self.buffer_pos < self.buffer_len) {
-            let value = unsafe {
-                std::ptr::read_unaligned(self.buffer.as_ptr().add(self.buffer_pos) as *const T)
-            };
-            self.buffer_pos += Self::SIZE_OF_T;
-            return Some(value);
-        }
+    pub(crate) fn can_read_buffer(&self) -> bool {
+        self.buffer_pos < self.buffer_len
+    }
 
-        // Slowest path: Stop
-        if unlikely(self.file_offset >= self.end_offset) {
-            return None;
-        }
+    #[inline(always)]
+    pub(crate) fn cant_read_buffer(&self) -> bool {
+        self.buffer_pos >= self.buffer_len
+    }
 
-        // Slow path: refill buffer and read
+    #[inline(always)]
+    pub(crate) fn can_read_file(&self) -> bool {
+        self.file_offset < self.end_offset
+    }
+
+    #[inline(always)]
+    pub(crate) fn cant_read_file(&self) -> bool {
+        self.file_offset >= self.end_offset
+    }
+
+    #[inline(always)]
+    pub(crate) fn refill_buffer(&mut self) {
         let remaining = (self.end_offset - self.file_offset) as usize;
         let to_read = remaining.min(self.buffer.len());
 
@@ -133,6 +130,33 @@ where
         self.file_offset += to_read as u64;
         self.buffer_len = to_read;
         self.buffer_pos = Self::SIZE_OF_T;
+    }
+}
+
+impl<I, T> Iterator for CleanRawVecValues<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredRaw,
+{
+    type Item = T;
+
+    #[inline(always)]
+    fn next(&mut self) -> Option<T> {
+        // Fast path: read from current buffer
+        if likely(self.can_read_buffer()) {
+            let value = unsafe {
+                std::ptr::read_unaligned(self.buffer.as_ptr().add(self.buffer_pos) as *const T)
+            };
+            self.buffer_pos += Self::SIZE_OF_T;
+            return Some(value);
+        }
+
+        // Slowest path: Stop
+        if unlikely(self.cant_read_file()) {
+            return None;
+        }
+
+        self.refill_buffer();
 
         Some(unsafe { std::ptr::read_unaligned(self.buffer.as_ptr() as *const T) })
     }
