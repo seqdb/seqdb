@@ -1,7 +1,11 @@
-use crate::database::DatabaseBenchmark;
 use anyhow::Result;
-use std::path::Path;
+use std::{
+    path::Path,
+    sync::atomic::{AtomicU64, Ordering},
+};
 use vecdb::{AnyStoredVec, AnyVec, Database, GenericStoredVec, RawVec, Version};
+
+use crate::database::DatabaseBenchmark;
 
 pub struct VecDbBench {
     vec: RawVec<usize, u64>,
@@ -59,6 +63,36 @@ impl DatabaseBenchmark for VecDbBench {
         }
 
         Ok(sum)
+    }
+
+    fn read_random_threaded(&self, indices_per_thread: &[Vec<u64>]) -> Result<u64> {
+        let total_sum = AtomicU64::new(0);
+
+        std::thread::scope(|s| {
+            let handles: Vec<_> = indices_per_thread
+                .iter()
+                .map(|indices| {
+                    s.spawn(move || {
+                        let mut sum = 0u64;
+                        let reader = self.vec.create_reader();
+                        for &idx in indices {
+                            if let Ok(value) = self.vec.read_(idx as usize, &reader) {
+                                sum = sum.wrapping_add(value);
+                            }
+                        }
+                        sum
+                    })
+                })
+                .collect();
+
+            for handle in handles {
+                if let Ok(sum) = handle.join() {
+                    total_sum.fetch_add(sum, Ordering::Relaxed);
+                }
+            }
+        });
+
+        Ok(total_sum.load(Ordering::Relaxed))
     }
 
     fn flush(&mut self) -> Result<()> {

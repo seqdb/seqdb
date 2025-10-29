@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::path::Path;
 
 /// Common interface for all database benchmarks
-pub trait DatabaseBenchmark: Sized {
+pub trait DatabaseBenchmark: Sized + Send + Sync {
     /// Name of the database for reporting
     fn name() -> &'static str;
 
@@ -23,6 +23,9 @@ pub trait DatabaseBenchmark: Sized {
 
     /// Read items at the given indices, returning the sum for verification
     fn read_random(&self, indices: &[u64]) -> Result<u64>;
+
+    /// Read items at the given indices with multiple threads, returning the sum for verification
+    fn read_random_threaded(&self, indices_per_thread: &[Vec<u64>]) -> Result<u64>;
 
     /// Ensure all data is flushed to disk
     fn flush(&mut self) -> Result<()>;

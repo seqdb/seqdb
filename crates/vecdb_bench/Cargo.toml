@@ -17,9 +17,11 @@ fjall2 = { version = "2.11.2", package = "fjall" }
 fjall3 = { version = "3.0.0-pre.2", package = "fjall" }
 redb = "3.1.0"
 heed = "0.22.0"
+rocksdb = "0.22"
 
 # Utilities
 rand = "0.9.2"
 anyhow = "1.0"
 walkdir = "2.5"
 byteorder = "1.5"
+sysinfo = "0.33"

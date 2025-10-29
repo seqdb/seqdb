@@ -1,7 +1,13 @@
-use crate::database::DatabaseBenchmark;
+use std::{
+    path::Path,
+    sync::atomic::{AtomicU64, Ordering},
+    thread,
+};
+
 use anyhow::Result;
 use fjall2::{Config, Keyspace, PartitionCreateOptions, PartitionHandle, PersistMode};
-use std::path::Path;
+
+use crate::database::DatabaseBenchmark;
 
 pub struct Fjall2Bench {
     keyspace: Keyspace,
@@ -67,6 +73,40 @@ impl DatabaseBenchmark for Fjall2Bench {
         }
 
         Ok(sum)
+    }
+
+    fn read_random_threaded(&self, indices_per_thread: &[Vec<u64>]) -> Result<u64> {
+        let total_sum = AtomicU64::new(0);
+
+        thread::scope(|s| {
+            let handles: Vec<_> = indices_per_thread
+                .iter()
+                .map(|indices| {
+                    let partition = self.partition.clone();
+                    s.spawn(move || {
+                        let mut sum = 0u64;
+                        for &idx in indices {
+                            let key = idx.to_be_bytes();
+                            if let Some(value) = partition.get(key).ok().flatten()
+                                && let Ok(val_bytes) = TryInto::<[u8; 8]>::try_into(value.as_ref())
+                            {
+                                let val = u64::from_be_bytes(val_bytes);
+                                sum = sum.wrapping_add(val);
+                            }
+                        }
+                        sum
+                    })
+                })
+                .collect();
+
+            for handle in handles {
+                if let Ok(sum) = handle.join() {
+                    total_sum.fetch_add(sum, Ordering::Relaxed);
+                }
+            }
+        });
+
+        Ok(total_sum.load(Ordering::Relaxed))
     }
 
     fn flush(&mut self) -> Result<()> {

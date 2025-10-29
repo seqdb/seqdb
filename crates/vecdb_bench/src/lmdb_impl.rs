@@ -1,8 +1,12 @@
-use crate::database::DatabaseBenchmark;
+use std::path::Path;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use anyhow::Result;
 use heed::types::*;
 use heed::{Database as HeedDb, EnvOpenOptions};
-use std::path::Path;
+
+use crate::database::DatabaseBenchmark;
 
 pub struct LmdbBench {
     env: heed::Env,
@@ -83,6 +87,40 @@ impl DatabaseBenchmark for LmdbBench {
         }
 
         Ok(sum)
+    }
+
+    fn read_random_threaded(&self, indices_per_thread: &[Vec<u64>]) -> Result<u64> {
+        let total_sum = AtomicU64::new(0);
+        let env = Arc::new(&self.env);
+        let db = self.db;
+
+        std::thread::scope(|s| {
+            let handles: Vec<_> = indices_per_thread
+                .iter()
+                .map(|indices| {
+                    let env = env.clone();
+                    s.spawn(move || {
+                        let mut sum = 0u64;
+                        if let Ok(rtxn) = env.read_txn() {
+                            for &idx in indices {
+                                if let Ok(Some(value)) = db.get(&rtxn, &idx) {
+                                    sum = sum.wrapping_add(value);
+                                }
+                            }
+                        }
+                        sum
+                    })
+                })
+                .collect();
+
+            for handle in handles {
+                if let Ok(sum) = handle.join() {
+                    total_sum.fetch_add(sum, Ordering::Relaxed);
+                }
+            }
+        });
+
+        Ok(total_sum.load(Ordering::Relaxed))
     }
 
     fn flush(&mut self) -> Result<()> {

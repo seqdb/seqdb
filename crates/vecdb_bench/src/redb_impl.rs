@@ -1,7 +1,15 @@
-use crate::database::DatabaseBenchmark;
+use std::{
+    path::Path,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+};
+
 use anyhow::Result;
 use redb::{Database, ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition};
-use std::path::Path;
+
+use crate::database::DatabaseBenchmark;
 
 const TABLE: TableDefinition<u64, u64> = TableDefinition::new("bench");
 
@@ -69,6 +77,41 @@ impl DatabaseBenchmark for RedbBench {
         }
 
         Ok(sum)
+    }
+
+    fn read_random_threaded(&self, indices_per_thread: &[Vec<u64>]) -> Result<u64> {
+        let total_sum = AtomicU64::new(0);
+        let db = Arc::new(&self.db);
+
+        std::thread::scope(|s| {
+            let handles: Vec<_> = indices_per_thread
+                .iter()
+                .map(|indices| {
+                    let db = db.clone();
+                    s.spawn(move || {
+                        let mut sum = 0u64;
+                        if let Ok(read_txn) = db.begin_read()
+                            && let Ok(table) = read_txn.open_table(TABLE)
+                        {
+                            for &idx in indices {
+                                if let Ok(Some(value)) = table.get(idx) {
+                                    sum = sum.wrapping_add(value.value());
+                                }
+                            }
+                        }
+                        sum
+                    })
+                })
+                .collect();
+
+            for handle in handles {
+                if let Ok(sum) = handle.join() {
+                    total_sum.fetch_add(sum, Ordering::Relaxed);
+                }
+            }
+        });
+
+        Ok(total_sum.load(Ordering::Relaxed))
     }
 
     fn flush(&mut self) -> Result<()> {
