@@ -6,7 +6,7 @@ use std::{
 };
 
 use log::info;
-use seqdb::Reader;
+use seqdb::{Reader, RegionReader};
 use zerocopy::FromBytes;
 
 use crate::{_TO_, AnyStoredVec, Error, Exit, Result, Stamp, Version};
@@ -42,8 +42,9 @@ where
     fn create_static_reader(&self) -> Reader<'static> {
         unsafe {
             std::mem::transmute(
-                self.db()
-                    .create_region_reader(self.region_index().into())
+                self.region()
+                    .read()
+                    .create_reader(self.db())
                     .inspect_err(|_| {
                         dbg!(self.region_index());
                     })
@@ -65,6 +66,8 @@ where
         self.read_(index.to_usize(), reader)
     }
     fn read_(&self, index: usize, reader: &Reader) -> Result<T>;
+    // fn read_into_(&self, index: usize, reader: &Reader, buffer: &mut [u8]) -> Result<T>;
+    // fn create_buffer() -> Vec<u8>;
 
     #[inline]
     fn get_any_or_read(&'_ self, index: I, reader: &Reader) -> Result<Option<T>> {

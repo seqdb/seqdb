@@ -21,6 +21,10 @@ pub trait DatabaseBenchmark: Sized + Send + Sync {
     /// Read all items sequentially, returning the sum for verification
     fn read_sequential(&self) -> Result<u64>;
 
+    /// Read all items sequentially with multiple threads, each reading a partition
+    /// Each thread reads a contiguous range: thread 0 reads [0..len/n), thread 1 reads [len/n..2*len/n), etc.
+    fn read_sequential_threaded(&self, num_threads: usize) -> Result<u64>;
+
     /// Read items at the given indices, returning the sum for verification
     fn read_random(&self, indices: &[u64]) -> Result<u64>;
 

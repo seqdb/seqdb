@@ -7,17 +7,26 @@ use super::{Error, Region, Result};
 
 #[derive(Debug)]
 pub struct Reader<'a> {
-    file: RwLockReadGuard<'a, File>,
+    _lock: RwLockReadGuard<'a, File>,
     region: RwLockReadGuard<'static, Region>,
+    file: File,
 }
 
 impl<'a> Reader<'a> {
     #[inline]
-    pub fn new(file: RwLockReadGuard<'a, File>, region: RwLockReadGuard<'static, Region>) -> Self {
-        Self { file, region }
+    pub fn new(
+        file: File,
+        region: RwLockReadGuard<'static, Region>,
+        _lock: RwLockReadGuard<'a, File>,
+    ) -> Self {
+        Self {
+            file,
+            region,
+            _lock,
+        }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn read_into(&self, offset: u64, buffer: &mut [u8]) -> Result<()> {
         let len = buffer.len() as u64;
         let region_len = self.region.len();

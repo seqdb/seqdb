@@ -156,12 +156,6 @@ impl DatabaseInner {
         Ok(region)
     }
 
-    pub fn create_region_reader<'a>(&'a self, identifier: Identifier) -> Result<Reader<'a>> {
-        let file: RwLockReadGuard<'a, File> = self.file.read();
-        let region = self.get_region(identifier)?;
-        Ok(Reader::new(file, region))
-    }
-
     #[inline]
     pub fn write_all_to_region(&self, identifier: Identifier, data: &[u8]) -> Result<()> {
         self.write_all_to_region_at_(identifier, data, None, false)

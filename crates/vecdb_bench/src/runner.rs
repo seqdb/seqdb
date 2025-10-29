@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use sysinfo::System;
 
-pub const WRITE_COUNT: u64 = 10_000_000;
-pub const RANDOM_READ_COUNT: usize = 1_000_000;
+pub const WRITE_COUNT: u64 = 100_000_000;
+pub const RANDOM_READ_COUNT: usize = 10_000_000;
 pub const RANDOM_SEED: u64 = 42;
 pub const NUM_ITERATIONS: usize = 3;
 
@@ -17,6 +17,9 @@ pub struct BenchmarkResult {
     pub write_time: Duration,
     pub len_time: Duration,
     pub linear_read_time: Duration,
+    pub seq_read_2t: Duration,
+    pub seq_read_4t: Duration,
+    pub seq_read_8t: Duration,
     pub random_read_time: Duration,
     pub random_read_4t: Duration,
     pub random_read_8t: Duration,
@@ -132,7 +135,11 @@ impl BenchmarkRunner {
             .collect()
     }
 
-    pub fn generate_indices_per_thread(count: u64, num_threads: usize, base_seed: u64) -> Vec<Vec<u64>> {
+    pub fn generate_indices_per_thread(
+        count: u64,
+        num_threads: usize,
+        base_seed: u64,
+    ) -> Vec<Vec<u64>> {
         (0..num_threads)
             .map(|thread_id| {
                 let seed = base_seed.wrapping_add(thread_id as u64);
@@ -169,6 +176,7 @@ impl BenchmarkRunner {
         Ok(write_time)
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn run_iteration<DB: DatabaseBenchmark>(
         &self,
         indices: &[u64],
@@ -176,7 +184,19 @@ impl BenchmarkRunner {
         indices_8t: &[Vec<u64>],
         indices_12t: &[Vec<u64>],
         indices_16t: &[Vec<u64>],
-    ) -> Result<(Duration, Duration, Duration, Duration, Duration, Duration, Duration, Duration)> {
+    ) -> Result<(
+        Duration,
+        Duration,
+        Duration,
+        Duration,
+        Duration,
+        Duration,
+        Duration,
+        Duration,
+        Duration,
+        Duration,
+        Duration,
+    )> {
         let name = DB::name();
         let path = self.db_path(name);
 
@@ -197,6 +217,24 @@ impl BenchmarkRunner {
         println!("{name}: read seq...");
         let _sum = db.read_sequential()?;
         let linear_read_time = start.elapsed();
+
+        // Sequential reads (2 threads)
+        let start = Instant::now();
+        println!("{name}: read seq 2t...");
+        let _sum = db.read_sequential_threaded(2)?;
+        let seq_read_2t = start.elapsed();
+
+        // Sequential reads (4 threads)
+        let start = Instant::now();
+        println!("{name}: read seq 4t...");
+        let _sum = db.read_sequential_threaded(4)?;
+        let seq_read_4t = start.elapsed();
+
+        // Sequential reads (8 threads)
+        let start = Instant::now();
+        println!("{name}: read seq 8t...");
+        let _sum = db.read_sequential_threaded(8)?;
+        let seq_read_8t = start.elapsed();
 
         // Random reads (single-threaded)
         let start = Instant::now();
@@ -230,7 +268,19 @@ impl BenchmarkRunner {
 
         drop(db);
 
-        Ok((open_time, len_time, linear_read_time, random_read_time, random_read_4t, random_read_8t, random_read_12t, random_read_16t))
+        Ok((
+            open_time,
+            len_time,
+            linear_read_time,
+            seq_read_2t,
+            seq_read_4t,
+            seq_read_8t,
+            random_read_time,
+            random_read_4t,
+            random_read_8t,
+            random_read_12t,
+            random_read_16t,
+        ))
     }
 
     pub fn measure_disk_size<DB: DatabaseBenchmark>(&self) -> Result<u64> {
@@ -257,37 +307,148 @@ impl BenchmarkRunner {
                 BenchmarkResult::format_duration(result.open_time)
             );
             println!("  Write:");
-            println!("    {}", BenchmarkResult::format_throughput(WRITE_COUNT, result.write_time));
-            println!("    {}", BenchmarkResult::format_bandwidth(write_bytes, result.write_time));
-            println!("    {}", BenchmarkResult::format_latency(WRITE_COUNT, result.write_time));
+            println!(
+                "    {}",
+                BenchmarkResult::format_throughput(WRITE_COUNT, result.write_time)
+            );
+            println!(
+                "    {}",
+                BenchmarkResult::format_bandwidth(write_bytes, result.write_time)
+            );
+            println!(
+                "    {}",
+                BenchmarkResult::format_latency(WRITE_COUNT, result.write_time)
+            );
             println!(
                 "  len():       {}",
                 BenchmarkResult::format_duration(result.len_time)
             );
             println!("  Linear:");
-            println!("    {}", BenchmarkResult::format_throughput(WRITE_COUNT, result.linear_read_time));
-            println!("    {}", BenchmarkResult::format_bandwidth(write_bytes, result.linear_read_time));
-            println!("    {}", BenchmarkResult::format_latency(WRITE_COUNT, result.linear_read_time));
+            println!(
+                "    {}",
+                BenchmarkResult::format_throughput(WRITE_COUNT, result.linear_read_time)
+            );
+            println!(
+                "    {}",
+                BenchmarkResult::format_bandwidth(write_bytes, result.linear_read_time)
+            );
+            println!(
+                "    {}",
+                BenchmarkResult::format_latency(WRITE_COUNT, result.linear_read_time)
+            );
+            println!("  Seq 2t:");
+            println!(
+                "    {}",
+                BenchmarkResult::format_throughput(WRITE_COUNT, result.seq_read_2t)
+            );
+            println!(
+                "    {}",
+                BenchmarkResult::format_bandwidth(write_bytes, result.seq_read_2t)
+            );
+            println!(
+                "    {}",
+                BenchmarkResult::format_latency(WRITE_COUNT, result.seq_read_2t)
+            );
+            println!("  Seq 4t:");
+            println!(
+                "    {}",
+                BenchmarkResult::format_throughput(WRITE_COUNT, result.seq_read_4t)
+            );
+            println!(
+                "    {}",
+                BenchmarkResult::format_bandwidth(write_bytes, result.seq_read_4t)
+            );
+            println!(
+                "    {}",
+                BenchmarkResult::format_latency(WRITE_COUNT, result.seq_read_4t)
+            );
+            println!("  Seq 8t:");
+            println!(
+                "    {}",
+                BenchmarkResult::format_throughput(WRITE_COUNT, result.seq_read_8t)
+            );
+            println!(
+                "    {}",
+                BenchmarkResult::format_bandwidth(write_bytes, result.seq_read_8t)
+            );
+            println!(
+                "    {}",
+                BenchmarkResult::format_latency(WRITE_COUNT, result.seq_read_8t)
+            );
             println!("  Random 1t:");
-            println!("    {}", BenchmarkResult::format_throughput(RANDOM_READ_COUNT as u64, result.random_read_time));
-            println!("    {}", BenchmarkResult::format_bandwidth(random_bytes, result.random_read_time));
-            println!("    {}", BenchmarkResult::format_latency(RANDOM_READ_COUNT as u64, result.random_read_time));
+            println!(
+                "    {}",
+                BenchmarkResult::format_throughput(
+                    RANDOM_READ_COUNT as u64,
+                    result.random_read_time
+                )
+            );
+            println!(
+                "    {}",
+                BenchmarkResult::format_bandwidth(random_bytes, result.random_read_time)
+            );
+            println!(
+                "    {}",
+                BenchmarkResult::format_latency(RANDOM_READ_COUNT as u64, result.random_read_time)
+            );
             println!("  Random 4t:");
-            println!("    {}", BenchmarkResult::format_throughput(RANDOM_READ_COUNT as u64, result.random_read_4t));
-            println!("    {}", BenchmarkResult::format_bandwidth(random_bytes, result.random_read_4t));
-            println!("    {}", BenchmarkResult::format_latency(RANDOM_READ_COUNT as u64, result.random_read_4t));
+            println!(
+                "    {}",
+                BenchmarkResult::format_throughput(RANDOM_READ_COUNT as u64, result.random_read_4t)
+            );
+            println!(
+                "    {}",
+                BenchmarkResult::format_bandwidth(random_bytes, result.random_read_4t)
+            );
+            println!(
+                "    {}",
+                BenchmarkResult::format_latency(RANDOM_READ_COUNT as u64, result.random_read_4t)
+            );
             println!("  Random 8t:");
-            println!("    {}", BenchmarkResult::format_throughput(RANDOM_READ_COUNT as u64, result.random_read_8t));
-            println!("    {}", BenchmarkResult::format_bandwidth(random_bytes, result.random_read_8t));
-            println!("    {}", BenchmarkResult::format_latency(RANDOM_READ_COUNT as u64, result.random_read_8t));
+            println!(
+                "    {}",
+                BenchmarkResult::format_throughput(RANDOM_READ_COUNT as u64, result.random_read_8t)
+            );
+            println!(
+                "    {}",
+                BenchmarkResult::format_bandwidth(random_bytes, result.random_read_8t)
+            );
+            println!(
+                "    {}",
+                BenchmarkResult::format_latency(RANDOM_READ_COUNT as u64, result.random_read_8t)
+            );
             println!("  Random 12t:");
-            println!("    {}", BenchmarkResult::format_throughput(RANDOM_READ_COUNT as u64, result.random_read_12t));
-            println!("    {}", BenchmarkResult::format_bandwidth(random_bytes, result.random_read_12t));
-            println!("    {}", BenchmarkResult::format_latency(RANDOM_READ_COUNT as u64, result.random_read_12t));
+            println!(
+                "    {}",
+                BenchmarkResult::format_throughput(
+                    RANDOM_READ_COUNT as u64,
+                    result.random_read_12t
+                )
+            );
+            println!(
+                "    {}",
+                BenchmarkResult::format_bandwidth(random_bytes, result.random_read_12t)
+            );
+            println!(
+                "    {}",
+                BenchmarkResult::format_latency(RANDOM_READ_COUNT as u64, result.random_read_12t)
+            );
             println!("  Random 16t:");
-            println!("    {}", BenchmarkResult::format_throughput(RANDOM_READ_COUNT as u64, result.random_read_16t));
-            println!("    {}", BenchmarkResult::format_bandwidth(random_bytes, result.random_read_16t));
-            println!("    {}", BenchmarkResult::format_latency(RANDOM_READ_COUNT as u64, result.random_read_16t));
+            println!(
+                "    {}",
+                BenchmarkResult::format_throughput(
+                    RANDOM_READ_COUNT as u64,
+                    result.random_read_16t
+                )
+            );
+            println!(
+                "    {}",
+                BenchmarkResult::format_bandwidth(random_bytes, result.random_read_16t)
+            );
+            println!(
+                "    {}",
+                BenchmarkResult::format_latency(RANDOM_READ_COUNT as u64, result.random_read_16t)
+            );
             println!(
                 "  Disk Size:   {}",
                 BenchmarkResult::format_size(result.disk_size)
@@ -356,6 +517,9 @@ impl BenchmarkRunner {
         let best_write = results.iter().map(|r| r.write_time).min().unwrap();
         let best_len = results.iter().map(|r| r.len_time).min().unwrap();
         let best_linear = results.iter().map(|r| r.linear_read_time).min().unwrap();
+        let best_seq_2t = results.iter().map(|r| r.seq_read_2t).min().unwrap();
+        let best_seq_4t = results.iter().map(|r| r.seq_read_4t).min().unwrap();
+        let best_seq_8t = results.iter().map(|r| r.seq_read_8t).min().unwrap();
         let best_random = results.iter().map(|r| r.random_read_time).min().unwrap();
         let best_random_4t = results.iter().map(|r| r.random_read_4t).min().unwrap();
         let best_random_8t = results.iter().map(|r| r.random_read_8t).min().unwrap();
@@ -363,130 +527,238 @@ impl BenchmarkRunner {
         let best_random_16t = results.iter().map(|r| r.random_read_16t).min().unwrap();
         let best_disk = results.iter().map(|r| r.disk_size).min().unwrap();
 
-        // Results table
-        writeln!(
-            file,
-            "| Database | Open | Write | len() | Linear Read | Random 1t | Random 4t | Random 8t | Random 12t | Random 16t | Disk Size |"
-        )?;
-        writeln!(
-            file,
-            "|----------|------|-------|-------|-------------|-----------|-----------|-----------|------------|------------|-----------|"
-        )?;
-
         let write_bytes = WRITE_COUNT * 8;
         let random_bytes = RANDOM_READ_COUNT as u64 * 8;
+
+        // Results table (transposed: metrics as rows, databases as columns)
+        // Header row
+        write!(file, "| Metric |")?;
+        for result in results {
+            write!(file, " {} |", result.name)?;
+        }
+        writeln!(file)?;
+
+        // Separator row
+        write!(file, "|--------|")?;
+        for _ in results {
+            write!(file, "--------|")?;
+        }
+        writeln!(file)?;
+
+        // Open row
+        write!(file, "| **Open** |")?;
         for result in results {
             let open_str = BenchmarkResult::format_duration(result.open_time);
-            let open_val = if result.open_time == best_open {
-                format!("**{}**", open_str)
+            if result.open_time == best_open {
+                write!(file, " **{}** |", open_str)?;
             } else {
-                open_str
-            };
+                write!(file, " {} |", open_str)?;
+            }
+        }
+        writeln!(file)?;
 
-            let write_info = format!(
+        // Write row
+        write!(file, "| **Write** |")?;
+        for result in results {
+            let info = format!(
                 "{}<br>{}<br>{}",
                 BenchmarkResult::format_throughput(WRITE_COUNT, result.write_time),
                 BenchmarkResult::format_bandwidth(write_bytes, result.write_time),
                 BenchmarkResult::format_latency(WRITE_COUNT, result.write_time)
             );
-            let write_val = if result.write_time == best_write {
-                format!("**{}**", write_info)
+            if result.write_time == best_write {
+                write!(file, " **{}** |", info)?;
             } else {
-                write_info
-            };
+                write!(file, " {} |", info)?;
+            }
+        }
+        writeln!(file)?;
 
+        // len() row
+        write!(file, "| **len()** |")?;
+        for result in results {
             let len_str = BenchmarkResult::format_duration(result.len_time);
-            let len_val = if result.len_time == best_len {
-                format!("**{}**", len_str)
+            if result.len_time == best_len {
+                write!(file, " **{}** |", len_str)?;
             } else {
-                len_str
-            };
+                write!(file, " {} |", len_str)?;
+            }
+        }
+        writeln!(file)?;
 
-            let linear_info = format!(
+        // Linear Read row
+        write!(file, "| **Linear Read** |")?;
+        for result in results {
+            let info = format!(
                 "{}<br>{}<br>{}",
                 BenchmarkResult::format_throughput(WRITE_COUNT, result.linear_read_time),
                 BenchmarkResult::format_bandwidth(write_bytes, result.linear_read_time),
                 BenchmarkResult::format_latency(WRITE_COUNT, result.linear_read_time)
             );
-            let linear_val = if result.linear_read_time == best_linear {
-                format!("**{}**", linear_info)
+            if result.linear_read_time == best_linear {
+                write!(file, " **{}** |", info)?;
             } else {
-                linear_info
-            };
+                write!(file, " {} |", info)?;
+            }
+        }
+        writeln!(file)?;
 
-            let random_1t_info = format!(
+        // Seq Read 2t row
+        write!(file, "| **Seq 2t** |")?;
+        for result in results {
+            let info = format!(
                 "{}<br>{}<br>{}",
-                BenchmarkResult::format_throughput(RANDOM_READ_COUNT as u64, result.random_read_time),
+                BenchmarkResult::format_throughput(WRITE_COUNT, result.seq_read_2t),
+                BenchmarkResult::format_bandwidth(write_bytes, result.seq_read_2t),
+                BenchmarkResult::format_latency(WRITE_COUNT, result.seq_read_2t)
+            );
+            if result.seq_read_2t == best_seq_2t {
+                write!(file, " **{}** |", info)?;
+            } else {
+                write!(file, " {} |", info)?;
+            }
+        }
+        writeln!(file)?;
+
+        // Seq Read 4t row
+        write!(file, "| **Seq 4t** |")?;
+        for result in results {
+            let info = format!(
+                "{}<br>{}<br>{}",
+                BenchmarkResult::format_throughput(WRITE_COUNT, result.seq_read_4t),
+                BenchmarkResult::format_bandwidth(write_bytes, result.seq_read_4t),
+                BenchmarkResult::format_latency(WRITE_COUNT, result.seq_read_4t)
+            );
+            if result.seq_read_4t == best_seq_4t {
+                write!(file, " **{}** |", info)?;
+            } else {
+                write!(file, " {} |", info)?;
+            }
+        }
+        writeln!(file)?;
+
+        // Seq Read 8t row
+        write!(file, "| **Seq 8t** |")?;
+        for result in results {
+            let info = format!(
+                "{}<br>{}<br>{}",
+                BenchmarkResult::format_throughput(WRITE_COUNT, result.seq_read_8t),
+                BenchmarkResult::format_bandwidth(write_bytes, result.seq_read_8t),
+                BenchmarkResult::format_latency(WRITE_COUNT, result.seq_read_8t)
+            );
+            if result.seq_read_8t == best_seq_8t {
+                write!(file, " **{}** |", info)?;
+            } else {
+                write!(file, " {} |", info)?;
+            }
+        }
+        writeln!(file)?;
+
+        // Random Read 1t row
+        write!(file, "| **Random 1t** |")?;
+        for result in results {
+            let info = format!(
+                "{}<br>{}<br>{}",
+                BenchmarkResult::format_throughput(
+                    RANDOM_READ_COUNT as u64,
+                    result.random_read_time
+                ),
                 BenchmarkResult::format_bandwidth(random_bytes, result.random_read_time),
                 BenchmarkResult::format_latency(RANDOM_READ_COUNT as u64, result.random_read_time)
             );
-            let random_1t_val = if result.random_read_time == best_random {
-                format!("**{}**", random_1t_info)
+            if result.random_read_time == best_random {
+                write!(file, " **{}** |", info)?;
             } else {
-                random_1t_info
-            };
+                write!(file, " {} |", info)?;
+            }
+        }
+        writeln!(file)?;
 
-            let random_4t_info = format!(
+        // Random Read 4t row
+        write!(file, "| **Random 4t** |")?;
+        for result in results {
+            let info = format!(
                 "{}<br>{}<br>{}",
                 BenchmarkResult::format_throughput(RANDOM_READ_COUNT as u64, result.random_read_4t),
                 BenchmarkResult::format_bandwidth(random_bytes, result.random_read_4t),
                 BenchmarkResult::format_latency(RANDOM_READ_COUNT as u64, result.random_read_4t)
             );
-            let random_4t_val = if result.random_read_4t == best_random_4t {
-                format!("**{}**", random_4t_info)
+            if result.random_read_4t == best_random_4t {
+                write!(file, " **{}** |", info)?;
             } else {
-                random_4t_info
-            };
+                write!(file, " {} |", info)?;
+            }
+        }
+        writeln!(file)?;
 
-            let random_8t_info = format!(
+        // Random Read 8t row
+        write!(file, "| **Random 8t** |")?;
+        for result in results {
+            let info = format!(
                 "{}<br>{}<br>{}",
                 BenchmarkResult::format_throughput(RANDOM_READ_COUNT as u64, result.random_read_8t),
                 BenchmarkResult::format_bandwidth(random_bytes, result.random_read_8t),
                 BenchmarkResult::format_latency(RANDOM_READ_COUNT as u64, result.random_read_8t)
             );
-            let random_8t_val = if result.random_read_8t == best_random_8t {
-                format!("**{}**", random_8t_info)
+            if result.random_read_8t == best_random_8t {
+                write!(file, " **{}** |", info)?;
             } else {
-                random_8t_info
-            };
+                write!(file, " {} |", info)?;
+            }
+        }
+        writeln!(file)?;
 
-            let random_12t_info = format!(
+        // Random Read 12t row
+        write!(file, "| **Random 12t** |")?;
+        for result in results {
+            let info = format!(
                 "{}<br>{}<br>{}",
-                BenchmarkResult::format_throughput(RANDOM_READ_COUNT as u64, result.random_read_12t),
+                BenchmarkResult::format_throughput(
+                    RANDOM_READ_COUNT as u64,
+                    result.random_read_12t
+                ),
                 BenchmarkResult::format_bandwidth(random_bytes, result.random_read_12t),
                 BenchmarkResult::format_latency(RANDOM_READ_COUNT as u64, result.random_read_12t)
             );
-            let random_12t_val = if result.random_read_12t == best_random_12t {
-                format!("**{}**", random_12t_info)
+            if result.random_read_12t == best_random_12t {
+                write!(file, " **{}** |", info)?;
             } else {
-                random_12t_info
-            };
+                write!(file, " {} |", info)?;
+            }
+        }
+        writeln!(file)?;
 
-            let random_16t_info = format!(
+        // Random Read 16t row
+        write!(file, "| **Random 16t** |")?;
+        for result in results {
+            let info = format!(
                 "{}<br>{}<br>{}",
-                BenchmarkResult::format_throughput(RANDOM_READ_COUNT as u64, result.random_read_16t),
+                BenchmarkResult::format_throughput(
+                    RANDOM_READ_COUNT as u64,
+                    result.random_read_16t
+                ),
                 BenchmarkResult::format_bandwidth(random_bytes, result.random_read_16t),
                 BenchmarkResult::format_latency(RANDOM_READ_COUNT as u64, result.random_read_16t)
             );
-            let random_16t_val = if result.random_read_16t == best_random_16t {
-                format!("**{}**", random_16t_info)
+            if result.random_read_16t == best_random_16t {
+                write!(file, " **{}** |", info)?;
             } else {
-                random_16t_info
-            };
-
-            let disk_str = BenchmarkResult::format_size(result.disk_size);
-            let disk_val = if result.disk_size == best_disk {
-                format!("**{}**", disk_str)
-            } else {
-                disk_str
-            };
-
-            writeln!(
-                file,
-                "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
-                result.name, open_val, write_val, len_val, linear_val, random_1t_val, random_4t_val, random_8t_val, random_12t_val, random_16t_val, disk_val,
-            )?;
+                write!(file, " {} |", info)?;
+            }
         }
+        writeln!(file)?;
+
+        // Disk Size row
+        write!(file, "| **Disk Size** |")?;
+        for result in results {
+            let disk_str = BenchmarkResult::format_size(result.disk_size);
+            if result.disk_size == best_disk {
+                write!(file, " **{}** |", disk_str)?;
+            } else {
+                write!(file, " {} |", disk_str)?;
+            }
+        }
+        writeln!(file)?;
 
         writeln!(file)?;
         writeln!(file, "## Run")?;

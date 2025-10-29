@@ -4,6 +4,7 @@ use std::{
         Arc,
         atomic::{AtomicU64, Ordering},
     },
+    thread,
 };
 
 use anyhow::Result;
@@ -80,6 +81,49 @@ impl DatabaseBenchmark for RocksDbBench {
         Ok(sum)
     }
 
+    fn read_sequential_threaded(&self, num_threads: usize) -> Result<u64> {
+        let total_sum = AtomicU64::new(0);
+        let db = Arc::new(&self.db);
+        let len = self.len()?;
+        let chunk_size = len / num_threads as u64;
+
+        thread::scope(|s| {
+            let handles: Vec<_> = (0..num_threads)
+                .map(|thread_id| {
+                    let db = db.clone();
+                    s.spawn(move || {
+                        let start = thread_id as u64 * chunk_size;
+                        let end = if thread_id == num_threads - 1 {
+                            len
+                        } else {
+                            (thread_id as u64 + 1) * chunk_size
+                        };
+
+                        let mut sum = 0u64;
+                        for idx in start..end {
+                            let key = idx.to_le_bytes();
+                            if let Ok(Some(value)) = db.get(key) {
+                                let value_u64 = u64::from_le_bytes(
+                                    value.as_slice().try_into().unwrap_or([0u8; 8]),
+                                );
+                                sum = sum.wrapping_add(value_u64);
+                            }
+                        }
+                        sum
+                    })
+                })
+                .collect();
+
+            for handle in handles {
+                if let Ok(sum) = handle.join() {
+                    total_sum.fetch_add(sum, Ordering::Relaxed);
+                }
+            }
+        });
+
+        Ok(total_sum.load(Ordering::Relaxed))
+    }
+
     fn read_random(&self, indices: &[u64]) -> Result<u64> {
         let mut sum = 0u64;
 
@@ -98,7 +142,7 @@ impl DatabaseBenchmark for RocksDbBench {
         let total_sum = AtomicU64::new(0);
         let db = Arc::new(&self.db);
 
-        std::thread::scope(|s| {
+        thread::scope(|s| {
             let handles: Vec<_> = indices_per_thread
                 .iter()
                 .map(|indices| {

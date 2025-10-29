@@ -51,7 +51,7 @@ fn main() -> Result<()> {
 
         assert!(region.reserved() == PAGE_SIZE);
 
-        let reader = region.create_reader(&database);
+        let reader = region.create_reader(&database)?;
         assert!(reader.read(0, 5)? == [0, 1, 2, 3, 4]);
     }
 
@@ -66,7 +66,7 @@ fn main() -> Result<()> {
 
         assert!(region.reserved() == PAGE_SIZE);
 
-        let reader = region.create_reader(&database);
+        let reader = region.create_reader(&database)?;
         assert!(reader.read(0, 10)? == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
     }
 
@@ -78,7 +78,7 @@ fn main() -> Result<()> {
         assert!(region.len() == 10);
         assert!(region.reserved() == PAGE_SIZE);
 
-        let reader = region.create_reader(&database);
+        let reader = region.create_reader(&database)?;
         assert!(reader.read(0, 10)? == [1, 2, 2, 3, 4, 5, 6, 7, 8, 9]);
     }
 
@@ -90,7 +90,7 @@ fn main() -> Result<()> {
         assert!(region.len() == 13);
         assert!(region.reserved() == PAGE_SIZE);
 
-        let reader = region.create_reader(&database);
+        let reader = region.create_reader(&database)?;
         assert!(reader.read(0, 13)? == [1, 2, 2, 3, 10, 11, 12, 13, 14, 15, 16, 17, 18]);
     }
 
@@ -104,7 +104,7 @@ fn main() -> Result<()> {
 
         dbg!(1);
 
-        let reader = region.create_reader(&database);
+        let reader = region.create_reader(&database)?;
         assert!(
             reader.read(0, 19)?
                 == [
@@ -123,7 +123,7 @@ fn main() -> Result<()> {
         assert!(region.len() == 8000);
         assert!(region.reserved() == PAGE_SIZE * 2);
 
-        let reader = region.create_reader(&database);
+        let reader = region.create_reader(&database)?;
         assert!(reader.read(0, 8000)? == [1; 8000]);
         assert!(reader.read(7999, 1).is_ok());
         assert!(reader.read(8000, 1).is_err());
@@ -144,7 +144,7 @@ fn main() -> Result<()> {
         // We only punch a hole in whole pages (4096 bytes)
         // Thus the last byte of the page where the is still data wasn't overwritten when truncating
         // And the first byte of the punched page was set to 0
-        let reader = region.create_reader(&database);
+        let reader = region.create_reader(&database)?;
         assert!(reader.read(4095, 2).is_err());
     }
 

@@ -4,17 +4,17 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
     thread,
 };
-use vecdb::{AnyStoredVec, AnyVec, Database, GenericStoredVec, RawVec, Version};
+use vecdb_old::{AnyStoredVec, AnyVec, Database, GenericStoredVec, RawVec, Version};
 
 use crate::database::DatabaseBenchmark;
 
-pub struct VecDbBench {
+pub struct VecDbOldBench {
     vec: RawVec<usize, u64>,
 }
 
-impl DatabaseBenchmark for VecDbBench {
+impl DatabaseBenchmark for VecDbOldBench {
     fn name() -> &'static str {
-        "vecdb"
+        "vecdb_old"
     }
 
     fn create(path: &Path) -> Result<Self> {
@@ -44,10 +44,9 @@ impl DatabaseBenchmark for VecDbBench {
 
     fn read_sequential(&self) -> Result<u64> {
         let mut sum = 0u64;
-        let values = self.vec.clean_values()?;
-
-        for value in values {
-            sum = sum.wrapping_add(value);
+        let values = self.vec.iter();
+        for (_, value) in values {
+            sum = sum.wrapping_add(value.into_owned());
         }
 
         Ok(sum)
@@ -66,9 +65,9 @@ impl DatabaseBenchmark for VecDbBench {
 
                         let mut sum = 0u64;
 
-                        let values = self.vec.clean_values_at(start).unwrap().take(chunk_size);
-                        for value in values {
-                            sum = sum.wrapping_add(value);
+                        let values = self.vec.iter_at(start).take(chunk_size);
+                        for (_, value) in values {
+                            sum = sum.wrapping_add(value.into_owned());
                         }
                         sum
                     })
@@ -108,11 +107,8 @@ impl DatabaseBenchmark for VecDbBench {
                     s.spawn(move || {
                         let mut sum = 0u64;
                         let reader = self.vec.create_reader();
-                        let mut buffer = self.vec.create_buffer();
                         for &idx in indices {
-                            if let Ok(value) =
-                                self.vec.read_into_(idx as usize, &reader, &mut buffer)
-                            {
+                            if let Ok(value) = self.vec.read_(idx as usize, &reader) {
                                 sum = sum.wrapping_add(value);
                             }
                         }

@@ -56,6 +56,48 @@ impl DatabaseBenchmark for Fjall3Bench {
         Ok(sum)
     }
 
+    fn read_sequential_threaded(&self, num_threads: usize) -> Result<u64> {
+        let total_sum = AtomicU64::new(0);
+        let len = self.len()?;
+        let chunk_size = len / num_threads as u64;
+
+        thread::scope(|s| {
+            let handles: Vec<_> = (0..num_threads)
+                .map(|thread_id| {
+                    let keyspace = self.keyspace.clone();
+                    s.spawn(move || {
+                        let start = thread_id as u64 * chunk_size;
+                        let end = if thread_id == num_threads - 1 {
+                            len
+                        } else {
+                            (thread_id as u64 + 1) * chunk_size
+                        };
+
+                        let mut sum = 0u64;
+                        for idx in start..end {
+                            let key = idx.to_be_bytes();
+                            if let Some(value) = keyspace.get(key).ok().flatten()
+                                && let Ok(val_bytes) = TryInto::<[u8; 8]>::try_into(value.as_ref())
+                            {
+                                let val = u64::from_be_bytes(val_bytes);
+                                sum = sum.wrapping_add(val);
+                            }
+                        }
+                        sum
+                    })
+                })
+                .collect();
+
+            for handle in handles {
+                if let Ok(sum) = handle.join() {
+                    total_sum.fetch_add(sum, Ordering::Relaxed);
+                }
+            }
+        });
+
+        Ok(total_sum.load(Ordering::Relaxed))
+    }
+
     fn read_random(&self, indices: &[u64]) -> Result<u64> {
         let mut sum = 0u64;
 

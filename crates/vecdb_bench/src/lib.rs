@@ -12,7 +12,9 @@ mod redb_impl;
 mod rocksdb_impl;
 mod runner;
 mod vecdb_impl;
+mod vecdb_old_impl;
 
+use database::DatabaseBenchmark;
 use fjall2_impl::*;
 use fjall3_impl::*;
 use lmdb_impl::*;
@@ -20,6 +22,135 @@ use redb_impl::*;
 use rocksdb_impl::*;
 use runner::*;
 use vecdb_impl::*;
+use vecdb_old_impl::*;
+
+struct AccumulatedTimes {
+    open: Vec<Duration>,
+    len: Vec<Duration>,
+    linear: Vec<Duration>,
+    seq_2t: Vec<Duration>,
+    seq_4t: Vec<Duration>,
+    seq_8t: Vec<Duration>,
+    random: Vec<Duration>,
+    random_4t: Vec<Duration>,
+    random_8t: Vec<Duration>,
+    random_12t: Vec<Duration>,
+    random_16t: Vec<Duration>,
+}
+
+impl AccumulatedTimes {
+    fn new() -> Self {
+        Self {
+            open: Vec::new(),
+            len: Vec::new(),
+            linear: Vec::new(),
+            seq_2t: Vec::new(),
+            seq_4t: Vec::new(),
+            seq_8t: Vec::new(),
+            random: Vec::new(),
+            random_4t: Vec::new(),
+            random_8t: Vec::new(),
+            random_12t: Vec::new(),
+            random_16t: Vec::new(),
+        }
+    }
+
+    fn push_iteration(
+        &mut self,
+        times: (
+            Duration,
+            Duration,
+            Duration,
+            Duration,
+            Duration,
+            Duration,
+            Duration,
+            Duration,
+            Duration,
+            Duration,
+            Duration,
+        ),
+    ) {
+        self.open.push(times.0);
+        self.len.push(times.1);
+        self.linear.push(times.2);
+        self.seq_2t.push(times.3);
+        self.seq_4t.push(times.4);
+        self.seq_8t.push(times.5);
+        self.random.push(times.6);
+        self.random_4t.push(times.7);
+        self.random_8t.push(times.8);
+        self.random_12t.push(times.9);
+        self.random_16t.push(times.10);
+    }
+
+    fn to_result(&self, name: String, write_time: Duration, disk_size: u64) -> BenchmarkResult {
+        BenchmarkResult {
+            name,
+            open_time: avg(&self.open),
+            write_time,
+            len_time: avg(&self.len),
+            linear_read_time: avg(&self.linear),
+            seq_read_2t: avg(&self.seq_2t),
+            seq_read_4t: avg(&self.seq_4t),
+            seq_read_8t: avg(&self.seq_8t),
+            random_read_time: avg(&self.random),
+            random_read_4t: avg(&self.random_4t),
+            random_read_8t: avg(&self.random_8t),
+            random_read_12t: avg(&self.random_12t),
+            random_read_16t: avg(&self.random_16t),
+            disk_size,
+        }
+    }
+}
+
+struct DbBenchmark<DB: DatabaseBenchmark> {
+    write_time: Duration,
+    times: AccumulatedTimes,
+    _phantom: std::marker::PhantomData<DB>,
+}
+
+impl<DB: DatabaseBenchmark> DbBenchmark<DB> {
+    fn new(runner: &BenchmarkRunner) -> Result<Self> {
+        let write_time = runner.prepare_database::<DB>()?;
+        Ok(Self {
+            write_time,
+            times: AccumulatedTimes::new(),
+            _phantom: std::marker::PhantomData,
+        })
+    }
+
+    fn run_iteration(
+        &mut self,
+        runner: &BenchmarkRunner,
+        indices: &[u64],
+        indices_4t: &[Vec<u64>],
+        indices_8t: &[Vec<u64>],
+        indices_12t: &[Vec<u64>],
+        indices_16t: &[Vec<u64>],
+    ) -> Result<()> {
+        let result = runner.run_iteration::<DB>(
+            indices,
+            indices_4t,
+            indices_8t,
+            indices_12t,
+            indices_16t,
+        )?;
+        self.times.push_iteration(result);
+        Ok(())
+    }
+
+    fn to_result(&self, runner: &BenchmarkRunner) -> Result<BenchmarkResult> {
+        let disk_size = runner.measure_disk_size::<DB>()?;
+        Ok(self
+            .times
+            .to_result(DB::name().to_string(), self.write_time, disk_size))
+    }
+
+    fn cleanup(&self, runner: &BenchmarkRunner) -> Result<()> {
+        runner.cleanup::<DB>()
+    }
+}
 
 pub fn run() -> Result<()> {
     println!("VecDB Benchmark Suite");
@@ -35,186 +166,101 @@ pub fn run() -> Result<()> {
     // Phase 1: Prepare all databases (write data)
     println!("\nPreparing databases:");
 
-    let vecdb_write_time = runner.prepare_database::<VecDbBench>()?;
-    let fjall2_write_time = runner.prepare_database::<Fjall2Bench>()?;
-    let fjall3_write_time = runner.prepare_database::<Fjall3Bench>()?;
-    let redb_write_time = runner.prepare_database::<RedbBench>()?;
-    let lmdb_write_time = runner.prepare_database::<LmdbBench>()?;
-    let rocksdb_write_time = runner.prepare_database::<RocksDbBench>()?;
+    let mut vecdb = DbBenchmark::<VecDbBench>::new(&runner)?;
+    let mut vecdb_old = DbBenchmark::<VecDbOldBench>::new(&runner)?;
+    let mut fjall2 = DbBenchmark::<Fjall2Bench>::new(&runner)?;
+    let mut fjall3 = DbBenchmark::<Fjall3Bench>::new(&runner)?;
+    let mut redb = DbBenchmark::<RedbBench>::new(&runner)?;
+    let mut lmdb = DbBenchmark::<LmdbBench>::new(&runner)?;
+    let mut rocksdb = DbBenchmark::<RocksDbBench>::new(&runner)?;
 
     // Generate random indices (same for all databases and iterations)
-    let indices = runner::BenchmarkRunner::generate_random_indices(runner::WRITE_COUNT);
-    let indices_4t = runner::BenchmarkRunner::generate_indices_per_thread(runner::WRITE_COUNT, 4, runner::RANDOM_SEED + 1000);
-    let indices_8t = runner::BenchmarkRunner::generate_indices_per_thread(runner::WRITE_COUNT, 8, runner::RANDOM_SEED + 2000);
-    let indices_12t = runner::BenchmarkRunner::generate_indices_per_thread(runner::WRITE_COUNT, 12, runner::RANDOM_SEED + 3000);
-    let indices_16t = runner::BenchmarkRunner::generate_indices_per_thread(runner::WRITE_COUNT, 16, runner::RANDOM_SEED + 4000);
+    let indices = BenchmarkRunner::generate_random_indices(WRITE_COUNT);
+    let indices_4t =
+        BenchmarkRunner::generate_indices_per_thread(WRITE_COUNT, 4, RANDOM_SEED + 1000);
+    let indices_8t =
+        BenchmarkRunner::generate_indices_per_thread(WRITE_COUNT, 8, RANDOM_SEED + 2000);
+    let indices_12t =
+        BenchmarkRunner::generate_indices_per_thread(WRITE_COUNT, 12, RANDOM_SEED + 3000);
+    let indices_16t =
+        BenchmarkRunner::generate_indices_per_thread(WRITE_COUNT, 16, RANDOM_SEED + 4000);
 
     // Phase 2: Run interleaved iterations
     println!("\nRunning iterations:");
 
-    let mut vecdb_times = (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
-    let mut fjall2_times = (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
-    let mut fjall3_times = (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
-    let mut redb_times = (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
-    let mut lmdb_times = (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
-    let mut rocksdb_times = (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
-
-    for i in 1..=runner::NUM_ITERATIONS {
-        print!("  Iteration {}/{} ... ", i, runner::NUM_ITERATIONS);
+    for i in 1..=NUM_ITERATIONS {
+        print!("  Iteration {}/{} ... ", i, NUM_ITERATIONS);
         std::io::Write::flush(&mut std::io::stdout()).ok();
 
-        // Run all databases in this iteration
-        let (open, len, linear, random, r4t, r8t, r12t, r16t) = runner.run_iteration::<VecDbBench>(&indices, &indices_4t, &indices_8t, &indices_12t, &indices_16t)?;
-        vecdb_times.0.push(open);
-        vecdb_times.1.push(len);
-        vecdb_times.2.push(linear);
-        vecdb_times.3.push(random);
-        vecdb_times.4.push(r4t);
-        vecdb_times.5.push(r8t);
-        vecdb_times.6.push(r12t);
-        vecdb_times.7.push(r16t);
-
-        let (open, len, linear, random, r4t, r8t, r12t, r16t) = runner.run_iteration::<Fjall2Bench>(&indices, &indices_4t, &indices_8t, &indices_12t, &indices_16t)?;
-        fjall2_times.0.push(open);
-        fjall2_times.1.push(len);
-        fjall2_times.2.push(linear);
-        fjall2_times.3.push(random);
-        fjall2_times.4.push(r4t);
-        fjall2_times.5.push(r8t);
-        fjall2_times.6.push(r12t);
-        fjall2_times.7.push(r16t);
-
-        let (open, len, linear, random, r4t, r8t, r12t, r16t) = runner.run_iteration::<Fjall3Bench>(&indices, &indices_4t, &indices_8t, &indices_12t, &indices_16t)?;
-        fjall3_times.0.push(open);
-        fjall3_times.1.push(len);
-        fjall3_times.2.push(linear);
-        fjall3_times.3.push(random);
-        fjall3_times.4.push(r4t);
-        fjall3_times.5.push(r8t);
-        fjall3_times.6.push(r12t);
-        fjall3_times.7.push(r16t);
-
-        let (open, len, linear, random, r4t, r8t, r12t, r16t) = runner.run_iteration::<RedbBench>(&indices, &indices_4t, &indices_8t, &indices_12t, &indices_16t)?;
-        redb_times.0.push(open);
-        redb_times.1.push(len);
-        redb_times.2.push(linear);
-        redb_times.3.push(random);
-        redb_times.4.push(r4t);
-        redb_times.5.push(r8t);
-        redb_times.6.push(r12t);
-        redb_times.7.push(r16t);
-
-        let (open, len, linear, random, r4t, r8t, r12t, r16t) = runner.run_iteration::<LmdbBench>(&indices, &indices_4t, &indices_8t, &indices_12t, &indices_16t)?;
-        lmdb_times.0.push(open);
-        lmdb_times.1.push(len);
-        lmdb_times.2.push(linear);
-        lmdb_times.3.push(random);
-        lmdb_times.4.push(r4t);
-        lmdb_times.5.push(r8t);
-        lmdb_times.6.push(r12t);
-        lmdb_times.7.push(r16t);
-
-        let (open, len, linear, random, r4t, r8t, r12t, r16t) = runner.run_iteration::<RocksDbBench>(&indices, &indices_4t, &indices_8t, &indices_12t, &indices_16t)?;
-        rocksdb_times.0.push(open);
-        rocksdb_times.1.push(len);
-        rocksdb_times.2.push(linear);
-        rocksdb_times.3.push(random);
-        rocksdb_times.4.push(r4t);
-        rocksdb_times.5.push(r8t);
-        rocksdb_times.6.push(r12t);
-        rocksdb_times.7.push(r16t);
+        vecdb.run_iteration(
+            &runner,
+            &indices,
+            &indices_4t,
+            &indices_8t,
+            &indices_12t,
+            &indices_16t,
+        )?;
+        vecdb_old.run_iteration(
+            &runner,
+            &indices,
+            &indices_4t,
+            &indices_8t,
+            &indices_12t,
+            &indices_16t,
+        )?;
+        fjall2.run_iteration(
+            &runner,
+            &indices,
+            &indices_4t,
+            &indices_8t,
+            &indices_12t,
+            &indices_16t,
+        )?;
+        fjall3.run_iteration(
+            &runner,
+            &indices,
+            &indices_4t,
+            &indices_8t,
+            &indices_12t,
+            &indices_16t,
+        )?;
+        redb.run_iteration(
+            &runner,
+            &indices,
+            &indices_4t,
+            &indices_8t,
+            &indices_12t,
+            &indices_16t,
+        )?;
+        lmdb.run_iteration(
+            &runner,
+            &indices,
+            &indices_4t,
+            &indices_8t,
+            &indices_12t,
+            &indices_16t,
+        )?;
+        rocksdb.run_iteration(
+            &runner,
+            &indices,
+            &indices_4t,
+            &indices_8t,
+            &indices_12t,
+            &indices_16t,
+        )?;
 
         println!("done");
     }
 
-    // Phase 3: Measure disk sizes
-    let vecdb_disk = runner.measure_disk_size::<VecDbBench>()?;
-    let fjall2_disk = runner.measure_disk_size::<Fjall2Bench>()?;
-    let fjall3_disk = runner.measure_disk_size::<Fjall3Bench>()?;
-    let redb_disk = runner.measure_disk_size::<RedbBench>()?;
-    let lmdb_disk = runner.measure_disk_size::<LmdbBench>()?;
-    let rocksdb_disk = runner.measure_disk_size::<RocksDbBench>()?;
-
-    // Build results
+    // Phase 3: Build results
     let results = vec![
-        BenchmarkResult {
-            name: "vecdb".to_string(),
-            open_time: avg(&vecdb_times.0),
-            write_time: vecdb_write_time,
-            len_time: avg(&vecdb_times.1),
-            linear_read_time: avg(&vecdb_times.2),
-            random_read_time: avg(&vecdb_times.3),
-            random_read_4t: avg(&vecdb_times.4),
-            random_read_8t: avg(&vecdb_times.5),
-            random_read_12t: avg(&vecdb_times.6),
-            random_read_16t: avg(&vecdb_times.7),
-            disk_size: vecdb_disk,
-        },
-        BenchmarkResult {
-            name: "fjall2".to_string(),
-            open_time: avg(&fjall2_times.0),
-            write_time: fjall2_write_time,
-            len_time: avg(&fjall2_times.1),
-            linear_read_time: avg(&fjall2_times.2),
-            random_read_time: avg(&fjall2_times.3),
-            random_read_4t: avg(&fjall2_times.4),
-            random_read_8t: avg(&fjall2_times.5),
-            random_read_12t: avg(&fjall2_times.6),
-            random_read_16t: avg(&fjall2_times.7),
-            disk_size: fjall2_disk,
-        },
-        BenchmarkResult {
-            name: "fjall3".to_string(),
-            open_time: avg(&fjall3_times.0),
-            write_time: fjall3_write_time,
-            len_time: avg(&fjall3_times.1),
-            linear_read_time: avg(&fjall3_times.2),
-            random_read_time: avg(&fjall3_times.3),
-            random_read_4t: avg(&fjall3_times.4),
-            random_read_8t: avg(&fjall3_times.5),
-            random_read_12t: avg(&fjall3_times.6),
-            random_read_16t: avg(&fjall3_times.7),
-            disk_size: fjall3_disk,
-        },
-        BenchmarkResult {
-            name: "redb".to_string(),
-            open_time: avg(&redb_times.0),
-            write_time: redb_write_time,
-            len_time: avg(&redb_times.1),
-            linear_read_time: avg(&redb_times.2),
-            random_read_time: avg(&redb_times.3),
-            random_read_4t: avg(&redb_times.4),
-            random_read_8t: avg(&redb_times.5),
-            random_read_12t: avg(&redb_times.6),
-            random_read_16t: avg(&redb_times.7),
-            disk_size: redb_disk,
-        },
-        BenchmarkResult {
-            name: "lmdb".to_string(),
-            open_time: avg(&lmdb_times.0),
-            write_time: lmdb_write_time,
-            len_time: avg(&lmdb_times.1),
-            linear_read_time: avg(&lmdb_times.2),
-            random_read_time: avg(&lmdb_times.3),
-            random_read_4t: avg(&lmdb_times.4),
-            random_read_8t: avg(&lmdb_times.5),
-            random_read_12t: avg(&lmdb_times.6),
-            random_read_16t: avg(&lmdb_times.7),
-            disk_size: lmdb_disk,
-        },
-        BenchmarkResult {
-            name: "rocksdb".to_string(),
-            open_time: avg(&rocksdb_times.0),
-            write_time: rocksdb_write_time,
-            len_time: avg(&rocksdb_times.1),
-            linear_read_time: avg(&rocksdb_times.2),
-            random_read_time: avg(&rocksdb_times.3),
-            random_read_4t: avg(&rocksdb_times.4),
-            random_read_8t: avg(&rocksdb_times.5),
-            random_read_12t: avg(&rocksdb_times.6),
-            random_read_16t: avg(&rocksdb_times.7),
-            disk_size: rocksdb_disk,
-        },
+        vecdb.to_result(&runner)?,
+        vecdb_old.to_result(&runner)?,
+        fjall2.to_result(&runner)?,
+        fjall3.to_result(&runner)?,
+        redb.to_result(&runner)?,
+        lmdb.to_result(&runner)?,
+        rocksdb.to_result(&runner)?,
     ];
 
     // Print summary
@@ -227,12 +273,13 @@ pub fn run() -> Result<()> {
     println!("README.md updated!");
 
     // Cleanup
-    runner.cleanup::<VecDbBench>()?;
-    runner.cleanup::<Fjall2Bench>()?;
-    runner.cleanup::<Fjall3Bench>()?;
-    runner.cleanup::<RedbBench>()?;
-    runner.cleanup::<LmdbBench>()?;
-    runner.cleanup::<RocksDbBench>()?;
+    vecdb.cleanup(&runner)?;
+    vecdb_old.cleanup(&runner)?;
+    fjall2.cleanup(&runner)?;
+    fjall3.cleanup(&runner)?;
+    redb.cleanup(&runner)?;
+    lmdb.cleanup(&runner)?;
+    rocksdb.cleanup(&runner)?;
 
     Ok(())
 }

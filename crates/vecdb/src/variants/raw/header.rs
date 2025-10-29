@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use allocative::Allocative;
-use parking_lot::RwLock;
-use seqdb::Database;
+use parking_lot::{RwLock, RwLockReadGuard};
+use seqdb::{Database, Region, RegionReader};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 use crate::{Error, Result, Stamp, Version};
@@ -34,13 +34,12 @@ impl Header {
 
     pub fn import_and_verify(
         db: &Database,
-        region_index: usize,
+        region: RwLockReadGuard<Region>,
         region_len: u64,
         vec_version: Version,
         format: Format,
     ) -> Result<Self> {
-        let inner =
-            HeaderInner::import_and_verify(db, region_index, region_len, vec_version, format)?;
+        let inner = HeaderInner::import_and_verify(db, region, region_len, vec_version, format)?;
         Ok(Self {
             inner: Arc::new(RwLock::new(inner)),
             modified: false,
@@ -122,7 +121,7 @@ impl HeaderInner {
 
     pub fn import_and_verify(
         db: &Database,
-        region_index: usize,
+        region: RwLockReadGuard<'_, Region>,
         region_len: u64,
         vec_version: Version,
         format: Format,
@@ -133,7 +132,7 @@ impl HeaderInner {
             return Err(Error::WrongLength);
         }
 
-        let reader = db.create_region_reader(region_index.into())?;
+        let reader = region.create_reader(db)?;
         let vec = reader.read(0, HEADER_OFFSET as u64)?;
         let header = HeaderInner::read_from_bytes(&vec)?;
 

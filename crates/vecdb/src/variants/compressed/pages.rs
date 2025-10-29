@@ -21,12 +21,12 @@ pub struct Pages {
 impl Pages {
     const SIZE_OF_PAGE: usize = size_of::<Page>();
 
-    pub fn import(file: &Database, name: &str) -> Result<Self> {
-        let (region_index, _region) = file.create_region_if_needed(name)?;
+    pub fn import(db: &Database, name: &str) -> Result<Self> {
+        let (region_index, _region) = db.create_region_if_needed(name)?;
 
         let vec = _region
             .read()
-            .create_reader(file)
+            .create_reader(db)?
             .read_all()?
             .chunks(Self::SIZE_OF_PAGE)
             .map(|b| Page::read_from_bytes(b).map_err(|e| e.into()))

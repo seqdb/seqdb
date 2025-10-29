@@ -123,13 +123,13 @@ where
         let header = if region_len == 0 {
             Header::create_and_write(db, region_index, version, format)?
         } else {
-            Header::import_and_verify(db, region_index, region.read().len(), version, format)?
+            Header::import_and_verify(db, region.read(), region.read().len(), version, format)?
         };
 
         let holes = if let Ok(holes) = db.get_region(Self::holes_region_name_(name).into()) {
             Some(
                 holes
-                    .create_reader(db)
+                    .create_reader(db)?
                     .read_all()?
                     .chunks(size_of::<usize>())
                     .map(|b| -> Result<usize> { usize::read_from_bytes(b).map_err(|e| e.into()) })
@@ -233,6 +233,24 @@ where
     #[inline]
     const fn aligned_buffer_size() -> usize {
         (VEC_PAGE_SIZE / Self::SIZE_OF_T) * Self::SIZE_OF_T
+    }
+
+    #[inline(always)]
+    pub fn read_into_(&self, index: usize, reader: &Reader, buffer: &mut [u8]) -> Result<T> {
+        reader.read_into((index * Self::SIZE_OF_T + HEADER_OFFSET) as u64, buffer)?;
+        Self::read_from_prefix(buffer)
+    }
+
+    #[inline(always)]
+    fn read_from_prefix(buffer: &[u8]) -> Result<T> {
+        T::read_from_prefix(buffer)
+            .map(|(v, _)| v)
+            .map_err(Error::from)
+    }
+
+    #[inline]
+    pub fn create_buffer(&self) -> Vec<u8> {
+        vec![0; Self::SIZE_OF_T]
     }
 }
 
@@ -485,14 +503,12 @@ where
     I: StoredIndex,
     T: StoredRaw,
 {
-    #[inline]
+    #[inline(always)]
     fn read_(&self, index: usize, reader: &Reader) -> Result<T> {
-        T::read_from_prefix(&reader.read(
+        Self::read_from_prefix(&reader.read(
             (index * Self::SIZE_OF_T + HEADER_OFFSET) as u64,
             Self::SIZE_OF_T as u64,
         )?)
-        .map(|(v, _)| v)
-        .map_err(Error::from)
     }
 
     #[inline]

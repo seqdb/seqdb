@@ -4,6 +4,8 @@ use allocative::Allocative;
 use parking_lot::RwLockReadGuard;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
+use crate::Result;
+
 use super::{DatabaseInner, PAGE_SIZE, Reader};
 
 #[derive(Debug, Clone, FromBytes, IntoBytes, Immutable, KnownLayout, Allocative)]
@@ -77,13 +79,13 @@ impl Region {
 }
 
 pub trait RegionReader {
-    fn create_reader(self, seqdb: &'_ DatabaseInner) -> Reader<'_>;
+    fn create_reader(self, seqdb: &'_ DatabaseInner) -> Result<Reader<'_>>;
 }
 
 impl<'a> RegionReader for RwLockReadGuard<'a, Region> {
-    fn create_reader(self, db: &DatabaseInner) -> Reader<'static> {
+    fn create_reader(self, db: &DatabaseInner) -> Result<Reader<'static>> {
         let region: RwLockReadGuard<'static, Region> = unsafe { std::mem::transmute(self) };
-        let file: RwLockReadGuard<'static, File> = unsafe { std::mem::transmute(db.file.read()) };
-        Reader::new(file, region)
+        let _lock: RwLockReadGuard<'static, File> = unsafe { std::mem::transmute(db.file.read()) };
+        Ok(Reader::new(db.open_read_only_file()?, region, _lock))
     }
 }
