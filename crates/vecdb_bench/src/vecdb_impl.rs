@@ -1,10 +1,11 @@
 use anyhow::Result;
+use rayon::prelude::*;
 use std::{
     path::Path,
     sync::atomic::{AtomicU64, Ordering},
     thread,
 };
-use vecdb::{AnyStoredVec, AnyVec, Database, GenericStoredVec, RawVec, Version};
+use vecdb::{AnyStoredVec, AnyVec, Database, GenericStoredVec, RawVec, Reader, Version};
 
 use crate::database::DatabaseBenchmark;
 
@@ -129,6 +130,33 @@ impl DatabaseBenchmark for VecDbBench {
         });
 
         Ok(total_sum.load(Ordering::Relaxed))
+    }
+
+    fn read_random_rayon(&self, indices: &[u64]) -> Result<u64> {
+        use std::cell::RefCell;
+
+        thread_local! {
+            static READER: RefCell<Option<Reader<'static>>> = const { RefCell::new(None) };
+        }
+
+        let sum = indices
+            .par_iter()
+            .map(|&idx| {
+                READER.with(|reader_cell| {
+                    let mut reader_opt = reader_cell.borrow_mut();
+                    if reader_opt.is_none() {
+                        *reader_opt = Some(self.vec.create_static_reader());
+                    }
+                    self.vec
+                        .read_(idx as usize, unsafe {
+                            reader_opt.as_ref().unwrap_unchecked()
+                        })
+                        .unwrap_or_default()
+                })
+            })
+            .reduce(|| 0, |a, b| a.wrapping_add(b));
+
+        Ok(sum)
     }
 
     fn flush(&mut self) -> Result<()> {

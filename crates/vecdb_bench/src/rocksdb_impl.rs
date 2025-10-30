@@ -8,6 +8,7 @@ use std::{
 };
 
 use anyhow::Result;
+use rayon::prelude::*;
 use rocksdb::{DB, Options, WriteBatch};
 
 use crate::database::DatabaseBenchmark;
@@ -172,6 +173,23 @@ impl DatabaseBenchmark for RocksDbBench {
         });
 
         Ok(total_sum.load(Ordering::Relaxed))
+    }
+
+    fn read_random_rayon(&self, indices: &[u64]) -> Result<u64> {
+        let db = &self.db;
+        let sum = indices
+            .par_iter()
+            .map(|&idx| {
+                let key = idx.to_le_bytes();
+                if let Ok(Some(value)) = db.get(key) {
+                    u64::from_le_bytes(value.as_slice().try_into().unwrap_or([0u8; 8]))
+                } else {
+                    0
+                }
+            })
+            .reduce(|| 0, |a, b| a.wrapping_add(b));
+
+        Ok(sum)
     }
 
     fn flush(&mut self) -> Result<()> {

@@ -31,6 +31,9 @@ pub trait DatabaseBenchmark: Sized + Send + Sync {
     /// Read items at the given indices with multiple threads, returning the sum for verification
     fn read_random_threaded(&self, indices_per_thread: &[Vec<u64>]) -> Result<u64>;
 
+    /// Read items at the given indices using rayon parallel iteration, returning the sum for verification
+    fn read_random_rayon(&self, indices: &[u64]) -> Result<u64>;
+
     /// Ensure all data is flushed to disk
     fn flush(&mut self) -> Result<()>;
 

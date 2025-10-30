@@ -1,4 +1,5 @@
 use anyhow::Result;
+use rayon::prelude::*;
 use std::{
     path::Path,
     sync::atomic::{AtomicU64, Ordering},
@@ -125,6 +126,16 @@ impl DatabaseBenchmark for VecDbOldBench {
         });
 
         Ok(total_sum.load(Ordering::Relaxed))
+    }
+
+    fn read_random_rayon(&self, indices: &[u64]) -> Result<u64> {
+        let reader = self.vec.create_reader();
+        let sum = indices
+            .par_iter()
+            .map(|&idx| self.vec.read_(idx as usize, &reader).unwrap_or_default())
+            .reduce(|| 0, |a, b| a.wrapping_add(b));
+
+        Ok(sum)
     }
 
     fn flush(&mut self) -> Result<()> {

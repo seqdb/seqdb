@@ -35,6 +35,7 @@ struct AccumulatedTimes {
     random_8t: Vec<Duration>,
     random_12t: Vec<Duration>,
     random_16t: Vec<Duration>,
+    random_rayon: Vec<Duration>,
 }
 
 impl AccumulatedTimes {
@@ -51,6 +52,7 @@ impl AccumulatedTimes {
             random_8t: Vec::new(),
             random_12t: Vec::new(),
             random_16t: Vec::new(),
+            random_rayon: Vec::new(),
         }
     }
 
@@ -76,6 +78,7 @@ impl AccumulatedTimes {
             random_read_8t: avg(&self.random_8t),
             random_read_12t: avg(&self.random_12t),
             random_read_16t: avg(&self.random_16t),
+            random_read_rayon: avg(&self.random_rayon),
             disk_size,
             config,
             run_index,
@@ -84,6 +87,7 @@ impl AccumulatedTimes {
 }
 
 trait DatabaseBenchmarkTrait {
+    fn name(&self) -> &str;
     fn run_open(&mut self, runner: &BenchmarkRunner) -> Result<Duration>;
     fn run_len(&mut self, runner: &BenchmarkRunner) -> Result<Duration>;
     fn run_read_sequential(&mut self, runner: &BenchmarkRunner) -> Result<Duration>;
@@ -111,6 +115,11 @@ trait DatabaseBenchmarkTrait {
         runner: &BenchmarkRunner,
         indices_16t: &[Vec<u64>],
     ) -> Result<Duration>;
+    fn run_read_random_rayon(
+        &mut self,
+        runner: &BenchmarkRunner,
+        indices: &[u64],
+    ) -> Result<Duration>;
     fn push_open(&mut self, duration: Duration);
     fn push_len(&mut self, duration: Duration);
     fn push_linear(&mut self, duration: Duration);
@@ -122,6 +131,7 @@ trait DatabaseBenchmarkTrait {
     fn push_random_8t(&mut self, duration: Duration);
     fn push_random_12t(&mut self, duration: Duration);
     fn push_random_16t(&mut self, duration: Duration);
+    fn push_random_rayon(&mut self, duration: Duration);
     fn to_result(&self, runner: &BenchmarkRunner, run_index: usize) -> Result<BenchmarkResult>;
     fn cleanup(&self, runner: &BenchmarkRunner) -> Result<()>;
 }
@@ -144,6 +154,10 @@ impl<DB: DatabaseBenchmark> DbBenchmark<DB> {
 }
 
 impl<DB: DatabaseBenchmark + 'static> DatabaseBenchmarkTrait for DbBenchmark<DB> {
+    fn name(&self) -> &str {
+        DB::name()
+    }
+
     fn run_open(&mut self, runner: &BenchmarkRunner) -> Result<Duration> {
         let name = DB::name();
         let path = runner.db_path(name);
@@ -280,6 +294,21 @@ impl<DB: DatabaseBenchmark + 'static> DatabaseBenchmarkTrait for DbBenchmark<DB>
         Ok(duration)
     }
 
+    fn run_read_random_rayon(
+        &mut self,
+        runner: &BenchmarkRunner,
+        indices: &[u64],
+    ) -> Result<Duration> {
+        let name = DB::name();
+        let path = runner.db_path(name);
+        let db = DB::open(&path)?;
+        let start = std::time::Instant::now();
+        let _sum = db.read_random_rayon(indices)?;
+        let duration = start.elapsed();
+        drop(db);
+        Ok(duration)
+    }
+
     fn to_result(&self, runner: &BenchmarkRunner, run_index: usize) -> Result<BenchmarkResult> {
         let disk_size = runner.measure_disk_size::<DB>()?;
         Ok(self.times.to_result(
@@ -333,6 +362,10 @@ impl<DB: DatabaseBenchmark + 'static> DatabaseBenchmarkTrait for DbBenchmark<DB>
 
     fn push_random_16t(&mut self, duration: Duration) {
         self.times.random_16t.push(duration);
+    }
+
+    fn push_random_rayon(&mut self, duration: Duration) {
+        self.times.random_rayon.push(duration);
     }
 
     fn cleanup(&self, runner: &BenchmarkRunner) -> Result<()> {
@@ -400,109 +433,98 @@ pub fn run(configs: &[BenchConfig]) -> Result<()> {
             }
         }
 
+        // Helper to run a test across all databases
+        let run_test =
+            |name: &str,
+             benchmarks: &mut [Box<dyn DatabaseBenchmarkTrait>],
+             run_fn: &dyn Fn(&mut Box<dyn DatabaseBenchmarkTrait>) -> Result<Duration>|
+             -> Result<()> {
+                println!("    {}", name);
+                for db_bench in benchmarks.iter_mut() {
+                    print!("      {}... ", db_bench.name());
+                    std::io::Write::flush(&mut std::io::stdout()).ok();
+                    let duration = run_fn(db_bench)?;
+                    println!("{duration:?}");
+                }
+                Ok(())
+            };
+
         // Phase 2: Run interleaved iterations
         println!("\nRunning iterations:");
         for i in 1..=config.num_iterations {
             println!("  Iteration {}/{}:", i, config.num_iterations);
 
-            // open()
-            print!("    open() ... ");
-            std::io::Write::flush(&mut std::io::stdout()).ok();
-            for db_bench in &mut db_benchmarks {
-                let duration = db_bench.run_open(&runner)?;
-                db_bench.push_open(duration);
-            }
-            println!("done");
+            run_test("open()", &mut db_benchmarks, &|db| {
+                let duration = db.run_open(&runner)?;
+                db.push_open(duration);
+                Ok(duration)
+            })?;
 
-            // len()
-            print!("    len() ... ");
-            std::io::Write::flush(&mut std::io::stdout()).ok();
-            for db_bench in &mut db_benchmarks {
-                let duration = db_bench.run_len(&runner)?;
-                db_bench.push_len(duration);
-            }
-            println!("done");
+            run_test("len()", &mut db_benchmarks, &|db| {
+                let duration = db.run_len(&runner)?;
+                db.push_len(duration);
+                Ok(duration)
+            })?;
 
-            // read_sequential
-            print!("    read_seq(1) ... ");
-            std::io::Write::flush(&mut std::io::stdout()).ok();
-            for db_bench in &mut db_benchmarks {
-                let duration = db_bench.run_read_sequential(&runner)?;
-                db_bench.push_linear(duration);
-            }
-            println!("done");
+            run_test("read_seq(1)", &mut db_benchmarks, &|db| {
+                let duration = db.run_read_sequential(&runner)?;
+                db.push_linear(duration);
+                Ok(duration)
+            })?;
 
-            // read_seq_2t
-            print!("    read_seq(2) ... ");
-            std::io::Write::flush(&mut std::io::stdout()).ok();
-            for db_bench in &mut db_benchmarks {
-                let duration = db_bench.run_read_seq_2t(&runner)?;
-                db_bench.push_seq_2t(duration);
-            }
-            println!("done");
+            run_test("read_seq(2)", &mut db_benchmarks, &|db| {
+                let duration = db.run_read_seq_2t(&runner)?;
+                db.push_seq_2t(duration);
+                Ok(duration)
+            })?;
 
-            // read_seq_4t
-            print!("    read_seq(4) ... ");
-            std::io::Write::flush(&mut std::io::stdout()).ok();
-            for db_bench in &mut db_benchmarks {
-                let duration = db_bench.run_read_seq_4t(&runner)?;
-                db_bench.push_seq_4t(duration);
-            }
-            println!("done");
+            run_test("read_seq(4)", &mut db_benchmarks, &|db| {
+                let duration = db.run_read_seq_4t(&runner)?;
+                db.push_seq_4t(duration);
+                Ok(duration)
+            })?;
 
-            // read_seq_8t
-            print!("    read_seq(8) ... ");
-            std::io::Write::flush(&mut std::io::stdout()).ok();
-            for db_bench in &mut db_benchmarks {
-                let duration = db_bench.run_read_seq_8t(&runner)?;
-                db_bench.push_seq_8t(duration);
-            }
-            println!("done");
+            run_test("read_seq(8)", &mut db_benchmarks, &|db| {
+                let duration = db.run_read_seq_8t(&runner)?;
+                db.push_seq_8t(duration);
+                Ok(duration)
+            })?;
 
-            // read_random
-            print!("    read_rand(1) ... ");
-            std::io::Write::flush(&mut std::io::stdout()).ok();
-            for db_bench in &mut db_benchmarks {
-                let duration = db_bench.run_read_random(&runner, &indices)?;
-                db_bench.push_random(duration);
-            }
-            println!("done");
+            run_test("read_rand(1)", &mut db_benchmarks, &|db| {
+                let duration = db.run_read_random(&runner, &indices)?;
+                db.push_random(duration);
+                Ok(duration)
+            })?;
 
-            // read_random_4t
-            print!("    read_rand(4) ... ");
-            std::io::Write::flush(&mut std::io::stdout()).ok();
-            for db_bench in &mut db_benchmarks {
-                let duration = db_bench.run_read_random_4t(&runner, &indices_4t)?;
-                db_bench.push_random_4t(duration);
-            }
-            println!("done");
+            run_test("read_rand(4)", &mut db_benchmarks, &|db| {
+                let duration = db.run_read_random_4t(&runner, &indices_4t)?;
+                db.push_random_4t(duration);
+                Ok(duration)
+            })?;
 
-            // read_random_8t
-            print!("    read_rand(8) ... ");
-            std::io::Write::flush(&mut std::io::stdout()).ok();
-            for db_bench in &mut db_benchmarks {
-                let duration = db_bench.run_read_random_8t(&runner, &indices_8t)?;
-                db_bench.push_random_8t(duration);
-            }
-            println!("done");
+            run_test("read_rand(8)", &mut db_benchmarks, &|db| {
+                let duration = db.run_read_random_8t(&runner, &indices_8t)?;
+                db.push_random_8t(duration);
+                Ok(duration)
+            })?;
 
-            // read_random_12t
-            print!("    read_rand(12) ... ");
-            std::io::Write::flush(&mut std::io::stdout()).ok();
-            for db_bench in &mut db_benchmarks {
-                let duration = db_bench.run_read_random_12t(&runner, &indices_12t)?;
-                db_bench.push_random_12t(duration);
-            }
-            println!("done");
+            run_test("read_rand(12)", &mut db_benchmarks, &|db| {
+                let duration = db.run_read_random_12t(&runner, &indices_12t)?;
+                db.push_random_12t(duration);
+                Ok(duration)
+            })?;
 
-            // read_random_16t
-            print!("    read_rand(16) ... ");
-            std::io::Write::flush(&mut std::io::stdout()).ok();
-            for db_bench in &mut db_benchmarks {
-                let duration = db_bench.run_read_random_16t(&runner, &indices_16t)?;
-                db_bench.push_random_16t(duration);
-            }
-            println!("done");
+            run_test("read_rand(16)", &mut db_benchmarks, &|db| {
+                let duration = db.run_read_random_16t(&runner, &indices_16t)?;
+                db.push_random_16t(duration);
+                Ok(duration)
+            })?;
+
+            run_test("read_rand(rayon)", &mut db_benchmarks, &|db| {
+                let duration = db.run_read_random_rayon(&runner, &indices)?;
+                db.push_random_rayon(duration);
+                Ok(duration)
+            })?;
         }
 
         // Phase 3: Build results and cleanup

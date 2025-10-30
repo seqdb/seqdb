@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::Result;
 use fjall3::{Database, Keyspace, KeyspaceCreateOptions, PersistMode};
+use rayon::prelude::*;
 
 use crate::database::DatabaseBenchmark;
 
@@ -33,10 +34,17 @@ impl DatabaseBenchmark for Fjall3Bench {
     }
 
     fn write_sequential(&mut self, count: u64) -> Result<()> {
-        self.keyspace.ingest((0..count).map(|i| {
+        // Should be another test
+        // self.keyspace.ingest((0..count).map(|i| {
+        //     let b = i.to_be_bytes();
+        //     (b, b)
+        // }))?;
+
+        (0..count).try_for_each(|i| {
             let b = i.to_be_bytes();
-            (b, b)
-        }))?;
+            self.keyspace.insert(b, b)
+        })?;
+
         Ok(())
     }
 
@@ -144,6 +152,25 @@ impl DatabaseBenchmark for Fjall3Bench {
         });
 
         Ok(total_sum.load(Ordering::Relaxed))
+    }
+
+    fn read_random_rayon(&self, indices: &[u64]) -> Result<u64> {
+        let keyspace = &self.keyspace;
+        let sum = indices
+            .par_iter()
+            .map(|&idx| {
+                let key = idx.to_be_bytes();
+                if let Some(value) = keyspace.get(key).ok().flatten()
+                    && let Ok(val_bytes) = TryInto::<[u8; 8]>::try_into(value.as_ref())
+                {
+                    u64::from_be_bytes(val_bytes)
+                } else {
+                    0
+                }
+            })
+            .reduce(|| 0, |a, b| a.wrapping_add(b));
+
+        Ok(sum)
     }
 
     fn flush(&mut self) -> Result<()> {

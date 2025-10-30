@@ -8,6 +8,7 @@ use std::{
 };
 
 use anyhow::Result;
+use rayon::prelude::*;
 use redb::{Database, ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition};
 
 use crate::database::DatabaseBenchmark;
@@ -156,6 +157,37 @@ impl DatabaseBenchmark for RedbBench {
         });
 
         Ok(total_sum.load(Ordering::Relaxed))
+    }
+
+    fn read_random_rayon(&self, indices: &[u64]) -> Result<u64> {
+        use std::cell::RefCell;
+
+        thread_local! {
+            static TXN_CACHE: RefCell<Option<(redb::ReadTransaction, redb::ReadOnlyTable<u64, u64>)>> = const { RefCell::new(None) };
+        }
+
+        let db = &self.db;
+        let sum = indices
+            .par_iter()
+            .map(|&idx| {
+                TXN_CACHE.with(|cache| {
+                    let mut cache_opt = cache.borrow_mut();
+                    if cache_opt.is_none()
+                        && let Ok(read_txn) = db.begin_read()
+                        && let Ok(table) = read_txn.open_table(TABLE)
+                    {
+                        *cache_opt = Some((read_txn, table));
+                    }
+                    let table = &cache_opt.as_ref().unwrap().1;
+                    if let Ok(Some(value)) = table.get(idx) {
+                        return value.value();
+                    }
+                    0
+                })
+            })
+            .reduce(|| 0, |a, b| a.wrapping_add(b));
+
+        Ok(sum)
     }
 
     fn flush(&mut self) -> Result<()> {
