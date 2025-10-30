@@ -129,8 +129,8 @@ where
         let holes = if let Ok(holes) = db.get_region(Self::holes_region_name_(name).into()) {
             Some(
                 holes
-                    .create_reader(db)?
-                    .read_all()?
+                    .create_reader(db)
+                    .read_all()
                     .chunks(size_of::<usize>())
                     .map(|b| -> Result<usize> { usize::read_from_bytes(b).map_err(|e| e.into()) })
                     .collect::<Result<BTreeSet<usize>>>()?,
@@ -233,19 +233,6 @@ where
     #[inline]
     const fn aligned_buffer_size() -> usize {
         (VEC_PAGE_SIZE / Self::SIZE_OF_T) * Self::SIZE_OF_T
-    }
-
-    #[inline(always)]
-    pub fn read_into_(&self, index: usize, reader: &Reader, buffer: &mut [u8]) -> Result<T> {
-        reader.read_into((index * Self::SIZE_OF_T + HEADER_OFFSET) as u64, buffer)?;
-        Self::read_from_prefix(buffer)
-    }
-
-    #[inline(always)]
-    fn read_from_prefix(buffer: &[u8]) -> Result<T> {
-        T::read_from_prefix(buffer)
-            .map(|(v, _)| v)
-            .map_err(Error::from)
     }
 
     #[inline]
@@ -505,10 +492,9 @@ where
 {
     #[inline(always)]
     fn read_(&self, index: usize, reader: &Reader) -> Result<T> {
-        Self::read_from_prefix(&reader.read(
-            (index * Self::SIZE_OF_T + HEADER_OFFSET) as u64,
-            Self::SIZE_OF_T as u64,
-        )?)
+        T::read_from_prefix(reader.prefixed((index * Self::SIZE_OF_T + HEADER_OFFSET) as u64))
+            .map(|(v, _)| v)
+            .map_err(Error::from)
     }
 
     #[inline]

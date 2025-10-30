@@ -1,58 +1,45 @@
+use memmap2::MmapMut;
 use parking_lot::RwLockReadGuard;
-use std::{fs::File, os::unix::fs::FileExt};
 
-use crate::uninit_vec;
-
-use super::{Error, Region, Result};
+use super::Region;
 
 #[derive(Debug)]
 pub struct Reader<'a> {
-    _lock: RwLockReadGuard<'a, File>,
+    mmap: RwLockReadGuard<'a, MmapMut>,
     region: RwLockReadGuard<'static, Region>,
-    file: File,
 }
 
 impl<'a> Reader<'a> {
     #[inline]
     pub fn new(
-        file: File,
+        mmap: RwLockReadGuard<'a, MmapMut>,
         region: RwLockReadGuard<'static, Region>,
-        _lock: RwLockReadGuard<'a, File>,
     ) -> Self {
-        Self {
-            file,
-            region,
-            _lock,
-        }
+        Self { mmap, region }
     }
 
     #[inline(always)]
-    pub fn read_into(&self, offset: u64, buffer: &mut [u8]) -> Result<()> {
-        let len = buffer.len() as u64;
-        let region_len = self.region.len();
-        if offset + len > region_len {
-            return Err(Error::String(format!(
-                "Read beyond region bounds (buffer_len is {len} and region_len is {region_len})"
-            )));
-        }
+    pub fn unchecked_read(&self, offset: u64, len: u64) -> &[u8] {
         let start = self.region.start() + offset;
-
-        self.file.read_exact_at(buffer, start)?;
-
-        Ok(())
+        let end = start + len;
+        &self.mmap[start as usize..end as usize]
     }
 
     #[inline(always)]
-    pub fn read(&self, offset: u64, len: u64) -> Result<Vec<u8>> {
-        let mut buffer = uninit_vec(len as usize);
-        self.read_into(offset, &mut buffer)?;
-
-        Ok(buffer)
+    pub fn read(&self, offset: u64, len: u64) -> &[u8] {
+        assert!(offset + len <= self.region.len());
+        self.unchecked_read(offset, len)
     }
 
-    #[inline]
-    pub fn read_all(&self) -> Result<Vec<u8>> {
+    #[inline(always)]
+    pub fn read_all(&self) -> &[u8] {
         self.read(0, self.region().len())
+    }
+
+    #[inline(always)]
+    pub fn prefixed(&self, offset: u64) -> &[u8] {
+        let start = self.region.start() + offset;
+        &self.mmap[start as usize..]
     }
 
     #[inline]

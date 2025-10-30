@@ -111,7 +111,7 @@ where
         let len = page.bytes as u64;
         let offset = page.start;
 
-        let vec = reader.read(offset, len)?;
+        let vec = reader.unchecked_read(offset, len);
 
         let vec: Vec<T::NumberType> = pco::standalone::simple_decompress(&vec)?;
         let vec = T::from_inner_slice(vec);

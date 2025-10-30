@@ -1454,7 +1454,7 @@ version = "0.2.17"
 dependencies = [
  "allocative",
  "libc",
- "log",
+ "memmap2",
  "parking_lot 0.12.5",
  "rayon",
  "zerocopy",

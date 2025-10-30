@@ -40,17 +40,7 @@ where
     /// You'll want to drop the reader before mutable ops
     ///
     fn create_static_reader(&self) -> Reader<'static> {
-        unsafe {
-            std::mem::transmute(
-                self.region()
-                    .read()
-                    .create_reader(self.db())
-                    .inspect_err(|_| {
-                        dbg!(self.region_index());
-                    })
-                    .unwrap(),
-            )
-        }
+        unsafe { std::mem::transmute(self.region().read().create_reader(self.db())) }
     }
 
     #[inline]

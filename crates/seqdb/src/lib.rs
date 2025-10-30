@@ -15,8 +15,8 @@ use std::{
 
 use allocative::Allocative;
 use libc::off_t;
+use memmap2::{MmapMut, MmapOptions};
 use parking_lot::{RwLock, RwLockReadGuard};
-use std::os::unix::fs::FileExt;
 
 pub mod error;
 mod identifier;
@@ -35,7 +35,7 @@ use regions::*;
 
 pub const PAGE_SIZE: u64 = 4096;
 pub const PAGE_SIZE_MINUS_1: u64 = PAGE_SIZE - 1;
-const GB: u64 = 1024 * 1024 * 1024;
+const GB: usize = 1024 * 1024 * 1024;
 
 #[derive(Debug, Clone, Allocative)]
 pub struct Database(Arc<DatabaseInner>);
@@ -60,6 +60,8 @@ pub struct DatabaseInner {
     layout: RwLock<Layout>,
     #[allocative(skip)]
     file: RwLock<File>,
+    #[allocative(skip)]
+    mmap: RwLock<MmapMut>,
 }
 
 impl DatabaseInner {
@@ -78,9 +80,12 @@ impl DatabaseInner {
             .open(Self::data_path_(path))?;
         file.try_lock()?;
 
+        let mmap = Self::create_mmap(&file)?;
+
         Ok(Self {
             path: path.to_owned(),
             file: RwLock::new(file),
+            mmap: RwLock::new(mmap),
             regions: RwLock::new(regions),
             layout: RwLock::new(layout),
         })
@@ -95,8 +100,10 @@ impl DatabaseInner {
 
         let file_len = self.file_len()?;
         if file_len < len {
+            let mut mmap = self.mmap.write();
             let file = self.file.write();
             file.set_len(len)?;
+            *mmap = Self::create_mmap(&file)?;
             Ok(())
         } else {
             Ok(())
@@ -220,13 +227,13 @@ impl DatabaseInner {
             // );
 
             if at.is_none() {
-                self.write(write_start, data)?;
+                self.write(write_start, data);
             }
 
             let mut region = region_lock.write();
 
             if at.is_some() {
-                self.write(write_start, data)?;
+                self.write(write_start, data);
             }
 
             region.set_len(new_len);
@@ -255,7 +262,7 @@ impl DatabaseInner {
             drop(region);
             drop(layout);
 
-            self.write(write_start, data)?;
+            self.write(write_start, data);
 
             let mut region = region_lock.write();
             region.set_len(new_len);
@@ -278,7 +285,7 @@ impl DatabaseInner {
             drop(region);
             drop(layout);
 
-            self.write(write_start, data)?;
+            self.write(write_start, data);
 
             let mut region = region_lock.write();
             region.set_len(new_len);
@@ -294,14 +301,12 @@ impl DatabaseInner {
             layout.remove_or_compress_hole(hole_start, new_reserved);
             drop(layout);
 
-            // Read existing data and write to new location
-            let file = self.file.read();
-            let existing_len = (write_start - start) as usize;
-            let mut existing_data = uninit_vec(existing_len);
-            file.read_exact_at(&mut existing_data, start)?;
-            file.write_all_at(&existing_data, hole_start)?;
-            file.write_all_at(data, hole_start + at.unwrap_or(len))?;
-            drop(file);
+            self.write(
+                hole_start,
+                &self.mmap.read()[start as usize..write_start as usize],
+            );
+
+            self.write(hole_start + at.unwrap_or(len), data);
 
             let mut region = region_lock.write();
             let mut layout = self.layout.write();
@@ -328,13 +333,11 @@ impl DatabaseInner {
         drop(layout);
 
         // Read existing data and write to new location
-        let file = self.file.read();
-        let existing_len = (write_start - start) as usize;
-        let mut existing_data = uninit_vec(existing_len);
-        file.read_exact_at(&mut existing_data, start)?;
-        file.write_all_at(&existing_data, new_start)?;
-        file.write_all_at(data, new_start + at.unwrap_or(len))?;
-        drop(file);
+        self.write(
+            new_start,
+            &self.mmap.read()[start as usize..write_start as usize],
+        );
+        self.write(new_start + at.unwrap_or(len), data);
 
         let mut region = region_lock.write();
         let mut layout = self.layout.write();
@@ -351,10 +354,18 @@ impl DatabaseInner {
     }
 
     #[inline]
-    fn write(&self, at: u64, data: &[u8]) -> Result<()> {
-        let file = self.file.read();
-        file.write_all_at(data, at)?;
-        Ok(())
+    fn write(&self, at: u64, data: &[u8]) {
+        let mmap = self.mmap.read();
+        let data_len = data.len();
+        let start = at as usize;
+        let end = start + data_len;
+        if end > mmap.len() {
+            unreachable!("Trying to write beyond mmap")
+        }
+
+        (unsafe { std::slice::from_raw_parts_mut(mmap.as_ptr() as *mut u8, mmap.len()) })
+            [start..end]
+            .copy_from_slice(data);
     }
 
     ///
@@ -418,6 +429,16 @@ impl DatabaseInner {
     }
 
     #[inline]
+    fn create_mmap(file: &File) -> Result<MmapMut> {
+        Ok(unsafe { MmapOptions::new().map_mut(file)? })
+    }
+
+    #[inline]
+    pub fn mmap(&self) -> RwLockReadGuard<'_, MmapMut> {
+        self.mmap.read()
+    }
+
+    #[inline]
     pub fn regions(&self) -> RwLockReadGuard<'_, Regions> {
         self.regions.read()
     }
@@ -464,9 +485,9 @@ impl DatabaseInner {
     }
 
     pub fn flush(&self) -> Result<()> {
-        let file = self.file.read();
-        file.sync_data()?;
+        let mmap = self.mmap.read();
         let regions = self.regions.read();
+        mmap.flush()?;
         regions.flush()
     }
 
@@ -478,14 +499,15 @@ impl DatabaseInner {
 
     pub fn punch_holes(&self) -> Result<()> {
         let file = self.file.write();
+        let mut mmap = self.mmap.write();
         let regions = self.regions.read();
         let layout = self.layout.read();
 
-        regions
+        let mut punched = regions
             .index_to_region()
             .par_iter()
             .flatten()
-            .try_for_each(|region_lock| -> Result<()> {
+            .map(|region_lock| -> Result<usize> {
                 let region = region_lock.read();
                 let rstart = region.start();
                 let len = region.len();
@@ -497,88 +519,80 @@ impl DatabaseInner {
                 } else if ceil_len < reserved {
                     let start = rstart + ceil_len;
                     let hole = reserved - ceil_len;
-                    if Self::approx_has_punchable_data(&file, start, hole)? {
-                        // info!(
-                        //     "dbg: {:?}",
-                        //     (region, rstart, len, ceil_len, reserved, start, hole)
-                        // );
-                        // info!("Punching a hole of {hole} bytes at {start}...");
+                    if Self::approx_has_punchable_data(&mmap, start, hole) {
                         Self::punch_hole(&file, start, hole)?;
+                        return Ok(1);
                     }
                 }
-                Ok(())
-            })?;
+                Ok(0)
+            })
+            .sum::<Result<usize>>()?;
 
-        layout
+        punched += layout
             .start_to_hole()
             .par_iter()
-            .try_for_each(|(&start, &hole)| -> Result<()> {
-                if Self::approx_has_punchable_data(&file, start, hole)? {
-                    // info!("dbg: {:?}", (start, hole));
-                    // info!("Punching a hole of {hole} bytes at {start}...");
+            .map(|(&start, &hole)| -> Result<usize> {
+                if Self::approx_has_punchable_data(&mmap, start, hole) {
                     Self::punch_hole(&file, start, hole)?;
+                    return Ok(1);
                 }
-                Ok(())
-            })?;
+                Ok(0)
+            })
+            .sum::<Result<usize>>()?;
+
+        if punched > 0 {
+            unsafe {
+                libc::fsync(file.as_raw_fd());
+            }
+            *mmap = Self::create_mmap(&file)?;
+        }
 
         Ok(())
     }
 
-    fn approx_has_punchable_data(file: &File, start: u64, len: u64) -> Result<bool> {
+    fn approx_has_punchable_data(mmap: &MmapMut, start: u64, len: u64) -> bool {
         assert!(start.is_multiple_of(PAGE_SIZE));
         assert!(len.is_multiple_of(PAGE_SIZE));
 
+        let start = start as usize;
+        let len = len as usize;
+
         let min = start;
         let max = start + len;
-        let check = |pos_start: u64, pos_end: u64| -> Result<bool> {
-            assert!(pos_start >= min);
-            assert!(pos_end < max);
-
-            let mut buf = [0u8; 1];
-            file.read_exact_at(&mut buf, pos_start)?;
-            let start_is_some = buf[0] != 0;
-            // if start_is_some {
-            // info!("file[pos = {}] = {}", pos_start, buf[0])
-            // }
-
-            file.read_exact_at(&mut buf, pos_end)?;
-            let end_is_some = buf[0] != 0;
-            // if end_is_some {
-            // info!("file[pos = {}] = {}", pos_end, buf[0])
-            // }
-
-            Ok(start_is_some || end_is_some)
+        let check = |start, end| {
+            assert!(start >= min);
+            assert!(end < max);
+            let start_is_some = mmap[start] != 0;
+            let end_is_some = mmap[end] != 0;
+            start_is_some || end_is_some
         };
 
-        // Check first page (first and last byte)
         let first_page_start = start;
-        let first_page_end = start + PAGE_SIZE - 1;
-        if check(first_page_start, first_page_end)? {
-            return Ok(true);
+        let first_page_end = start + PAGE_SIZE as usize - 1;
+        if check(first_page_start, first_page_end) {
+            return true;
         }
 
-        // Check last page (first and last byte)
-        let last_page_start = start + len - PAGE_SIZE;
+        let last_page_start = start + len - PAGE_SIZE as usize;
         let last_page_end = start + len - 1;
-        if check(last_page_start, last_page_end)? {
-            return Ok(true);
+        if check(last_page_start, last_page_end) {
+            return true;
         }
 
-        // For large lengths, check at 1GB intervals
         if len > GB {
-            let num_gb_checks = (len / GB) as usize;
+            let num_gb_checks = len / GB;
             for i in 1..num_gb_checks {
-                let gb_boundary = start + (i as u64 * GB);
+                let gb_boundary = start + i * GB;
                 let page_start = gb_boundary;
-                let page_end = gb_boundary + PAGE_SIZE - 1;
+                let page_end = gb_boundary + PAGE_SIZE as usize - 1;
 
-                if check(page_start, page_end)? {
-                    return Ok(true);
+                if check(page_start, page_end) {
+                    return true;
                 }
             }
         }
 
-        Ok(false)
+        false
     }
 
     #[cfg(target_os = "macos")]
@@ -671,20 +685,4 @@ struct FPunchhole {
     reserved: u32,
     fp_offset: off_t,
     fp_length: off_t,
-}
-
-/// Creates an uninitialized Vec<u8> with the specified capacity and length.
-/// This avoids the overhead of zeroing memory when the buffer will be immediately overwritten.
-///
-/// # Safety
-/// The caller must ensure that all bytes are initialized before reading them.
-/// This is safe when immediately passing to `read_exact_at` or similar functions.
-#[inline]
-#[allow(clippy::uninit_vec)]
-fn uninit_vec(len: usize) -> Vec<u8> {
-    let mut vec = Vec::with_capacity(len);
-    unsafe {
-        vec.set_len(len);
-    }
-    vec
 }

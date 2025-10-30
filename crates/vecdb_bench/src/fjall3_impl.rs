@@ -5,14 +5,14 @@ use std::{
 };
 
 use anyhow::Result;
-use fjall3::{Database, Keyspace, KeyspaceCreateOptions, PersistMode};
+use fjall3::{KeyspaceCreateOptions, PersistMode, TxDatabase, TxKeyspace};
 use rayon::prelude::*;
 
 use crate::database::DatabaseBenchmark;
 
 pub struct Fjall3Bench {
-    database: Database,
-    keyspace: Keyspace,
+    database: TxDatabase,
+    keyspace: TxKeyspace,
 }
 
 impl DatabaseBenchmark for Fjall3Bench {
@@ -25,7 +25,7 @@ impl DatabaseBenchmark for Fjall3Bench {
     }
 
     fn open(path: &Path) -> Result<Self> {
-        let database = Database::builder(path)
+        let database = TxDatabase::builder(path)
             .cache_size(1024 * 1024 * 1024)
             .open()?;
         let options = KeyspaceCreateOptions::default();
@@ -49,13 +49,13 @@ impl DatabaseBenchmark for Fjall3Bench {
     }
 
     fn len(&self) -> Result<u64> {
-        Ok(self.keyspace.len()? as u64)
+        Ok(self.database.read_tx().len(&self.keyspace)? as u64)
     }
 
     fn read_sequential(&self) -> Result<u64> {
         let mut sum = 0u64;
 
-        for item in self.keyspace.iter() {
+        for item in self.database.read_tx().iter(&self.keyspace) {
             let value = item.value()?;
             let val = u64::from_be_bytes(value.as_ref().try_into()?);
             sum = sum.wrapping_add(val);
@@ -118,40 +118,6 @@ impl DatabaseBenchmark for Fjall3Bench {
         }
 
         Ok(sum)
-    }
-
-    fn read_random_threaded(&self, indices_per_thread: &[Vec<u64>]) -> Result<u64> {
-        let total_sum = AtomicU64::new(0);
-
-        thread::scope(|s| {
-            let handles: Vec<_> = indices_per_thread
-                .iter()
-                .map(|indices| {
-                    let keyspace = self.keyspace.clone();
-                    s.spawn(move || {
-                        let mut sum = 0u64;
-                        for &idx in indices {
-                            let key = idx.to_be_bytes();
-                            if let Some(value) = keyspace.get(key).ok().flatten()
-                                && let Ok(val_bytes) = TryInto::<[u8; 8]>::try_into(value.as_ref())
-                            {
-                                let val = u64::from_be_bytes(val_bytes);
-                                sum = sum.wrapping_add(val);
-                            }
-                        }
-                        sum
-                    })
-                })
-                .collect();
-
-            for handle in handles {
-                if let Ok(sum) = handle.join() {
-                    total_sum.fetch_add(sum, Ordering::Relaxed);
-                }
-            }
-        });
-
-        Ok(total_sum.load(Ordering::Relaxed))
     }
 
     fn read_random_rayon(&self, indices: &[u64]) -> Result<u64> {

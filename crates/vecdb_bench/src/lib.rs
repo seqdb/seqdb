@@ -27,14 +27,8 @@ struct AccumulatedTimes {
     open: Vec<Duration>,
     len: Vec<Duration>,
     linear: Vec<Duration>,
-    seq_2t: Vec<Duration>,
     seq_4t: Vec<Duration>,
-    seq_8t: Vec<Duration>,
     random: Vec<Duration>,
-    random_4t: Vec<Duration>,
-    random_8t: Vec<Duration>,
-    random_12t: Vec<Duration>,
-    random_16t: Vec<Duration>,
     random_rayon: Vec<Duration>,
 }
 
@@ -44,14 +38,8 @@ impl AccumulatedTimes {
             open: Vec::new(),
             len: Vec::new(),
             linear: Vec::new(),
-            seq_2t: Vec::new(),
             seq_4t: Vec::new(),
-            seq_8t: Vec::new(),
             random: Vec::new(),
-            random_4t: Vec::new(),
-            random_8t: Vec::new(),
-            random_12t: Vec::new(),
-            random_16t: Vec::new(),
             random_rayon: Vec::new(),
         }
     }
@@ -70,14 +58,8 @@ impl AccumulatedTimes {
             write_time,
             len_time: avg(&self.len),
             linear_read_time: avg(&self.linear),
-            seq_read_2t: avg(&self.seq_2t),
             seq_read_4t: avg(&self.seq_4t),
-            seq_read_8t: avg(&self.seq_8t),
             random_read_time: avg(&self.random),
-            random_read_4t: avg(&self.random_4t),
-            random_read_8t: avg(&self.random_8t),
-            random_read_12t: avg(&self.random_12t),
-            random_read_16t: avg(&self.random_16t),
             random_read_rayon: avg(&self.random_rayon),
             disk_size,
             config,
@@ -91,30 +73,8 @@ trait DatabaseBenchmarkTrait {
     fn run_open(&mut self, runner: &BenchmarkRunner) -> Result<Duration>;
     fn run_len(&mut self, runner: &BenchmarkRunner) -> Result<Duration>;
     fn run_read_sequential(&mut self, runner: &BenchmarkRunner) -> Result<Duration>;
-    fn run_read_seq_2t(&mut self, runner: &BenchmarkRunner) -> Result<Duration>;
     fn run_read_seq_4t(&mut self, runner: &BenchmarkRunner) -> Result<Duration>;
-    fn run_read_seq_8t(&mut self, runner: &BenchmarkRunner) -> Result<Duration>;
     fn run_read_random(&mut self, runner: &BenchmarkRunner, indices: &[u64]) -> Result<Duration>;
-    fn run_read_random_4t(
-        &mut self,
-        runner: &BenchmarkRunner,
-        indices_4t: &[Vec<u64>],
-    ) -> Result<Duration>;
-    fn run_read_random_8t(
-        &mut self,
-        runner: &BenchmarkRunner,
-        indices_8t: &[Vec<u64>],
-    ) -> Result<Duration>;
-    fn run_read_random_12t(
-        &mut self,
-        runner: &BenchmarkRunner,
-        indices_12t: &[Vec<u64>],
-    ) -> Result<Duration>;
-    fn run_read_random_16t(
-        &mut self,
-        runner: &BenchmarkRunner,
-        indices_16t: &[Vec<u64>],
-    ) -> Result<Duration>;
     fn run_read_random_rayon(
         &mut self,
         runner: &BenchmarkRunner,
@@ -123,14 +83,8 @@ trait DatabaseBenchmarkTrait {
     fn push_open(&mut self, duration: Duration);
     fn push_len(&mut self, duration: Duration);
     fn push_linear(&mut self, duration: Duration);
-    fn push_seq_2t(&mut self, duration: Duration);
     fn push_seq_4t(&mut self, duration: Duration);
-    fn push_seq_8t(&mut self, duration: Duration);
     fn push_random(&mut self, duration: Duration);
-    fn push_random_4t(&mut self, duration: Duration);
-    fn push_random_8t(&mut self, duration: Duration);
-    fn push_random_12t(&mut self, duration: Duration);
-    fn push_random_16t(&mut self, duration: Duration);
     fn push_random_rayon(&mut self, duration: Duration);
     fn to_result(&self, runner: &BenchmarkRunner, run_index: usize) -> Result<BenchmarkResult>;
     fn cleanup(&self, runner: &BenchmarkRunner) -> Result<()>;
@@ -190,17 +144,6 @@ impl<DB: DatabaseBenchmark + 'static> DatabaseBenchmarkTrait for DbBenchmark<DB>
         Ok(duration)
     }
 
-    fn run_read_seq_2t(&mut self, runner: &BenchmarkRunner) -> Result<Duration> {
-        let name = DB::name();
-        let path = runner.db_path(name);
-        let db = DB::open(&path)?;
-        let start = std::time::Instant::now();
-        let _sum = db.read_sequential_threaded(2)?;
-        let duration = start.elapsed();
-        drop(db);
-        Ok(duration)
-    }
-
     fn run_read_seq_4t(&mut self, runner: &BenchmarkRunner) -> Result<Duration> {
         let name = DB::name();
         let path = runner.db_path(name);
@@ -212,83 +155,12 @@ impl<DB: DatabaseBenchmark + 'static> DatabaseBenchmarkTrait for DbBenchmark<DB>
         Ok(duration)
     }
 
-    fn run_read_seq_8t(&mut self, runner: &BenchmarkRunner) -> Result<Duration> {
-        let name = DB::name();
-        let path = runner.db_path(name);
-        let db = DB::open(&path)?;
-        let start = std::time::Instant::now();
-        let _sum = db.read_sequential_threaded(8)?;
-        let duration = start.elapsed();
-        drop(db);
-        Ok(duration)
-    }
-
     fn run_read_random(&mut self, runner: &BenchmarkRunner, indices: &[u64]) -> Result<Duration> {
         let name = DB::name();
         let path = runner.db_path(name);
         let db = DB::open(&path)?;
         let start = std::time::Instant::now();
         let _sum = db.read_random(indices)?;
-        let duration = start.elapsed();
-        drop(db);
-        Ok(duration)
-    }
-
-    fn run_read_random_4t(
-        &mut self,
-        runner: &BenchmarkRunner,
-        indices_4t: &[Vec<u64>],
-    ) -> Result<Duration> {
-        let name = DB::name();
-        let path = runner.db_path(name);
-        let db = DB::open(&path)?;
-        let start = std::time::Instant::now();
-        let _sum = db.read_random_threaded(indices_4t)?;
-        let duration = start.elapsed();
-        drop(db);
-        Ok(duration)
-    }
-
-    fn run_read_random_8t(
-        &mut self,
-        runner: &BenchmarkRunner,
-        indices_8t: &[Vec<u64>],
-    ) -> Result<Duration> {
-        let name = DB::name();
-        let path = runner.db_path(name);
-        let db = DB::open(&path)?;
-        let start = std::time::Instant::now();
-        let _sum = db.read_random_threaded(indices_8t)?;
-        let duration = start.elapsed();
-        drop(db);
-        Ok(duration)
-    }
-
-    fn run_read_random_12t(
-        &mut self,
-        runner: &BenchmarkRunner,
-        indices_12t: &[Vec<u64>],
-    ) -> Result<Duration> {
-        let name = DB::name();
-        let path = runner.db_path(name);
-        let db = DB::open(&path)?;
-        let start = std::time::Instant::now();
-        let _sum = db.read_random_threaded(indices_12t)?;
-        let duration = start.elapsed();
-        drop(db);
-        Ok(duration)
-    }
-
-    fn run_read_random_16t(
-        &mut self,
-        runner: &BenchmarkRunner,
-        indices_16t: &[Vec<u64>],
-    ) -> Result<Duration> {
-        let name = DB::name();
-        let path = runner.db_path(name);
-        let db = DB::open(&path)?;
-        let start = std::time::Instant::now();
-        let _sum = db.read_random_threaded(indices_16t)?;
         let duration = start.elapsed();
         drop(db);
         Ok(duration)
@@ -332,36 +204,12 @@ impl<DB: DatabaseBenchmark + 'static> DatabaseBenchmarkTrait for DbBenchmark<DB>
         self.times.linear.push(duration);
     }
 
-    fn push_seq_2t(&mut self, duration: Duration) {
-        self.times.seq_2t.push(duration);
-    }
-
     fn push_seq_4t(&mut self, duration: Duration) {
         self.times.seq_4t.push(duration);
     }
 
-    fn push_seq_8t(&mut self, duration: Duration) {
-        self.times.seq_8t.push(duration);
-    }
-
     fn push_random(&mut self, duration: Duration) {
         self.times.random.push(duration);
-    }
-
-    fn push_random_4t(&mut self, duration: Duration) {
-        self.times.random_4t.push(duration);
-    }
-
-    fn push_random_8t(&mut self, duration: Duration) {
-        self.times.random_8t.push(duration);
-    }
-
-    fn push_random_12t(&mut self, duration: Duration) {
-        self.times.random_12t.push(duration);
-    }
-
-    fn push_random_16t(&mut self, duration: Duration) {
-        self.times.random_16t.push(duration);
     }
 
     fn push_random_rayon(&mut self, duration: Duration) {
@@ -390,18 +238,14 @@ pub fn run(configs: &[BenchConfig]) -> Result<()> {
     for (config_idx, config) in configs.iter().enumerate() {
         println!("\n=== Running Benchmark {} ===", config_idx + 1);
         println!(
-            "Config: {} writes, {} random reads, {} iterations",
-            config.write_count, config.random_read_count, config.num_iterations
+            "Config: {} writes, {}% random reads, {} iterations",
+            config.write_count, config.random_read_percent * 100.0, config.num_iterations
         );
 
         let runner = BenchmarkRunner::new(&base_path, config.clone());
 
         // Generate random indices (same for all databases and iterations)
         let indices = runner.generate_random_indices();
-        let indices_4t = runner.generate_indices_per_thread(4, config.random_seed + 1000);
-        let indices_8t = runner.generate_indices_per_thread(8, config.random_seed + 2000);
-        let indices_12t = runner.generate_indices_per_thread(12, config.random_seed + 3000);
-        let indices_16t = runner.generate_indices_per_thread(16, config.random_seed + 4000);
 
         // Phase 1: Prepare all databases (write data)
         println!("\nPreparing databases:");
@@ -415,11 +259,11 @@ pub fn run(configs: &[BenchConfig]) -> Result<()> {
                 Database::VecDbOld => {
                     db_benchmarks.push(Box::new(DbBenchmark::<VecDbOldBench>::new(&runner)?));
                 }
-                Database::Fjall2 => {
-                    db_benchmarks.push(Box::new(DbBenchmark::<Fjall2Bench>::new(&runner)?));
-                }
                 Database::Fjall3 => {
                     db_benchmarks.push(Box::new(DbBenchmark::<Fjall3Bench>::new(&runner)?));
+                }
+                Database::Fjall2 => {
+                    db_benchmarks.push(Box::new(DbBenchmark::<Fjall2Bench>::new(&runner)?));
                 }
                 Database::Redb => {
                     db_benchmarks.push(Box::new(DbBenchmark::<RedbBench>::new(&runner)?));
@@ -466,57 +310,21 @@ pub fn run(configs: &[BenchConfig]) -> Result<()> {
                 Ok(duration)
             })?;
 
-            run_test("read_seq(1)", &mut db_benchmarks, &|db| {
+            run_test("read_seq", &mut db_benchmarks, &|db| {
                 let duration = db.run_read_sequential(&runner)?;
                 db.push_linear(duration);
                 Ok(duration)
             })?;
 
-            run_test("read_seq(2)", &mut db_benchmarks, &|db| {
-                let duration = db.run_read_seq_2t(&runner)?;
-                db.push_seq_2t(duration);
-                Ok(duration)
-            })?;
-
-            run_test("read_seq(4)", &mut db_benchmarks, &|db| {
+            run_test("read_seq_4t", &mut db_benchmarks, &|db| {
                 let duration = db.run_read_seq_4t(&runner)?;
                 db.push_seq_4t(duration);
                 Ok(duration)
             })?;
 
-            run_test("read_seq(8)", &mut db_benchmarks, &|db| {
-                let duration = db.run_read_seq_8t(&runner)?;
-                db.push_seq_8t(duration);
-                Ok(duration)
-            })?;
-
-            run_test("read_rand(1)", &mut db_benchmarks, &|db| {
+            run_test("read_rand", &mut db_benchmarks, &|db| {
                 let duration = db.run_read_random(&runner, &indices)?;
                 db.push_random(duration);
-                Ok(duration)
-            })?;
-
-            run_test("read_rand(4)", &mut db_benchmarks, &|db| {
-                let duration = db.run_read_random_4t(&runner, &indices_4t)?;
-                db.push_random_4t(duration);
-                Ok(duration)
-            })?;
-
-            run_test("read_rand(8)", &mut db_benchmarks, &|db| {
-                let duration = db.run_read_random_8t(&runner, &indices_8t)?;
-                db.push_random_8t(duration);
-                Ok(duration)
-            })?;
-
-            run_test("read_rand(12)", &mut db_benchmarks, &|db| {
-                let duration = db.run_read_random_12t(&runner, &indices_12t)?;
-                db.push_random_12t(duration);
-                Ok(duration)
-            })?;
-
-            run_test("read_rand(16)", &mut db_benchmarks, &|db| {
-                let duration = db.run_read_random_16t(&runner, &indices_16t)?;
-                db.push_random_16t(duration);
                 Ok(duration)
             })?;
 

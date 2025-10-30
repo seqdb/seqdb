@@ -124,41 +124,6 @@ impl DatabaseBenchmark for RedbBench {
         Ok(sum)
     }
 
-    fn read_random_threaded(&self, indices_per_thread: &[Vec<u64>]) -> Result<u64> {
-        let total_sum = AtomicU64::new(0);
-        let db = Arc::new(&self.db);
-
-        thread::scope(|s| {
-            let handles: Vec<_> = indices_per_thread
-                .iter()
-                .map(|indices| {
-                    let db = db.clone();
-                    s.spawn(move || {
-                        let mut sum = 0u64;
-                        if let Ok(read_txn) = db.begin_read()
-                            && let Ok(table) = read_txn.open_table(TABLE)
-                        {
-                            for &idx in indices {
-                                if let Ok(Some(value)) = table.get(idx) {
-                                    sum = sum.wrapping_add(value.value());
-                                }
-                            }
-                        }
-                        sum
-                    })
-                })
-                .collect();
-
-            for handle in handles {
-                if let Ok(sum) = handle.join() {
-                    total_sum.fetch_add(sum, Ordering::Relaxed);
-                }
-            }
-        });
-
-        Ok(total_sum.load(Ordering::Relaxed))
-    }
-
     fn read_random_rayon(&self, indices: &[u64]) -> Result<u64> {
         use std::cell::RefCell;
 

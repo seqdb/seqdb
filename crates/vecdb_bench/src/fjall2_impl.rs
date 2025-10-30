@@ -5,14 +5,17 @@ use std::{
 };
 
 use anyhow::Result;
-use fjall2::{Config, Keyspace, PartitionCreateOptions, PartitionHandle, PersistMode};
+use fjall2::{
+    Config, PartitionCreateOptions, PersistMode, TransactionalKeyspace,
+    TransactionalPartitionHandle,
+};
 use rayon::prelude::*;
 
 use crate::database::DatabaseBenchmark;
 
 pub struct Fjall2Bench {
-    keyspace: Keyspace,
-    partition: PartitionHandle,
+    keyspace: TransactionalKeyspace,
+    partition: TransactionalPartitionHandle,
 }
 
 impl DatabaseBenchmark for Fjall2Bench {
@@ -21,16 +24,11 @@ impl DatabaseBenchmark for Fjall2Bench {
     }
 
     fn create(path: &Path) -> Result<Self> {
-        let keyspace = Config::new(path).open()?;
-        let partition = keyspace.open_partition("bench", PartitionCreateOptions::default())?;
-        Ok(Self {
-            keyspace,
-            partition,
-        })
+        Self::open(path)
     }
 
     fn open(path: &Path) -> Result<Self> {
-        let keyspace = Config::new(path).open()?;
+        let keyspace = Config::new(path).open_transactional()?;
         let partition = keyspace.open_partition("bench", PartitionCreateOptions::default())?;
         Ok(Self {
             keyspace,
@@ -54,13 +52,13 @@ impl DatabaseBenchmark for Fjall2Bench {
     }
 
     fn len(&self) -> Result<u64> {
-        Ok(self.partition.len()? as u64)
+        Ok(self.keyspace.read_tx().len(&self.partition)? as u64)
     }
 
     fn read_sequential(&self) -> Result<u64> {
         let mut sum = 0u64;
 
-        for item in self.partition.iter() {
+        for item in self.keyspace.read_tx().iter(&self.partition) {
             let (_, value) = item?;
             let val = u64::from_be_bytes(value.as_ref().try_into()?);
             sum = sum.wrapping_add(val);
@@ -123,40 +121,6 @@ impl DatabaseBenchmark for Fjall2Bench {
         }
 
         Ok(sum)
-    }
-
-    fn read_random_threaded(&self, indices_per_thread: &[Vec<u64>]) -> Result<u64> {
-        let total_sum = AtomicU64::new(0);
-
-        thread::scope(|s| {
-            let handles: Vec<_> = indices_per_thread
-                .iter()
-                .map(|indices| {
-                    let partition = self.partition.clone();
-                    s.spawn(move || {
-                        let mut sum = 0u64;
-                        for &idx in indices {
-                            let key = idx.to_be_bytes();
-                            if let Some(value) = partition.get(key).ok().flatten()
-                                && let Ok(val_bytes) = TryInto::<[u8; 8]>::try_into(value.as_ref())
-                            {
-                                let val = u64::from_be_bytes(val_bytes);
-                                sum = sum.wrapping_add(val);
-                            }
-                        }
-                        sum
-                    })
-                })
-                .collect();
-
-            for handle in handles {
-                if let Ok(sum) = handle.join() {
-                    total_sum.fetch_add(sum, Ordering::Relaxed);
-                }
-            }
-        });
-
-        Ok(total_sum.load(Ordering::Relaxed))
     }
 
     fn read_random_rayon(&self, indices: &[u64]) -> Result<u64> {

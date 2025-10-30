@@ -60,7 +60,7 @@ impl Regions {
             .iter()
             .try_for_each(|(_, &index)| -> Result<()> {
                 let start = (index * SIZE_OF_REGION) as u64;
-                let mut buffer = crate::uninit_vec(SIZE_OF_REGION);
+                let mut buffer = vec![0; SIZE_OF_REGION];
                 index_to_region_file.read_exact_at(&mut buffer, start)?;
                 let region = Region::read_from_bytes(&buffer)?;
                 if index_to_region.len() < index + 1 {
