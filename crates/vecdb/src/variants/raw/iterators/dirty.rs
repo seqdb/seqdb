@@ -149,6 +149,26 @@ where
     I: StoredIndex,
     T: StoredRaw,
 {
+    fn set_position_(&mut self, i: usize) {
+        self.index = i.min(self.vec_len());
+
+        // Update inner iterator position if within stored range
+        if i < self.stored_len {
+            self.inner.set_position_(i);
+        }
+    }
+
+    fn set_end_(&mut self, i: usize) {
+        let new_total_len = i.min(self.vec_len());
+        let new_pushed_len = new_total_len.saturating_sub(self.stored_len);
+        self.pushed_len = new_pushed_len;
+
+        // Cap inner iterator if new end is within stored range
+        if i <= self.stored_len {
+            self.inner.set_end_(i);
+        }
+    }
+
     fn skip_optimized(mut self, n: usize) -> Self {
         let stored_skip = n.min(self.stored_len.saturating_sub(self.index));
         if stored_skip > 0 {

@@ -126,7 +126,32 @@ where
 
         self.file_offset += buffer_len as u64;
         self.buffer_len = buffer_len;
-        self.buffer_pos = Self::SIZE_OF_T;
+        self.buffer_pos = 0;
+    }
+
+    #[inline(always)]
+    fn index_to_bytes(index: usize) -> u64 {
+        index.saturating_mul(Self::SIZE_OF_T) as u64
+    }
+
+    #[inline(always)]
+    fn skip_bytes(&mut self, skip_bytes: u64) -> bool {
+        if skip_bytes == 0 {
+            return true;
+        }
+
+        let buffer_remaining = self.remaining_buffer_bytes();
+        if (skip_bytes as usize) < buffer_remaining {
+            // Fast path: skip within buffer
+            self.buffer_pos += skip_bytes as usize;
+            true
+        } else {
+            // Slow path: seek file
+            self.seek(
+                self.file_offset
+                    .saturating_add(skip_bytes - buffer_remaining as u64),
+            )
+        }
     }
 }
 
@@ -153,6 +178,7 @@ where
 
         self.refill_buffer();
 
+        self.buffer_pos = Self::SIZE_OF_T;
         Some(unsafe { std::ptr::read_unaligned(self.buffer.as_ptr() as *const T) })
     }
 
@@ -162,17 +188,8 @@ where
             return self.next();
         }
 
-        let skip_bytes = n.saturating_mul(Self::SIZE_OF_T);
-        let buffer_remaining = self.remaining_buffer_bytes();
-        if skip_bytes < buffer_remaining {
-            self.buffer_pos += skip_bytes;
-            return self.next();
-        }
-
-        if !self.seek(
-            self.file_offset
-                .saturating_add((skip_bytes - buffer_remaining) as u64),
-        ) {
+        let skip_bytes = Self::index_to_bytes(n);
+        if !self.skip_bytes(skip_bytes) {
             return None;
         }
 
@@ -225,19 +242,39 @@ where
     I: StoredIndex,
     T: StoredRaw,
 {
+    fn set_position_(&mut self, i: usize) {
+        let target_offset = self.start_offset + Self::index_to_bytes(i);
+
+        // Check if target is within current buffer
+        if self.buffer_len > 0 {
+            let buffer_start = self.file_offset - self.buffer_len as u64;
+            let buffer_end = self.file_offset;
+
+            if target_offset >= buffer_start && target_offset < buffer_end {
+                // Just adjust buffer position without seeking
+                self.buffer_pos = (target_offset - buffer_start) as usize;
+                return;
+            }
+        }
+
+        // Otherwise seek to new position
+        self.seek(target_offset);
+    }
+
+    fn set_end_(&mut self, i: usize) {
+        let byte_offset = self.start_offset + Self::index_to_bytes(i);
+        self.end_offset = self.end_offset.min(byte_offset);
+    }
+
     fn skip_optimized(mut self, n: usize) -> Self {
-        self.seek(
-            self.file_offset
-                .saturating_add((n.saturating_mul(Self::SIZE_OF_T)) as u64),
-        );
+        self.skip_bytes(Self::index_to_bytes(n));
         self
     }
 
     fn take_optimized(mut self, n: usize) -> Self {
-        self.end_offset = self.end_offset.min(
-            self.file_offset
-                .saturating_add((n.saturating_mul(Self::SIZE_OF_T)) as u64),
-        );
+        self.end_offset = self
+            .end_offset
+            .min(self.file_offset.saturating_add(Self::index_to_bytes(n)));
         self
     }
 }
