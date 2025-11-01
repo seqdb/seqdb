@@ -41,8 +41,9 @@ where
         })
     }
 
+    /// Skip one stored element without reading it (for holes/updates optimization)
     #[inline(always)]
-    fn skip_element_if_needed(&mut self) {
+    fn skip_stored_element(&mut self) {
         if self.index >= self.stored_len {
             return;
         }
@@ -63,6 +64,19 @@ where
     fn vec_len(&self) -> usize {
         self.stored_len + self.pushed_len
     }
+
+    /// Set the absolute end position for the iterator
+    #[inline(always)]
+    fn set_absolute_end(&mut self, absolute_end: usize) {
+        let new_total_len = absolute_end.min(self.vec_len());
+        let new_pushed_len = new_total_len.saturating_sub(self.stored_len);
+        self.pushed_len = new_pushed_len;
+
+        // Cap inner iterator if new end is within stored range
+        if absolute_end <= self.stored_len {
+            self.inner.set_end_(absolute_end);
+        }
+    }
 }
 
 impl<I, T> Iterator for DirtyRawVecIterator<'_, I, T>
@@ -78,7 +92,7 @@ where
         self.index += 1;
 
         if unlikely(self.holes) && self.inner._vec.holes().contains(&index) {
-            self.skip_element_if_needed();
+            self.skip_stored_element();
             return self.next();
         }
 
@@ -89,7 +103,7 @@ where
         if unlikely(self.updated)
             && let Some(updated) = self.inner._vec.updated().get(&index)
         {
-            self.skip_element_if_needed();
+            self.skip_stored_element();
             return Some(updated.clone());
         }
 
@@ -98,12 +112,45 @@ where
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<T> {
+        if n == 0 {
+            return self.next();
+        }
+
+        let new_index = self.index.saturating_add(n);
+        if new_index >= self.vec_len() {
+            self.index = self.vec_len();
+            return None;
+        }
+
+        // Fast path: no holes or updates, can use optimized inner nth
+        if !self.holes && !self.updated {
+            if new_index < self.stored_len {
+                // All skips are in stored data
+                self.inner.nth(n - 1)?;
+                self.index = new_index;
+                return self.next();
+            } else if self.index < self.stored_len {
+                // Skip to end of stored, then into pushed
+                let stored_skip = self.stored_len - self.index;
+                if stored_skip > 0 {
+                    self.inner.nth(stored_skip - 1);
+                }
+                self.index = new_index;
+                return self.next();
+            } else {
+                // Already in pushed, just update index
+                self.index = new_index;
+                return self.next();
+            }
+        }
+
+        // Slow path: need to check each element for holes/updates
         for _ in 0..n {
             if self.index >= self.vec_len() {
                 self.index = self.vec_len();
                 return None;
             }
-            self.skip_element_if_needed();
+            self.skip_stored_element();
             self.index += 1;
         }
         self.next()
@@ -159,14 +206,7 @@ where
     }
 
     fn set_end_(&mut self, i: usize) {
-        let new_total_len = i.min(self.vec_len());
-        let new_pushed_len = new_total_len.saturating_sub(self.stored_len);
-        self.pushed_len = new_pushed_len;
-
-        // Cap inner iterator if new end is within stored range
-        if i <= self.stored_len {
-            self.inner.set_end_(i);
-        }
+        self.set_absolute_end(i);
     }
 
     fn skip_optimized(mut self, n: usize) -> Self {
@@ -179,14 +219,8 @@ where
     }
 
     fn take_optimized(mut self, n: usize) -> Self {
-        let new_total_len = self.index.saturating_add(n);
-        let new_pushed_len = new_total_len.saturating_sub(self.stored_len);
-        self.pushed_len = self.pushed_len.min(new_pushed_len);
-
-        let stored_remaining = self.stored_len.saturating_sub(self.index);
-        let inner_take = n.min(stored_remaining);
-        self.inner = self.inner.take_optimized(inner_take);
-
+        let absolute_end = self.index.saturating_add(n);
+        self.set_absolute_end(absolute_end);
         self
     }
 }

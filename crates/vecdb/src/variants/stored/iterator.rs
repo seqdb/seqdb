@@ -98,6 +98,20 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
+    fn set_position_(&mut self, i: usize) {
+        match self {
+            Self::Raw(iter) => iter.set_position_(i),
+            Self::Compressed(iter) => iter.set_position_(i),
+        };
+    }
+
+    fn set_end_(&mut self, i: usize) {
+        match self {
+            Self::Raw(iter) => iter.set_end_(i),
+            Self::Compressed(iter) => iter.set_end_(i),
+        };
+    }
+
     fn skip_optimized(self, n: usize) -> Self {
         match self {
             Self::Raw(iter) => Self::Raw(iter.skip_optimized(n)),

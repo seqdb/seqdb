@@ -1,8 +1,8 @@
 use std::{collections::BTreeSet, fs, path::Path};
 
 use vecdb::{
-    AnyStoredVec, AnyVec, CollectableVec, Database, GenericStoredVec, RawVec, Stamp, VecIterator,
-    Version,
+    AnyStoredVec, AnyVec, CollectableVec, Database, GenericStoredVec, RawVec, Stamp,
+    VecIteratorExtended, Version,
 };
 
 #[allow(clippy::upper_case_acronyms)]
@@ -107,10 +107,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
 
         vec.push(vec.len() as u32);
-        assert_eq!(VecIterator::last(vec.into_iter()), Some((14, 14)));
+        assert_eq!(vec.iter()?.last(), Some(14));
 
         assert_eq!(
-            vec.into_iter().map(|(_, v)| v).collect::<Vec<_>>(),
+            vec.into_iter().collect::<Vec<_>>(),
             vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
         );
 
@@ -120,10 +120,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let mut vec: VEC = RawVec::forced_import_with(options)?;
 
-        assert_eq!(VecIterator::last(vec.into_iter()), Some((14, 14)));
+        assert_eq!(vec.iter()?.last(), Some(14));
 
         assert_eq!(
-            vec.into_iter().map(|(_, v)| v).collect::<Vec<_>>(),
+            vec.into_iter().collect::<Vec<_>>(),
             vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
         );
 

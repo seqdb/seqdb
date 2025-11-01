@@ -2,7 +2,7 @@ use std::iter::FusedIterator;
 
 use crate::{
     AnyStoredVec, CompressedVec, GenericStoredVec, Result, StoredCompressed, StoredIndex,
-    VecIterator, likely,
+    VecIterator, VecIteratorExtended, likely,
 };
 
 use super::CleanCompressedVecIterator;
@@ -41,6 +41,19 @@ where
     fn vec_len(&self) -> usize {
         self.stored_len + self.pushed_len
     }
+
+    /// Set the absolute end position for the iterator
+    #[inline(always)]
+    fn set_absolute_end(&mut self, absolute_end: usize) {
+        let new_total_len = absolute_end.min(self.vec_len());
+        let new_pushed_len = new_total_len.saturating_sub(self.stored_len);
+        self.pushed_len = new_pushed_len;
+
+        // Cap inner iterator if new end is within stored range
+        if absolute_end <= self.stored_len {
+            self.inner.set_end_(absolute_end);
+        }
+    }
 }
 
 impl<I, T> Iterator for DirtyCompressedVecIterator<'_, I, T>
@@ -74,12 +87,10 @@ where
             return None;
         }
 
-        // Skip elements in the inner iterator if we're still in the stored range
-        if self.index < self.stored_len {
-            let skip_in_stored = (new_index.min(self.stored_len)) - self.index;
-            if skip_in_stored > 0 {
-                self.inner.nth(skip_in_stored - 1)?;
-            }
+        // Optimize: skip within inner iterator if crossing stored range
+        if self.index < self.stored_len && new_index > self.index {
+            let skip_in_stored = new_index.min(self.stored_len) - self.index;
+            self.inner.nth(skip_in_stored - 1)?;
         }
 
         self.index = new_index;
@@ -136,6 +147,19 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
+    fn set_position_(&mut self, i: usize) {
+        self.index = i.min(self.vec_len());
+
+        // Update inner iterator position if within stored range
+        if i < self.stored_len {
+            self.inner.set_position_(i);
+        }
+    }
+
+    fn set_end_(&mut self, i: usize) {
+        self.set_absolute_end(i);
+    }
+
     fn skip_optimized(mut self, n: usize) -> Self {
         let stored_skip = n.min(self.stored_len.saturating_sub(self.index));
         if stored_skip > 0 {
@@ -146,14 +170,17 @@ where
     }
 
     fn take_optimized(mut self, n: usize) -> Self {
-        let new_total_len = self.index.saturating_add(n);
-        let new_pushed_len = new_total_len.saturating_sub(self.stored_len);
-        self.pushed_len = self.pushed_len.min(new_pushed_len);
-
-        let stored_remaining = self.stored_len.saturating_sub(self.index);
-        let inner_take = n.min(stored_remaining);
-        self.inner = self.inner.take_optimized(inner_take);
-
+        let absolute_end = self.index.saturating_add(n);
+        self.set_absolute_end(absolute_end);
         self
     }
+}
+
+impl<I, T> VecIteratorExtended for DirtyCompressedVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredCompressed,
+{
+    type I = I;
+    type T = T;
 }

@@ -112,7 +112,7 @@ where
 
         let vec = reader.unchecked_read(offset, len);
 
-        let vec: Vec<T::NumberType> = pco::standalone::simple_decompress(&vec)?;
+        let vec: Vec<T::NumberType> = pco::standalone::simple_decompress(vec)?;
         let vec = T::from_inner_slice(vec);
 
         if vec.len() != page.values as usize {
@@ -156,23 +156,6 @@ where
     pub fn dirty_iter(&self) -> Result<DirtyCompressedVecIterator<'_, I, T>> {
         DirtyCompressedVecIterator::new(self)
     }
-
-    // #[inline]
-    // pub fn iter(&self) -> CompressedVecIterator<'_, I, T> {
-    //     self.into_iter()
-    // }
-
-    // #[inline]
-    // pub fn iter_at(&self, i: I) -> CompressedVecIterator<'_, I, T> {
-    //     self.iter_at_(i.to_usize())
-    // }
-
-    // #[inline]
-    // pub fn iter_at_(&self, i: usize) -> CompressedVecIterator<'_, I, T> {
-    //     let mut iter = self.into_iter();
-    //     iter.set_(i);
-    //     iter
-    // }
 
     fn pages_region_name(&self) -> String {
         Self::pages_region_name_(self.name())

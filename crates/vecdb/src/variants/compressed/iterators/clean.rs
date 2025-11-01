@@ -5,7 +5,7 @@ use seqdb::Reader;
 
 use crate::{
     AnyStoredVec, CompressedVec, GenericStoredVec, Result, StoredCompressed, StoredIndex,
-    VecIterator, likely, unlikely, variants::MAX_COMPRESSED_PAGE_SIZE,
+    VecIterator, VecIteratorExtended, likely, unlikely, variants::MAX_COMPRESSED_PAGE_SIZE,
 };
 
 use super::super::pages::Pages;
@@ -155,6 +155,30 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
+    fn set_position_(&mut self, i: usize) {
+        let new_index = i.min(self.stored_len).min(self.end_index);
+
+        // Check if new position is within the currently decoded page
+        if let Some((page_index, _)) = &self.decoded {
+            let page_start = page_index * Self::PER_PAGE;
+            let page_end = page_start + Self::PER_PAGE;
+
+            if new_index >= page_start && new_index < page_end {
+                // Keep decoded page, just update index
+                self.index = new_index;
+                return;
+            }
+        }
+
+        // New position is outside current page, invalidate cache
+        self.decoded = None;
+        self.index = new_index;
+    }
+
+    fn set_end_(&mut self, i: usize) {
+        self.end_index = i.min(self.stored_len);
+    }
+
     fn skip_optimized(mut self, n: usize) -> Self {
         self.index = self.index.saturating_add(n).min(self.end_index);
         self
@@ -164,4 +188,13 @@ where
         self.end_index = self.index.saturating_add(n).min(self.end_index);
         self
     }
+}
+
+impl<I, T> VecIteratorExtended for CleanCompressedVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredCompressed,
+{
+    type I = I;
+    type T = T;
 }

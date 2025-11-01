@@ -81,6 +81,14 @@ impl<Iter> VecIterator for Enumerated<Iter>
 where
     Iter: VecIterator,
 {
+    fn set_position_(&mut self, i: usize) {
+        self.iter.set_position_(i);
+    }
+
+    fn set_end_(&mut self, i: usize) {
+        self.iter.set_end_(i);
+    }
+
     fn skip_optimized(mut self, n: usize) -> Self {
         self.index += n;
         self.iter = self.iter.skip_optimized(n);

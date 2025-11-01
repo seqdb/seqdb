@@ -102,6 +102,20 @@ where
     I: StoredIndex,
     T: StoredRaw,
 {
+    fn set_position_(&mut self, i: usize) {
+        match self {
+            Self::Clean(iter) => iter.set_position_(i),
+            Self::Dirty(iter) => iter.set_position_(i),
+        };
+    }
+
+    fn set_end_(&mut self, i: usize) {
+        match self {
+            Self::Clean(iter) => iter.set_end_(i),
+            Self::Dirty(iter) => iter.set_end_(i),
+        };
+    }
+
     fn skip_optimized(self, n: usize) -> Self {
         match self {
             Self::Clean(iter) => Self::Clean(iter.skip_optimized(n)),

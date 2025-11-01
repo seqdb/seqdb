@@ -41,6 +41,14 @@ where
     S1I: StoredIndex,
     S1T: StoredRaw,
 {
+    fn set_position_(&mut self, i: usize) {
+        todo!()
+    }
+
+    fn set_end_(&mut self, i: usize) {
+        todo!()
+    }
+
     fn skip_optimized(self, _: usize) -> Self {
         todo!();
     }
