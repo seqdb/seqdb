@@ -37,9 +37,8 @@ impl DatabaseBenchmark for VecDbBench {
 
     fn read_sequential(&self) -> Result<u64> {
         let mut sum = 0u64;
-        let values = self.vec.clean_values()?;
 
-        for value in values {
+        for value in self.vec.clean_iter()? {
             sum = sum.wrapping_add(value);
         }
 

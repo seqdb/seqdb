@@ -42,31 +42,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         vec.mut_header().update_stamp(Stamp::new(100));
 
-        assert!(vec.header().stamp() == Stamp::new(100));
+        assert_eq!(vec.header().stamp(), Stamp::new(100));
 
-        let mut iter = vec.into_iter();
-        assert!(iter.get(0) == Some(0));
-        assert!(iter.get(1) == Some(1));
-        assert!(iter.get(2) == Some(2));
-        assert!(iter.get(3) == Some(3));
-        assert!(iter.get(4) == Some(4));
-        assert!(iter.get(5) == Some(5));
-        assert!(iter.get(20) == Some(20));
-        assert!(iter.get(20) == Some(20));
-        assert!(iter.get(0) == Some(0));
+        let mut iter = vec.iter()?;
+        assert_eq!(iter.get(0), Some(0));
+        assert_eq!(iter.get(1), Some(1));
+        assert_eq!(iter.get(2), Some(2));
+        assert_eq!(iter.get(3), Some(3));
+        assert_eq!(iter.get(4), Some(4));
+        assert_eq!(iter.get(5), Some(5));
+        assert_eq!(iter.get(20), Some(20));
+        assert_eq!(iter.get(20), Some(20));
+        assert_eq!(iter.get(0), Some(0));
         drop(iter);
 
         vec.push(21);
         vec.push(22);
 
-        assert!(vec.stored_len() == 21);
-        assert!(vec.pushed_len() == 2);
-        assert!(vec.len() == 23);
+        assert_eq!(vec.stored_len(), 21);
+        assert_eq!(vec.pushed_len(), 2);
+        assert_eq!(vec.len(), 23);
 
         let mut iter = vec.into_iter();
-        assert!(iter.get(20) == Some(20));
-        assert!(iter.get(21) == Some(21));
-        assert!(iter.get(22) == Some(22));
+        assert_eq!(iter.get(20), Some(20));
+        assert_eq!(iter.get(21), Some(21));
+        assert_eq!(iter.get(22), Some(22));
         assert!(iter.get(23).is_none());
         drop(iter);
 
@@ -76,17 +76,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let mut vec: VEC = RawVec::forced_import_with(options)?;
 
-        assert!(vec.header().stamp() == Stamp::new(100));
+        assert_eq!(vec.header().stamp(), Stamp::new(100));
 
-        assert!(vec.stored_len() == 23);
-        assert!(vec.pushed_len() == 0);
-        assert!(vec.len() == 23);
+        assert_eq!(vec.stored_len(), 23);
+        assert_eq!(vec.pushed_len(), 0);
+        assert_eq!(vec.len(), 23);
 
         let mut iter = vec.into_iter();
-        assert!(iter.get(0) == Some(0));
-        assert!(iter.get(20) == Some(20));
-        assert!(iter.get(21) == Some(21));
-        assert!(iter.get(22) == Some(22));
+        assert_eq!(iter.get(0), Some(0));
+        assert_eq!(iter.get(20), Some(20));
+        assert_eq!(iter.get(21), Some(21));
+        assert_eq!(iter.get(22), Some(22));
         drop(iter);
 
         vec.truncate_if_needed(14)?;
@@ -96,6 +96,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(vec.len(), 14);
 
         let mut iter = vec.into_iter();
+        dbg!(iter.is_clean());
         assert_eq!(iter.get(0), Some(0));
         assert_eq!(iter.get(5), Some(5));
         assert_eq!(iter.get(20), None);
@@ -144,13 +145,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut iter = vec.into_iter();
         assert_eq!(iter.get(0), Some(0));
         assert_eq!(iter.get(20), Some(20));
-        assert!(iter.get(21).is_none());
+        assert_eq!(iter.get(21), None);
         drop(iter);
 
         let reader = vec.create_static_reader();
         assert_eq!(vec.take(10, &reader)?, Some(10));
         assert_eq!(vec.holes(), &BTreeSet::from([10]));
-        assert!(vec.get_any_or_read(10, &reader)?.is_none());
+        assert_eq!(vec.get_any_or_read(10, &reader)?, None);
         drop(reader);
 
         vec.flush()?;
@@ -234,7 +235,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let mut vec: VEC = RawVec::forced_import_with(options)?;
 
-        assert_eq!(vec.collect(), vec![10, 1, 2, 5, 4]);
+        assert_eq!(vec.collect(), vec![10, 1, 2, 5, 4, 6, 7, 8, 9, 21]);
 
         let reader = vec.create_static_reader();
         vec.take(0, &reader)?;
@@ -424,7 +425,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let mut vec: VEC = RawVec::forced_import_with(options)?;
 
-        assert_eq!(vec.collect(), vec![10, 1, 2, 5, 4]);
+        assert_eq!(vec.collect(), vec![10, 1, 2, 5, 4, 6, 7, 8, 9, 21]);
 
         let reader = vec.create_static_reader();
         vec.take(0, &reader)?;

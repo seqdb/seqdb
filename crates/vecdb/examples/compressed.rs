@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         vec.mut_header().update_stamp(Stamp::new(100));
 
-        assert!(vec.header().stamp() == Stamp::new(100));
+        assert_eq!(vec.header().stamp(), Stamp::new(100));
 
         let mut iter = vec.into_iter();
         assert_eq!(iter.get(0), Some(0));
@@ -178,11 +178,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let vec: VEC = CompressedVec::forced_import_with(options)?;
 
-        assert!(
-            vec.collect()
-                == vec![
-                    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-                ]
+        assert_eq!(
+            vec.collect(),
+            vec![
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+            ]
         );
     }
 

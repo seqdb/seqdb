@@ -8,8 +8,8 @@ use parking_lot::RwLockReadGuard;
 use seqdb::Region;
 
 use crate::{
-    RawVec, Result, StoredIndex, StoredRaw, VecIterator, VecIteratorExtended, likely, unlikely,
-    variants::HEADER_OFFSET,
+    AnyStoredVec, RawVec, Result, StoredIndex, StoredRaw, VecIterator, VecIteratorExtended, likely,
+    unlikely, variants::HEADER_OFFSET,
 };
 
 /// Clean raw vec iterator, to read on disk data
@@ -32,14 +32,20 @@ where
 {
     const SIZE_OF_T: usize = size_of::<T>();
     const NORMAL_BUFFER_SIZE: usize = RawVec::<I, T>::aligned_buffer_size();
-    const CHECK_T: () = assert!(Self::SIZE_OF_T > 0, "Can't have T with size_of() == 0");
+    const _CHECK_T: () = assert!(Self::SIZE_OF_T > 0, "Can't have T with size_of() == 0");
 
     pub fn new(vec: &'a RawVec<I, T>) -> Result<Self> {
         let region = vec.region.read();
         let file = vec.db.open_read_only_file()?;
 
         let region_start = region.start();
-        let start_offset = region_start + HEADER_OFFSET as u64;
+        let start_offset = region_start + HEADER_OFFSET;
+
+        // Support truncated vecs
+        let end_offset = region_start
+            + (region
+                .len()
+                .min(Self::index_to_bytes(vec.stored_len()) + HEADER_OFFSET));
 
         let mut this = Self {
             file,
@@ -47,7 +53,7 @@ where
             buffer_pos: 0,
             buffer_len: 0,
             file_offset: start_offset,
-            end_offset: region_start + region.len(),
+            end_offset,
             start_offset,
             _vec: vec,
             _lock: region,

@@ -26,6 +26,14 @@ where
             Self::Clean(CleanRawVecIterator::new(vec)?)
         })
     }
+
+    pub fn is_clean(&self) -> bool {
+        matches!(self, Self::Clean(_))
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        matches!(self, Self::Dirty(_))
+    }
 }
 
 impl<I, T> Iterator for RawVecIterator<'_, I, T>

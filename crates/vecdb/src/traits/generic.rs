@@ -75,6 +75,12 @@ where
     fn get_any_or_read_(&'_ self, index: usize, reader: &Reader) -> Result<Option<T>> {
         let stored_len = self.stored_len();
 
+        // We can have holes in pushed
+        let holes = self.holes();
+        if !holes.is_empty() && holes.contains(&index) {
+            return Ok(None);
+        }
+
         if index >= stored_len {
             return Ok(self.get_pushed(index, stored_len).cloned());
         }
@@ -91,12 +97,6 @@ where
             && let Some(prev) = prev_updated.get(&index)
         {
             return Ok(Some(prev.clone()));
-        }
-
-        // Was before pushed, not sure why and if it needs to be there
-        let holes = self.holes();
-        if !holes.is_empty() && holes.contains(&index) {
-            return Ok(None);
         }
 
         Ok(Some(self.read_(index, reader)?))

@@ -10,7 +10,7 @@ use crate::{Error, Result, Stamp, Version};
 use super::Format;
 
 const HEADER_VERSION: Version = Version::ONE;
-pub const HEADER_OFFSET: usize = size_of::<HeaderInner>();
+pub const HEADER_OFFSET: u64 = size_of::<HeaderInner>() as u64;
 
 #[derive(Debug, Clone, Allocative)]
 pub struct Header {
@@ -128,12 +128,12 @@ impl HeaderInner {
     ) -> Result<Self> {
         let len = region_len;
 
-        if len < HEADER_OFFSET as u64 {
+        if len < HEADER_OFFSET {
             return Err(Error::WrongLength);
         }
 
         let reader = region.create_reader(db);
-        let vec = reader.unchecked_read(0, HEADER_OFFSET as u64);
+        let vec = reader.unchecked_read(0, HEADER_OFFSET);
         let header = HeaderInner::read_from_bytes(vec)?;
 
         if header.header_version != HEADER_VERSION {

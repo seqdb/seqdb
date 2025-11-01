@@ -12,7 +12,7 @@ use seqdb::{Database, Reader, Region};
 use crate::{
     AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, AsInnerSlice, BoxedVecIterator,
     CollectableVec, Error, Format, FromInnerSlice, GenericStoredVec, HEADER_OFFSET, Header, RawVec,
-    Result, StoredCompressed, StoredIndex, VEC_PAGE_SIZE, Version, variants::ImportOptions,
+    Result, StoredCompressed, StoredIndex, Version, variants::ImportOptions,
 };
 
 mod iterators;
@@ -24,7 +24,8 @@ use page::*;
 use pages::*;
 
 const PCO_COMPRESSION_LEVEL: usize = 4;
-pub const MAX_COMPRESSED_PAGE_SIZE: usize = VEC_PAGE_SIZE;
+/// Maximum size in bytes of a single compressed (pco) page
+pub const MAX_UNCOMPRESSED_PAGE_SIZE: usize = 16 * 1024; // 16 KiB
 
 const VERSION: Version = Version::TWO;
 
@@ -39,7 +40,7 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    const PER_PAGE: usize = MAX_COMPRESSED_PAGE_SIZE / Self::SIZE_OF_T;
+    const PER_PAGE: usize = MAX_UNCOMPRESSED_PAGE_SIZE / Self::SIZE_OF_T;
 
     /// Same as import but will reset the vec under certain errors, so be careful !
     pub fn forced_import(db: &Database, name: &str, version: Version) -> Result<Self> {
@@ -94,6 +95,20 @@ where
         Self::decode_page_(self.stored_len(), page_index, reader, &self.pages.read())
     }
 
+    /// Stateless: decompress raw bytes into Vec<T>
+    fn decompress_bytes(compressed_data: &[u8], expected_values: usize) -> Result<Vec<T>> {
+        let vec: Vec<T::NumberType> = pco::standalone::simple_decompress(compressed_data)?;
+        let vec = T::from_inner_slice(vec);
+
+        if vec.len() != expected_values {
+            dbg!((compressed_data.len(), vec.len(), expected_values));
+            dbg!(&vec);
+            unreachable!("Decompressed page has wrong number of values")
+        }
+
+        Ok(vec)
+    }
+
     fn decode_page_(
         stored_len: usize,
         page_index: usize,
@@ -110,18 +125,8 @@ where
         let len = page.bytes as u64;
         let offset = page.start;
 
-        let vec = reader.unchecked_read(offset, len);
-
-        let vec: Vec<T::NumberType> = pco::standalone::simple_decompress(vec)?;
-        let vec = T::from_inner_slice(vec);
-
-        if vec.len() != page.values as usize {
-            dbg!((offset, len, vec.len(), page.values));
-            dbg!(vec);
-            unreachable!()
-        }
-
-        Ok(vec)
+        let compressed_data = reader.unchecked_read(offset, len);
+        Self::decompress_bytes(compressed_data, page.values as usize)
     }
 
     fn compress_page(chunk: &[T]) -> Vec<u8> {
@@ -283,7 +288,7 @@ where
 
         let mut values = vec![];
 
-        let offset = HEADER_OFFSET as u64;
+        let offset = HEADER_OFFSET;
 
         let truncate_at = if starting_page_index < pages_len {
             let len = stored_len % Self::PER_PAGE;
@@ -489,7 +494,7 @@ where
 //     T: StoredCompressed,
 // {
 //     const SIZE_OF_T: usize = size_of::<T>();
-//     const PER_PAGE: usize = MAX_COMPRESSED_PAGE_SIZE / Self::SIZE_OF_T;
+//     const PER_PAGE: usize = COMPRESSED_BUFFER_SIZE / Self::SIZE_OF_T;
 // }
 
 // impl<I, T> VecIterator for CompressedVecIterator<'_, I, T>

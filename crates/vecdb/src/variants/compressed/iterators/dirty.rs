@@ -1,8 +1,8 @@
 use std::iter::FusedIterator;
 
 use crate::{
-    AnyStoredVec, CompressedVec, GenericStoredVec, Result, StoredCompressed, StoredIndex,
-    VecIterator, VecIteratorExtended, likely,
+    CompressedVec, GenericStoredVec, Result, StoredCompressed, StoredIndex, VecIterator,
+    VecIteratorExtended, likely,
 };
 
 use super::CleanCompressedVecIterator;
@@ -11,7 +11,6 @@ use super::CleanCompressedVecIterator;
 pub struct DirtyCompressedVecIterator<'a, I, T> {
     inner: CleanCompressedVecIterator<'a, I, T>,
     index: usize,
-    stored_len: usize,
     pushed_len: usize,
 }
 
@@ -21,13 +20,11 @@ where
     T: StoredCompressed,
 {
     pub fn new(vec: &'a CompressedVec<I, T>) -> Result<Self> {
-        let stored_len = vec.stored_len();
         let pushed_len = vec.pushed_len();
 
         Ok(Self {
             inner: CleanCompressedVecIterator::new(vec)?,
             index: 0,
-            stored_len,
             pushed_len,
         })
     }
@@ -39,18 +36,18 @@ where
 
     #[inline(always)]
     fn vec_len(&self) -> usize {
-        self.stored_len + self.pushed_len
+        self.inner.stored_len + self.pushed_len
     }
 
     /// Set the absolute end position for the iterator
     #[inline(always)]
     fn set_absolute_end(&mut self, absolute_end: usize) {
         let new_total_len = absolute_end.min(self.vec_len());
-        let new_pushed_len = new_total_len.saturating_sub(self.stored_len);
+        let new_pushed_len = new_total_len.saturating_sub(self.inner.stored_len);
         self.pushed_len = new_pushed_len;
 
         // Cap inner iterator if new end is within stored range
-        if absolute_end <= self.stored_len {
+        if absolute_end <= self.inner.stored_len {
             self.inner.set_end_(absolute_end);
         }
     }
@@ -68,11 +65,14 @@ where
         let index = self.index;
         self.index += 1;
 
-        if likely(index < self.stored_len) {
+        if likely(index < self.inner.stored_len) {
             return self.inner.next();
         }
 
-        self.inner._vec.get_pushed(index, self.stored_len).copied()
+        self.inner
+            ._vec
+            .get_pushed(index, self.inner.stored_len)
+            .copied()
     }
 
     #[inline]
@@ -87,10 +87,12 @@ where
             return None;
         }
 
-        // Optimize: skip within inner iterator if crossing stored range
-        if self.index < self.stored_len && new_index > self.index {
-            let skip_in_stored = new_index.min(self.stored_len) - self.index;
-            self.inner.nth(skip_in_stored - 1)?;
+        // Skip elements in the inner iterator if we're still in the stored range
+        if self.index < self.inner.stored_len {
+            let skip_in_stored = (new_index.min(self.inner.stored_len)) - self.index;
+            if skip_in_stored > 0 {
+                self.inner.nth(skip_in_stored - 1)?;
+            }
         }
 
         self.index = new_index;
@@ -111,14 +113,14 @@ where
     fn last(self) -> Option<T> {
         let last_index = self.vec_len().checked_sub(1)?;
 
-        if last_index < self.stored_len {
+        if last_index < self.inner.stored_len {
             // Last element is in stored data
             self.inner.last()
         } else {
             // Last element is in pushed data
             self.inner
                 ._vec
-                .get_pushed(last_index, self.stored_len)
+                .get_pushed(last_index, self.inner.stored_len)
                 .copied()
         }
     }
@@ -151,7 +153,7 @@ where
         self.index = i.min(self.vec_len());
 
         // Update inner iterator position if within stored range
-        if i < self.stored_len {
+        if i < self.inner.stored_len {
             self.inner.set_position_(i);
         }
     }
@@ -161,7 +163,7 @@ where
     }
 
     fn skip_optimized(mut self, n: usize) -> Self {
-        let stored_skip = n.min(self.stored_len.saturating_sub(self.index));
+        let stored_skip = n.min(self.inner.stored_len.saturating_sub(self.index));
         if stored_skip > 0 {
             self.inner = self.inner.skip_optimized(stored_skip);
         }

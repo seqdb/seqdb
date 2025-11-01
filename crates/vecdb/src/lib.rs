@@ -33,7 +33,7 @@ pub use variants::{
 pub use version::*;
 
 const ONE_KIB: usize = 1024;
-const VEC_PAGE_SIZE: usize = 512 * ONE_KIB;
+const BUFFER_SIZE: usize = 512 * ONE_KIB;
 
 // Branch prediction hints
 #[inline(always)]

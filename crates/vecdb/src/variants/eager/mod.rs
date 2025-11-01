@@ -1168,8 +1168,6 @@ where
         let mut source_iter = source.iter();
 
         (skip.to_usize()..source.len()).try_for_each(|i| {
-            let i = i;
-
             let previous_value = i
                 .checked_sub(len)
                 .map(|prev_i| f32::from(source_iter.unsafe_get_(prev_i)))

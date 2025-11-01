@@ -15,8 +15,8 @@ use seqdb::{Database, Reader, Region, RegionReader};
 use zerocopy::{FromBytes, IntoBytes};
 
 use crate::{
-    AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, BoxedVecIterator, CollectableVec,
-    Error, GenericStoredVec, Result, StoredIndex, StoredRaw, VEC_PAGE_SIZE, Version,
+    AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, BUFFER_SIZE, BoxedVecIterator,
+    CollectableVec, Error, GenericStoredVec, Result, StoredIndex, StoredRaw, Version,
 };
 
 use super::Format;
@@ -108,9 +108,9 @@ where
 
         let region_len = region.read().len() as usize;
         if region_len > 0
-            && (region_len < HEADER_OFFSET
+            && (region_len < HEADER_OFFSET as usize
                 || (format.is_raw()
-                    && !(region_len - HEADER_OFFSET).is_multiple_of(Self::SIZE_OF_T)))
+                    && !(region_len - HEADER_OFFSET as usize).is_multiple_of(Self::SIZE_OF_T)))
         {
             dbg!(region_len, region_len, HEADER_OFFSET);
             return Err(Error::Str("Region was saved incorrectly"));
@@ -196,7 +196,7 @@ where
     /// Calculate optimal buffer size aligned to SIZE_OF_T
     #[inline]
     const fn aligned_buffer_size() -> usize {
-        (VEC_PAGE_SIZE / Self::SIZE_OF_T) * Self::SIZE_OF_T
+        (BUFFER_SIZE / Self::SIZE_OF_T) * Self::SIZE_OF_T
     }
 }
 
@@ -281,7 +281,7 @@ where
 
     #[inline]
     fn real_stored_len(&self) -> usize {
-        (self.region.read().len() as usize - HEADER_OFFSET) / Self::SIZE_OF_T
+        (self.region.read().len() as usize - HEADER_OFFSET as usize) / Self::SIZE_OF_T
     }
 
     #[inline]
@@ -313,7 +313,7 @@ where
             return Ok(());
         }
 
-        let from = (stored_len * Self::SIZE_OF_T + HEADER_OFFSET) as u64;
+        let from = (stored_len * Self::SIZE_OF_T + HEADER_OFFSET as usize) as u64;
 
         // self.prev_stored_len = stored_len;
 
@@ -337,7 +337,7 @@ where
             updated.append(&mut mem::take(&mut self.prev_updated));
             updated.into_iter().try_for_each(|(i, v)| -> Result<()> {
                 let bytes = v.as_bytes();
-                let at = ((i * Self::SIZE_OF_T) + HEADER_OFFSET) as u64;
+                let at = (i * Self::SIZE_OF_T) as u64 + HEADER_OFFSET;
                 self.db
                     .write_all_to_region_at(self.region_index.into(), bytes, at)?;
                 Ok(())
@@ -451,7 +451,7 @@ where
 {
     #[inline(always)]
     fn read_(&self, index: usize, reader: &Reader) -> Result<T> {
-        T::read_from_prefix(reader.prefixed((index * Self::SIZE_OF_T + HEADER_OFFSET) as u64))
+        T::read_from_prefix(reader.prefixed((index * Self::SIZE_OF_T) as u64 + HEADER_OFFSET))
             .map(|(v, _)| v)
             .map_err(Error::from)
     }
