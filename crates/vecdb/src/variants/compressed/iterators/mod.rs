@@ -1,4 +1,8 @@
-use crate::{BaseVecIterator, CompressedVec, Result, StoredCompressed, StoredIndex};
+use std::iter::FusedIterator;
+
+use crate::{
+    CompressedVec, Result, StoredCompressed, StoredIndex, VecIterator, VecIteratorExtended,
+};
 
 mod clean;
 mod dirty;
@@ -18,15 +22,10 @@ where
 {
     #[inline]
     pub fn new(vec: &'a CompressedVec<I, T>) -> Result<Self> {
-        Self::new_at(vec, 0)
-    }
-
-    #[inline]
-    pub fn new_at(vec: &'a CompressedVec<I, T>, index: usize) -> Result<Self> {
         Ok(if vec.is_dirty() {
-            Self::Dirty(DirtyCompressedVecIterator::new_at(vec, index)?)
+            Self::Dirty(DirtyCompressedVecIterator::new(vec)?)
         } else {
-            Self::Clean(CleanCompressedVecIterator::new_at(vec, index)?)
+            Self::Clean(CleanCompressedVecIterator::new(vec)?)
         })
     }
 }
@@ -36,87 +35,95 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    type Item = (I, T);
-
-    #[inline(always)]
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            CompressedVecIterator::Clean(iter) => iter.next(),
-            CompressedVecIterator::Dirty(iter) => iter.next(),
-        }
-    }
-}
-
-impl<I, T> BaseVecIterator for CompressedVecIterator<'_, I, T>
-where
-    I: StoredIndex,
-    T: StoredCompressed,
-{
-    fn mut_index(&mut self) -> &mut usize {
-        todo!();
-        // match self {
-        //     CompressedVecIterator::Clean(iter) => &mut iter.index,
-        //     CompressedVecIterator::Dirty(iter) => &mut iter.index,
-        // }
-    }
-
-    fn len(&self) -> usize {
-        todo!();
-        // match self {
-        //     CompressedVecIterator::Clean(iter) => iter.stream.vec.len(),
-        //     CompressedVecIterator::Dirty(iter) => iter.vec.len(),
-        // }
-    }
-
-    fn name(&self) -> &str {
-        todo!();
-        // match self {
-        //     CompressedVecIterator::Clean(iter) => iter.stream.vec.name(),
-        //     CompressedVecIterator::Dirty(iter) => iter.vec.name(),
-        // }
-    }
-}
-
-// -------
-
-/// Main values enum - uses fast path for clean vecs, full path for dirty vecs
-pub enum CompressedVecValues<'a, I, T> {
-    Clean(CleanCompressedVecValues<'a, I, T>),
-    Dirty(DirtyCompressedVecValues<'a, I, T>),
-}
-
-impl<'a, I, T> CompressedVecValues<'a, I, T>
-where
-    I: StoredIndex,
-    T: StoredCompressed,
-{
-    #[inline]
-    pub fn new(vec: &'a CompressedVec<I, T>) -> Result<Self> {
-        Self::new_at(vec, 0)
-    }
-
-    #[inline]
-    pub fn new_at(vec: &'a CompressedVec<I, T>, index: usize) -> Result<Self> {
-        Ok(if vec.is_dirty() {
-            Self::Dirty(DirtyCompressedVecValues::new_at(vec, index)?)
-        } else {
-            Self::Clean(CleanCompressedVecValues::new_at(vec, index)?)
-        })
-    }
-}
-
-impl<I, T> Iterator for CompressedVecValues<'_, I, T>
-where
-    I: StoredIndex,
-    T: StoredCompressed,
-{
     type Item = T;
 
     #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            CompressedVecValues::Clean(iter) => iter.next(),
-            CompressedVecValues::Dirty(iter) => iter.next(),
+            Self::Clean(iter) => iter.next(),
+            Self::Dirty(iter) => iter.next(),
         }
     }
+
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<T> {
+        match self {
+            Self::Clean(iter) => iter.nth(n),
+            Self::Dirty(iter) => iter.nth(n),
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            Self::Clean(iter) => iter.size_hint(),
+            Self::Dirty(iter) => iter.size_hint(),
+        }
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        match self {
+            Self::Clean(iter) => iter.count(),
+            Self::Dirty(iter) => iter.count(),
+        }
+    }
+
+    #[inline]
+    fn last(self) -> Option<T> {
+        match self {
+            Self::Clean(iter) => iter.last(),
+            Self::Dirty(iter) => iter.last(),
+        }
+    }
+}
+
+impl<I, T> ExactSizeIterator for CompressedVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredCompressed,
+{
+    #[inline(always)]
+    fn len(&self) -> usize {
+        match self {
+            Self::Clean(iter) => iter.len(),
+            Self::Dirty(iter) => iter.len(),
+        }
+    }
+}
+
+impl<I, T> FusedIterator for CompressedVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredCompressed,
+{
+}
+
+impl<I, T> VecIterator for CompressedVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredCompressed,
+{
+    fn skip_optimized(self, n: usize) -> Self {
+        match self {
+            Self::Clean(iter) => Self::Clean(iter.skip_optimized(n)),
+            Self::Dirty(iter) => Self::Dirty(iter.skip_optimized(n)),
+        }
+    }
+
+    fn take_optimized(self, n: usize) -> Self {
+        match self {
+            Self::Clean(iter) => Self::Clean(iter.take_optimized(n)),
+            Self::Dirty(iter) => Self::Dirty(iter.take_optimized(n)),
+        }
+    }
+}
+
+impl<I, T> VecIteratorExtended for CompressedVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredCompressed,
+{
+    type I = I;
+    type T = T;
 }

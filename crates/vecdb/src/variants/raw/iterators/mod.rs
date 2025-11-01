@@ -1,4 +1,6 @@
-use crate::{BaseVecIterator, RawVec, Result, StoredIndex, StoredRaw};
+use std::iter::FusedIterator;
+
+use crate::{RawVec, Result, StoredIndex, StoredRaw, VecIterator, VecIteratorExtended};
 
 mod clean;
 mod dirty;
@@ -18,15 +20,10 @@ where
 {
     #[inline]
     pub fn new(vec: &'a RawVec<I, T>) -> Result<Self> {
-        Self::new_at(vec, 0)
-    }
-
-    #[inline]
-    pub fn new_at(vec: &'a RawVec<I, T>, index: usize) -> Result<Self> {
         Ok(if vec.is_dirty() {
-            Self::Dirty(DirtyRawVecIterator::new_at(vec, index)?)
+            Self::Dirty(DirtyRawVecIterator::new(vec)?)
         } else {
-            Self::Clean(CleanRawVecIterator::new_at(vec, index)?)
+            Self::Clean(CleanRawVecIterator::new(vec)?)
         })
     }
 }
@@ -36,87 +33,95 @@ where
     I: StoredIndex,
     T: StoredRaw,
 {
-    type Item = (I, T);
-
-    #[inline(always)]
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            RawVecIterator::Clean(iter) => iter.next(),
-            RawVecIterator::Dirty(iter) => iter.next(),
-        }
-    }
-}
-
-impl<I, T> BaseVecIterator for RawVecIterator<'_, I, T>
-where
-    I: StoredIndex,
-    T: StoredRaw,
-{
-    fn mut_index(&mut self) -> &mut usize {
-        todo!();
-        // match self {
-        //     RawVecIterator::Clean(iter) => &mut iter.index,
-        //     RawVecIterator::Dirty(iter) => &mut iter.index,
-        // }
-    }
-
-    fn len(&self) -> usize {
-        todo!();
-        // match self {
-        //     RawVecIterator::Clean(iter) => iter.stream.vec.len(),
-        //     RawVecIterator::Dirty(iter) => iter.vec.len(),
-        // }
-    }
-
-    fn name(&self) -> &str {
-        todo!();
-        // match self {
-        //     RawVecIterator::Clean(iter) => iter.stream.vec.name(),
-        //     RawVecIterator::Dirty(iter) => iter.vec.name(),
-        // }
-    }
-}
-
-// -------
-
-/// Main values enum - uses fast path for clean vecs, full path for dirty vecs
-pub enum RawVecValues<'a, I, T> {
-    Clean(CleanRawVecValues<'a, I, T>),
-    Dirty(DirtyRawVecValues<'a, I, T>),
-}
-
-impl<'a, I, T> RawVecValues<'a, I, T>
-where
-    I: StoredIndex,
-    T: StoredRaw,
-{
-    #[inline]
-    pub fn new(vec: &'a RawVec<I, T>) -> Result<Self> {
-        Self::new_at(vec, 0)
-    }
-
-    #[inline]
-    pub fn new_at(vec: &'a RawVec<I, T>, index: usize) -> Result<Self> {
-        Ok(if vec.is_dirty() {
-            Self::Dirty(DirtyRawVecValues::new_at(vec, index)?)
-        } else {
-            Self::Clean(CleanRawVecValues::new_at(vec, index)?)
-        })
-    }
-}
-
-impl<I, T> Iterator for RawVecValues<'_, I, T>
-where
-    I: StoredIndex,
-    T: StoredRaw,
-{
     type Item = T;
 
     #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            RawVecValues::Clean(iter) => iter.next(),
-            RawVecValues::Dirty(iter) => iter.next(),
+            Self::Clean(iter) => iter.next(),
+            Self::Dirty(iter) => iter.next(),
         }
     }
+
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<T> {
+        match self {
+            Self::Clean(iter) => iter.nth(n),
+            Self::Dirty(iter) => iter.nth(n),
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            Self::Clean(iter) => iter.size_hint(),
+            Self::Dirty(iter) => iter.size_hint(),
+        }
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        match self {
+            Self::Clean(iter) => iter.count(),
+            Self::Dirty(iter) => iter.count(),
+        }
+    }
+
+    #[inline]
+    fn last(self) -> Option<T> {
+        match self {
+            Self::Clean(iter) => iter.last(),
+            Self::Dirty(iter) => iter.last(),
+        }
+    }
+}
+
+impl<I, T> ExactSizeIterator for RawVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredRaw,
+{
+    #[inline(always)]
+    fn len(&self) -> usize {
+        match self {
+            Self::Clean(iter) => iter.len(),
+            Self::Dirty(iter) => iter.len(),
+        }
+    }
+}
+
+impl<I, T> FusedIterator for RawVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredRaw,
+{
+}
+
+impl<I, T> VecIterator for RawVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredRaw,
+{
+    fn skip_optimized(self, n: usize) -> Self {
+        match self {
+            Self::Clean(iter) => Self::Clean(iter.skip_optimized(n)),
+            Self::Dirty(iter) => Self::Dirty(iter.skip_optimized(n)),
+        }
+    }
+
+    fn take_optimized(self, n: usize) -> Self {
+        match self {
+            Self::Clean(iter) => Self::Clean(iter.take_optimized(n)),
+            Self::Dirty(iter) => Self::Dirty(iter.take_optimized(n)),
+        }
+    }
+}
+
+impl<I, T> VecIteratorExtended for RawVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredRaw,
+{
+    type I = I;
+    type T = T;
 }

@@ -1,7 +1,7 @@
 use crate::{
-    AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BaseVecIterator,
-    BoxedVecIterator, CollectableVec, Exit, Format, Result, StoredCompressed, StoredIndex,
-    StoredRaw, Version, variants::ImportOptions,
+    AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BoxedVecIterator,
+    CollectableVec, Exit, Format, Result, StoredCompressed, StoredIndex, StoredRaw, VecIterator,
+    Version, variants::ImportOptions,
 };
 
 use super::{
@@ -337,7 +337,9 @@ where
     S3I: StoredIndex,
     S3T: StoredRaw,
 {
-    type Item = (I, T);
+    type Item = T;
+
+    #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Eager(i) => i.next(),
@@ -348,7 +350,7 @@ where
     }
 }
 
-impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> BaseVecIterator
+impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> VecIterator
     for ComputedVecIterator<'_, I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where
     I: StoredIndex,
@@ -360,34 +362,22 @@ where
     S3I: StoredIndex,
     S3T: StoredRaw,
 {
-    #[inline]
-    fn mut_index(&mut self) -> &mut usize {
-        match self {
-            Self::Eager(i) => i.mut_index(),
-            Self::LazyFrom1(i) => i.mut_index(),
-            Self::LazyFrom2(i) => i.mut_index(),
-            Self::LazyFrom3(i) => i.mut_index(),
-        }
+    fn skip_optimized(self, n: usize) -> Self {
+        todo!();
     }
 
-    fn len(&self) -> usize {
-        match self {
-            Self::Eager(i) => i.len(),
-            Self::LazyFrom1(i) => i.len(),
-            Self::LazyFrom2(i) => i.len(),
-            Self::LazyFrom3(i) => i.len(),
-        }
+    fn take_optimized(self, n: usize) -> Self {
+        todo!();
     }
 
-    #[inline]
-    fn name(&self) -> &str {
-        match self {
-            Self::Eager(i) => i.name(),
-            Self::LazyFrom1(i) => i.name(),
-            Self::LazyFrom2(i) => i.name(),
-            Self::LazyFrom3(i) => i.name(),
-        }
-    }
+    // fn len(&self) -> usize {
+    //     match self {
+    //         Self::Eager(i) => i.len(),
+    //         Self::LazyFrom1(i) => i.len(),
+    //         Self::LazyFrom2(i) => i.len(),
+    //         Self::LazyFrom3(i) => i.len(),
+    //     }
+    // }
 }
 
 impl<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T> IntoIterator

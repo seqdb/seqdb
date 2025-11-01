@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use seqdb::{Database, PAGE_SIZE, RegionReader, Result};
+use seqdb::{Database, PAGE_SIZE, Result};
 
 fn main() -> Result<()> {
     let _ = fs::remove_dir_all("vecs");

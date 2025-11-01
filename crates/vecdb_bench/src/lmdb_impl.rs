@@ -1,7 +1,4 @@
 use std::path::Path;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::thread;
 
 use anyhow::Result;
 use heed::types::*;
@@ -61,11 +58,6 @@ impl DatabaseBenchmark for LmdbBench {
         Ok(())
     }
 
-    fn len(&self) -> Result<u64> {
-        let rtxn = self.env.read_txn()?;
-        Ok(self.db.len(&rtxn)?)
-    }
-
     fn read_sequential(&self) -> Result<u64> {
         let mut sum = 0u64;
         let rtxn = self.env.read_txn()?;
@@ -76,48 +68,6 @@ impl DatabaseBenchmark for LmdbBench {
         }
 
         Ok(sum)
-    }
-
-    fn read_sequential_threaded(&self, num_threads: usize) -> Result<u64> {
-        let total_sum = AtomicU64::new(0);
-        let env = Arc::new(&self.env);
-        let db = self.db;
-        let len = self.len()?;
-        let chunk_size = len / num_threads as u64;
-
-        thread::scope(|s| {
-            let handles: Vec<_> = (0..num_threads)
-                .map(|thread_id| {
-                    let env = env.clone();
-                    s.spawn(move || {
-                        let start = thread_id as u64 * chunk_size;
-                        let end = if thread_id == num_threads - 1 {
-                            len
-                        } else {
-                            (thread_id as u64 + 1) * chunk_size
-                        };
-
-                        let mut sum = 0u64;
-                        if let Ok(rtxn) = env.read_txn() {
-                            for idx in start..end {
-                                if let Ok(Some(value)) = db.get(&rtxn, &idx) {
-                                    sum = sum.wrapping_add(value);
-                                }
-                            }
-                        }
-                        sum
-                    })
-                })
-                .collect();
-
-            for handle in handles {
-                if let Ok(sum) = handle.join() {
-                    total_sum.fetch_add(sum, Ordering::Relaxed);
-                }
-            }
-        });
-
-        Ok(total_sum.load(Ordering::Relaxed))
     }
 
     fn read_random(&self, indices: &[u64]) -> Result<u64> {

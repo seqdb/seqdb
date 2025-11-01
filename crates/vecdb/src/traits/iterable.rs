@@ -14,26 +14,6 @@ pub trait AnyIterableVec<I, T>: AnyVec {
     {
         self.boxed_iter()
     }
-
-    fn iter_at(&self, i: I) -> BoxedVecIterator<'_, I, T>
-    where
-        I: StoredIndex,
-        T: StoredRaw,
-    {
-        let mut iter = self.boxed_iter();
-        iter.set(i);
-        iter
-    }
-
-    fn iter_at_(&self, i: usize) -> BoxedVecIterator<'_, I, T>
-    where
-        I: StoredIndex,
-        T: StoredRaw,
-    {
-        let mut iter = self.boxed_iter();
-        iter.set_(i);
-        iter
-    }
 }
 
 pub trait AnyStoredIterableVec<I, T>: AnyIterableVec<I, T> + AnyStoredVec {}

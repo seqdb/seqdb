@@ -1,11 +1,7 @@
 use anyhow::Result;
 use rayon::prelude::*;
-use std::{
-    path::Path,
-    sync::atomic::{AtomicU64, Ordering},
-    thread,
-};
-use vecdb::{AnyStoredVec, AnyVec, Database, GenericStoredVec, RawVec, Reader, Version};
+use std::path::Path;
+use vecdb::{AnyStoredVec, Database, GenericStoredVec, RawVec, Version};
 
 use crate::database::DatabaseBenchmark;
 
@@ -39,10 +35,6 @@ impl DatabaseBenchmark for VecDbBench {
         Ok(())
     }
 
-    fn len(&self) -> Result<u64> {
-        Ok(self.vec.len() as u64)
-    }
-
     fn read_sequential(&self) -> Result<u64> {
         let mut sum = 0u64;
         let values = self.vec.clean_values()?;
@@ -52,38 +44,6 @@ impl DatabaseBenchmark for VecDbBench {
         }
 
         Ok(sum)
-    }
-
-    fn read_sequential_threaded(&self, num_threads: usize) -> Result<u64> {
-        let total_sum = AtomicU64::new(0);
-        let len = self.vec.len();
-        let chunk_size = len / num_threads;
-
-        thread::scope(|s| {
-            let handles: Vec<_> = (0..num_threads)
-                .map(|thread_id| {
-                    s.spawn(move || {
-                        let start = thread_id * chunk_size;
-
-                        let mut sum = 0u64;
-
-                        let values = self.vec.clean_values_at(start).unwrap().take(chunk_size);
-                        for value in values {
-                            sum = sum.wrapping_add(value);
-                        }
-                        sum
-                    })
-                })
-                .collect();
-
-            for handle in handles {
-                if let Ok(sum) = handle.join() {
-                    total_sum.fetch_add(sum, Ordering::Relaxed);
-                }
-            }
-        });
-
-        Ok(total_sum.load(Ordering::Relaxed))
     }
 
     fn read_random(&self, indices: &[u64]) -> Result<u64> {
@@ -100,27 +60,10 @@ impl DatabaseBenchmark for VecDbBench {
     }
 
     fn read_random_rayon(&self, indices: &[u64]) -> Result<u64> {
-        use std::cell::RefCell;
-
-        thread_local! {
-            static READER: RefCell<Option<Reader<'static>>> = const { RefCell::new(None) };
-        }
-
+        let reader = self.vec.create_reader();
         let sum = indices
             .par_iter()
-            .map(|&idx| {
-                READER.with(|reader_cell| {
-                    let mut reader_opt = reader_cell.borrow_mut();
-                    if reader_opt.is_none() {
-                        *reader_opt = Some(self.vec.create_static_reader());
-                    }
-                    self.vec
-                        .read_(idx as usize, unsafe {
-                            reader_opt.as_ref().unwrap_unchecked()
-                        })
-                        .unwrap_or_default()
-                })
-            })
+            .map(|&idx| self.vec.read_(idx as usize, &reader).unwrap_or_default())
             .reduce(|| 0, |a, b| a.wrapping_add(b));
 
         Ok(sum)

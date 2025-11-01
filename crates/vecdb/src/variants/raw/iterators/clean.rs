@@ -1,16 +1,28 @@
 use std::{
     fs::File,
     io::{Read, Seek, SeekFrom},
+    iter::FusedIterator,
 };
 
 use parking_lot::RwLockReadGuard;
 use seqdb::Region;
 
-use crate::{RawVec, Result, StoredIndex, StoredRaw, likely, unlikely, variants::HEADER_OFFSET};
+use crate::{
+    RawVec, Result, StoredIndex, StoredRaw, VecIterator, VecIteratorExtended, likely, unlikely,
+    variants::HEADER_OFFSET,
+};
 
+/// Clean raw vec iterator, to read on disk data
 pub struct CleanRawVecIterator<'a, I, T> {
-    pub(crate) index: usize,
-    pub(crate) values: CleanRawVecValues<'a, I, T>,
+    pub(crate) file: File,
+    buffer: Vec<u8>,
+    pub(crate) buffer_pos: usize,
+    buffer_len: usize,
+    file_offset: u64,
+    end_offset: u64,
+    start_offset: u64,
+    pub(crate) _vec: &'a RawVec<I, T>,
+    _lock: RwLockReadGuard<'a, Region>,
 }
 
 impl<'a, I, T> CleanRawVecIterator<'a, I, T>
@@ -18,82 +30,48 @@ where
     I: StoredIndex,
     T: StoredRaw,
 {
-    #[inline]
-    pub fn new(vec: &'a RawVec<I, T>) -> Result<Self> {
-        Self::new_at(vec, 0)
-    }
-
-    #[inline]
-    pub fn new_at(vec: &'a RawVec<I, T>, index: usize) -> Result<Self> {
-        Ok(Self {
-            index,
-            values: CleanRawVecValues::new_at(vec, index)?,
-        })
-    }
-}
-
-impl<I, T> Iterator for CleanRawVecIterator<'_, I, T>
-where
-    I: StoredIndex,
-    T: StoredRaw,
-{
-    type Item = (I, T);
-
-    #[inline(always)]
-    fn next(&mut self) -> Option<Self::Item> {
-        let index = I::from(self.index);
-        let value = self.values.next()?;
-        self.index += 1;
-        Some((index, value))
-    }
-}
-
-pub struct CleanRawVecValues<'a, I, T> {
-    pub(crate) file: File,
-    buffer: Vec<u8>,
-    pub(crate) buffer_pos: usize,
-    pub(crate) buffer_len: usize,
-    pub(crate) file_offset: u64,
-    end_offset: u64,
-    pub(crate) _vec: &'a RawVec<I, T>,
-    _lock: RwLockReadGuard<'a, Region>,
-}
-
-impl<'a, I, T> CleanRawVecValues<'a, I, T>
-where
-    I: StoredIndex,
-    T: StoredRaw,
-{
     const SIZE_OF_T: usize = size_of::<T>();
     const NORMAL_BUFFER_SIZE: usize = RawVec::<I, T>::aligned_buffer_size();
+    const CHECK_T: () = assert!(Self::SIZE_OF_T > 0, "Can't have T with size_of() == 0");
 
     pub fn new(vec: &'a RawVec<I, T>) -> Result<Self> {
-        Self::new_at(vec, 0)
-    }
-
-    pub fn new_at(vec: &'a RawVec<I, T>, index: usize) -> Result<Self> {
         let region = vec.region.read();
+        let file = vec.db.open_read_only_file()?;
 
         let region_start = region.start();
-        let region_len = region.len();
+        let start_offset = region_start + HEADER_OFFSET as u64;
 
-        let mut file = vec.db.open_read_only_file()?;
-
-        let start_offset = region_start + HEADER_OFFSET as u64 + (index * size_of::<T>()) as u64;
-
-        file.seek(SeekFrom::Start(start_offset))
-            .expect("Failed to seek to start position");
-
-        Ok(Self {
+        let mut this = Self {
             file,
             buffer: vec![0; Self::NORMAL_BUFFER_SIZE],
             buffer_pos: 0,
             buffer_len: 0,
             file_offset: start_offset,
-            end_offset: region_start + region_len,
+            end_offset: region_start + region.len(),
+            start_offset,
             _vec: vec,
             _lock: region,
-        })
+        };
+
+        this.seek(start_offset);
+
+        Ok(this)
+    }
+
+    #[inline(always)]
+    fn seek(&mut self, pos: u64) -> bool {
+        self.file_offset = pos.min(self.end_offset).max(self.start_offset);
+        self.buffer_pos = 0;
+        self.buffer_len = 0;
+
+        if likely(self.can_read_file()) {
+            self.file
+                .seek(SeekFrom::Start(self.file_offset))
+                .expect("Failed to seek to start position");
+            true
+        } else {
+            false
+        }
     }
 
     #[inline(always)]
@@ -117,24 +95,42 @@ where
     }
 
     #[inline(always)]
-    pub(crate) fn refill_buffer(&mut self) {
-        let remaining = (self.end_offset - self.file_offset) as usize;
-        let to_read = remaining.min(Self::NORMAL_BUFFER_SIZE);
+    pub(crate) fn remaining_file_bytes(&self) -> usize {
+        (self.end_offset - self.file_offset) as usize
+    }
 
-        // Safety: we're within file bounds, read should succeed
+    #[inline(always)]
+    pub(crate) fn remaining_buffer_bytes(&self) -> usize {
+        self.buffer_len - self.buffer_pos
+    }
+
+    #[inline(always)]
+    pub(crate) fn remaining_bytes(&self) -> usize {
+        self.remaining_file_bytes() + self.remaining_buffer_bytes()
+    }
+
+    #[inline(always)]
+    pub(crate) fn remaining(&self) -> usize {
+        self.remaining_bytes() / Self::SIZE_OF_T
+    }
+
+    #[inline(always)]
+    pub(crate) fn refill_buffer(&mut self) {
+        let buffer_len = self.remaining_file_bytes().min(Self::NORMAL_BUFFER_SIZE);
+
         unsafe {
             self.file
-                .read_exact(&mut self.buffer[..to_read])
+                .read_exact(&mut self.buffer[..buffer_len])
                 .unwrap_unchecked()
         };
 
-        self.file_offset += to_read as u64;
-        self.buffer_len = to_read;
+        self.file_offset += buffer_len as u64;
+        self.buffer_len = buffer_len;
         self.buffer_pos = Self::SIZE_OF_T;
     }
 }
 
-impl<I, T> Iterator for CleanRawVecValues<'_, I, T>
+impl<I, T> Iterator for CleanRawVecIterator<'_, I, T>
 where
     I: StoredIndex,
     T: StoredRaw,
@@ -143,7 +139,6 @@ where
 
     #[inline(always)]
     fn next(&mut self) -> Option<T> {
-        // Fast path: read from current buffer
         if likely(self.can_read_buffer()) {
             let value = unsafe {
                 std::ptr::read_unaligned(self.buffer.as_ptr().add(self.buffer_pos) as *const T)
@@ -152,7 +147,6 @@ where
             return Some(value);
         }
 
-        // Slowest path: Stop
         if unlikely(self.cant_read_file()) {
             return None;
         }
@@ -161,4 +155,98 @@ where
 
         Some(unsafe { std::ptr::read_unaligned(self.buffer.as_ptr() as *const T) })
     }
+
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<T> {
+        if n == 0 {
+            return self.next();
+        }
+
+        let skip_bytes = n.saturating_mul(Self::SIZE_OF_T);
+        let buffer_remaining = self.remaining_buffer_bytes();
+        if skip_bytes < buffer_remaining {
+            self.buffer_pos += skip_bytes;
+            return self.next();
+        }
+
+        if !self.seek(
+            self.file_offset
+                .saturating_add((skip_bytes - buffer_remaining) as u64),
+        ) {
+            return None;
+        }
+
+        self.next()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.remaining();
+        (remaining, Some(remaining))
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        self.len()
+    }
+
+    #[inline]
+    fn last(mut self) -> Option<T> {
+        if unlikely(self.cant_read_file() || self.start_offset == self.end_offset) {
+            return None;
+        }
+
+        self.seek(self.end_offset - Self::SIZE_OF_T as u64);
+
+        self.next()
+    }
+}
+
+impl<I, T> ExactSizeIterator for CleanRawVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredRaw,
+{
+    #[inline(always)]
+    fn len(&self) -> usize {
+        self.remaining()
+    }
+}
+
+impl<I, T> FusedIterator for CleanRawVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredRaw,
+{
+}
+
+impl<I, T> VecIterator for CleanRawVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredRaw,
+{
+    fn skip_optimized(mut self, n: usize) -> Self {
+        self.seek(
+            self.file_offset
+                .saturating_add((n.saturating_mul(Self::SIZE_OF_T)) as u64),
+        );
+        self
+    }
+
+    fn take_optimized(mut self, n: usize) -> Self {
+        self.end_offset = self.end_offset.min(
+            self.file_offset
+                .saturating_add((n.saturating_mul(Self::SIZE_OF_T)) as u64),
+        );
+        self
+    }
+}
+
+impl<I, T> VecIteratorExtended for CleanRawVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredRaw,
+{
+    type I = I;
+    type T = T;
 }

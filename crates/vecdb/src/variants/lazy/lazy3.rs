@@ -1,15 +1,15 @@
 use allocative::Allocative;
 
 use crate::{
-    AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BaseVecIterator,
-    BoxedVecIterator, CollectableVec, StoredIndex, StoredRaw, Version,
+    AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BoxedVecIterator,
+    CollectableVec, StoredIndex, StoredRaw, VecIterator, Version,
 };
 
 pub type ComputeFrom3<I, T, S1I, S1T, S2I, S2T, S3I, S3T> = for<'a> fn(
     I,
-    &mut dyn BaseVecIterator<Item = (S1I, S1T)>,
-    &mut dyn BaseVecIterator<Item = (S2I, S2T)>,
-    &mut dyn BaseVecIterator<Item = (S3I, S3T)>,
+    &mut dyn VecIterator<Item = (S1I, S1T)>,
+    &mut dyn VecIterator<Item = (S2I, S2T)>,
+    &mut dyn VecIterator<Item = (S3I, S3T)>,
 ) -> Option<T>;
 
 #[derive(Clone, Allocative)]
@@ -103,8 +103,9 @@ where
     S3I: StoredIndex,
     S3T: StoredRaw,
 {
-    type Item = (I, T);
+    type Item = T;
 
+    #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         let index = I::from(self.index);
         let opt = (self.lazy.compute)(
@@ -121,7 +122,7 @@ where
     }
 }
 
-impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> BaseVecIterator
+impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> VecIterator
     for LazyVecFrom3Iterator<'_, I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where
     I: StoredIndex,
@@ -133,35 +134,33 @@ where
     S3I: StoredIndex,
     S3T: StoredRaw,
 {
-    #[inline]
-    fn mut_index(&mut self) -> &mut usize {
-        &mut self.index
+    fn skip_optimized(self, n: usize) -> Self {
+        todo!();
     }
 
-    #[inline]
-    fn len(&self) -> usize {
-        let len1 = if self.source1.index_type_to_string() == I::to_string() {
-            self.source1.len()
-        } else {
-            usize::MAX
-        };
-        let len2 = if self.source2.index_type_to_string() == I::to_string() {
-            self.source2.len()
-        } else {
-            usize::MAX
-        };
-        let len3 = if self.source3.index_type_to_string() == I::to_string() {
-            self.source3.len()
-        } else {
-            usize::MAX
-        };
-        len1.min(len2).min(len3)
+    fn take_optimized(self, n: usize) -> Self {
+        todo!();
     }
 
-    #[inline]
-    fn name(&self) -> &str {
-        self.source1.name()
-    }
+    // #[inline]
+    // fn len(&self) -> usize {
+    //     let len1 = if self.source1.index_type_to_string() == I::to_string() {
+    //         self.source1.len()
+    //     } else {
+    //         usize::MAX
+    //     };
+    //     let len2 = if self.source2.index_type_to_string() == I::to_string() {
+    //         self.source2.len()
+    //     } else {
+    //         usize::MAX
+    //     };
+    //     let len3 = if self.source3.index_type_to_string() == I::to_string() {
+    //         self.source3.len()
+    //     } else {
+    //         usize::MAX
+    //     };
+    //     len1.min(len2).min(len3)
+    // }
 }
 
 impl<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T> IntoIterator

@@ -15,9 +15,8 @@ use seqdb::{Database, Reader, Region, RegionReader};
 use zerocopy::{FromBytes, IntoBytes};
 
 use crate::{
-    AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, BaseVecIterator, BoxedVecIterator,
-    CollectableVec, Error, GenericStoredVec, Result, StoredIndex, StoredRaw, VEC_PAGE_SIZE,
-    Version,
+    AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, BoxedVecIterator, CollectableVec,
+    Error, GenericStoredVec, Result, StoredIndex, StoredRaw, VEC_PAGE_SIZE, Version,
 };
 
 use super::Format;
@@ -27,10 +26,7 @@ mod iterators;
 mod options;
 
 pub use header::*;
-pub use iterators::{
-    CleanRawVecIterator, CleanRawVecValues, DirtyRawVecIterator, DirtyRawVecValues, RawVecIterator,
-    RawVecValues,
-};
+pub use iterators::*;
 pub use options::*;
 
 const VERSION: Version = Version::ONE;
@@ -166,50 +162,18 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> RawVecIterator<'_, I, T> {
-        self.into_iter()
+    pub fn iter(&self) -> Result<RawVecIterator<'_, I, T>> {
+        RawVecIterator::new(self)
     }
 
     #[inline]
-    pub fn iter_at(&self, i: I) -> RawVecIterator<'_, I, T> {
-        self.iter_at_(i.to_usize())
+    pub fn clean_iter(&self) -> Result<CleanRawVecIterator<'_, I, T>> {
+        CleanRawVecIterator::new(self)
     }
 
     #[inline]
-    pub fn iter_at_(&self, i: usize) -> RawVecIterator<'_, I, T> {
-        let mut iter = self.into_iter();
-        iter.set_(i);
-        iter
-    }
-
-    #[inline]
-    pub fn values(&self) -> Result<RawVecValues<'_, I, T>> {
-        RawVecValues::new(self)
-    }
-
-    #[inline]
-    pub fn values_at(&self, index: usize) -> Result<RawVecValues<'_, I, T>> {
-        RawVecValues::new_at(self, index)
-    }
-
-    #[inline]
-    pub fn clean_values(&self) -> Result<CleanRawVecValues<'_, I, T>> {
-        CleanRawVecValues::new(self)
-    }
-
-    #[inline]
-    pub fn clean_values_at(&self, index: usize) -> Result<CleanRawVecValues<'_, I, T>> {
-        CleanRawVecValues::new_at(self, index)
-    }
-
-    #[inline]
-    pub fn dirty_values(&self) -> Result<DirtyRawVecValues<'_, I, T>> {
-        DirtyRawVecValues::new(self)
-    }
-
-    #[inline]
-    pub fn dirty_values_at(&self, index: usize) -> Result<DirtyRawVecValues<'_, I, T>> {
-        DirtyRawVecValues::new_at(self, index)
+    pub fn dirty_iter(&self) -> Result<DirtyRawVecIterator<'_, I, T>> {
+        DirtyRawVecIterator::new(self)
     }
 
     pub fn write_header_if_needed(&mut self) -> Result<()> {
@@ -233,11 +197,6 @@ where
     #[inline]
     const fn aligned_buffer_size() -> usize {
         (VEC_PAGE_SIZE / Self::SIZE_OF_T) * Self::SIZE_OF_T
-    }
-
-    #[inline]
-    pub fn create_buffer(&self) -> Vec<u8> {
-        vec![0; Self::SIZE_OF_T]
     }
 }
 
@@ -568,11 +527,11 @@ where
     I: StoredIndex,
     T: StoredRaw,
 {
-    type Item = (I, T);
+    type Item = T;
     type IntoIter = RawVecIterator<'a, I, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        RawVecIterator::new(self).unwrap()
+        self.iter().expect("RawVecIter::new(self) to work")
     }
 }
 
@@ -582,7 +541,7 @@ where
     T: StoredRaw,
 {
     fn boxed_iter(&self) -> BoxedVecIterator<'_, I, T> {
-        Box::new(self.iter())
+        Box::new(self.into_iter())
     }
 }
 

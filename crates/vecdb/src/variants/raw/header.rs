@@ -134,7 +134,7 @@ impl HeaderInner {
 
         let reader = region.create_reader(db);
         let vec = reader.unchecked_read(0, HEADER_OFFSET as u64);
-        let header = HeaderInner::read_from_bytes(&vec)?;
+        let header = HeaderInner::read_from_bytes(vec)?;
 
         if header.header_version != HEADER_VERSION {
             return Err(Error::DifferentVersion {

@@ -25,9 +25,7 @@ use vecdb_old_impl::*;
 
 struct AccumulatedTimes {
     open: Vec<Duration>,
-    len: Vec<Duration>,
     linear: Vec<Duration>,
-    seq_4t: Vec<Duration>,
     random: Vec<Duration>,
     random_rayon: Vec<Duration>,
 }
@@ -36,31 +34,27 @@ impl AccumulatedTimes {
     fn new() -> Self {
         Self {
             open: Vec::new(),
-            len: Vec::new(),
             linear: Vec::new(),
-            seq_4t: Vec::new(),
             random: Vec::new(),
             random_rayon: Vec::new(),
         }
     }
 
     fn to_result(
-        &self,
         name: String,
         write_time: Duration,
+        times: &AccumulatedTimes,
         disk_size: u64,
         config: BenchConfig,
         run_index: usize,
     ) -> BenchmarkResult {
         BenchmarkResult {
             name,
-            open_time: avg(&self.open),
+            open_time: avg(&times.open),
             write_time,
-            len_time: avg(&self.len),
-            linear_read_time: avg(&self.linear),
-            seq_read_4t: avg(&self.seq_4t),
-            random_read_time: avg(&self.random),
-            random_read_rayon: avg(&self.random_rayon),
+            linear_read_time: avg(&times.linear),
+            random_read_time: avg(&times.random),
+            random_read_rayon: avg(&times.random_rayon),
             disk_size,
             config,
             run_index,
@@ -71,9 +65,7 @@ impl AccumulatedTimes {
 trait DatabaseBenchmarkTrait {
     fn name(&self) -> &str;
     fn run_open(&mut self, runner: &BenchmarkRunner) -> Result<Duration>;
-    fn run_len(&mut self, runner: &BenchmarkRunner) -> Result<Duration>;
     fn run_read_sequential(&mut self, runner: &BenchmarkRunner) -> Result<Duration>;
-    fn run_read_seq_4t(&mut self, runner: &BenchmarkRunner) -> Result<Duration>;
     fn run_read_random(&mut self, runner: &BenchmarkRunner, indices: &[u64]) -> Result<Duration>;
     fn run_read_random_rayon(
         &mut self,
@@ -81,9 +73,7 @@ trait DatabaseBenchmarkTrait {
         indices: &[u64],
     ) -> Result<Duration>;
     fn push_open(&mut self, duration: Duration);
-    fn push_len(&mut self, duration: Duration);
     fn push_linear(&mut self, duration: Duration);
-    fn push_seq_4t(&mut self, duration: Duration);
     fn push_random(&mut self, duration: Duration);
     fn push_random_rayon(&mut self, duration: Duration);
     fn to_result(&self, runner: &BenchmarkRunner, run_index: usize) -> Result<BenchmarkResult>;
@@ -122,35 +112,15 @@ impl<DB: DatabaseBenchmark + 'static> DatabaseBenchmarkTrait for DbBenchmark<DB>
         Ok(duration)
     }
 
-    fn run_len(&mut self, runner: &BenchmarkRunner) -> Result<Duration> {
-        let name = DB::name();
-        let path = runner.db_path(name);
-        let db = DB::open(&path)?;
-        let start = std::time::Instant::now();
-        let _len = db.len()?;
-        let duration = start.elapsed();
-        drop(db);
-        Ok(duration)
-    }
-
     fn run_read_sequential(&mut self, runner: &BenchmarkRunner) -> Result<Duration> {
         let name = DB::name();
         let path = runner.db_path(name);
         let db = DB::open(&path)?;
+
         let start = std::time::Instant::now();
         let _sum = db.read_sequential()?;
         let duration = start.elapsed();
-        drop(db);
-        Ok(duration)
-    }
 
-    fn run_read_seq_4t(&mut self, runner: &BenchmarkRunner) -> Result<Duration> {
-        let name = DB::name();
-        let path = runner.db_path(name);
-        let db = DB::open(&path)?;
-        let start = std::time::Instant::now();
-        let _sum = db.read_sequential_threaded(4)?;
-        let duration = start.elapsed();
         drop(db);
         Ok(duration)
     }
@@ -159,9 +129,11 @@ impl<DB: DatabaseBenchmark + 'static> DatabaseBenchmarkTrait for DbBenchmark<DB>
         let name = DB::name();
         let path = runner.db_path(name);
         let db = DB::open(&path)?;
+
         let start = std::time::Instant::now();
         let _sum = db.read_random(indices)?;
         let duration = start.elapsed();
+
         drop(db);
         Ok(duration)
     }
@@ -174,18 +146,21 @@ impl<DB: DatabaseBenchmark + 'static> DatabaseBenchmarkTrait for DbBenchmark<DB>
         let name = DB::name();
         let path = runner.db_path(name);
         let db = DB::open(&path)?;
+
         let start = std::time::Instant::now();
         let _sum = db.read_random_rayon(indices)?;
         let duration = start.elapsed();
+
         drop(db);
         Ok(duration)
     }
 
     fn to_result(&self, runner: &BenchmarkRunner, run_index: usize) -> Result<BenchmarkResult> {
         let disk_size = runner.measure_disk_size::<DB>()?;
-        Ok(self.times.to_result(
+        Ok(AccumulatedTimes::to_result(
             DB::name().to_string(),
             self.write_time,
+            &self.times,
             disk_size,
             runner.config().clone(),
             run_index,
@@ -196,16 +171,8 @@ impl<DB: DatabaseBenchmark + 'static> DatabaseBenchmarkTrait for DbBenchmark<DB>
         self.times.open.push(duration);
     }
 
-    fn push_len(&mut self, duration: Duration) {
-        self.times.len.push(duration);
-    }
-
     fn push_linear(&mut self, duration: Duration) {
         self.times.linear.push(duration);
-    }
-
-    fn push_seq_4t(&mut self, duration: Duration) {
-        self.times.seq_4t.push(duration);
     }
 
     fn push_random(&mut self, duration: Duration) {
@@ -304,21 +271,9 @@ pub fn run(configs: &[BenchConfig]) -> Result<()> {
                 Ok(duration)
             })?;
 
-            run_test("len()", &mut db_benchmarks, &|db| {
-                let duration = db.run_len(&runner)?;
-                db.push_len(duration);
-                Ok(duration)
-            })?;
-
-            run_test("read_seq", &mut db_benchmarks, &|db| {
+            run_test("linear", &mut db_benchmarks, &|db| {
                 let duration = db.run_read_sequential(&runner)?;
                 db.push_linear(duration);
-                Ok(duration)
-            })?;
-
-            run_test("read_seq_4t", &mut db_benchmarks, &|db| {
-                let duration = db.run_read_seq_4t(&runner)?;
-                db.push_seq_4t(duration);
                 Ok(duration)
             })?;
 

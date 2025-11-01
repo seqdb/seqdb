@@ -13,6 +13,7 @@ pub use vecdb_derive::StoredCompressed;
 
 mod error;
 mod exit;
+mod iterators;
 mod stamp;
 mod traits;
 mod variants;
@@ -22,6 +23,7 @@ use variants::*;
 
 pub use error::*;
 pub use exit::*;
+pub use iterators::*;
 pub use stamp::*;
 pub use traits::*;
 pub use variants::{

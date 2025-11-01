@@ -5,16 +5,18 @@ use parking_lot::RwLock;
 use seqdb::{Database, Reader, Region};
 
 use crate::{
-    AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, BaseVecIterator, BoxedVecIterator,
-    CollectableVec, GenericStoredVec, Header, Result, StoredCompressed, StoredIndex, Version,
+    AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, BoxedVecIterator, CollectableVec,
+    GenericStoredVec, Header, Result, StoredCompressed, StoredIndex, Version,
     variants::ImportOptions,
 };
 
-use super::{CompressedVec, CompressedVecIterator, RawVec, RawVecIterator};
+use super::{CompressedVec, RawVec};
 
 mod format;
+mod iterator;
 
 pub use format::*;
+pub use iterator::*;
 
 #[derive(Debug, Clone, Allocative)]
 pub enum StoredVec<I, T> {
@@ -39,7 +41,7 @@ where
     pub fn forced_import_with(options: ImportOptions, format: Format) -> Result<Self> {
         if options.version == Version::ZERO {
             dbg!(options);
-            panic!("Version must be at least 1, can't verify endianess otherwise");
+            panic!("Version must be at least 1, can't verify endianness otherwise");
         }
 
         if format.is_compressed() {
@@ -318,72 +320,12 @@ where
     }
 }
 
-// #[derive(Debug)]
-pub enum StoredVecIterator<'a, I, T> {
-    Raw(RawVecIterator<'a, I, T>),
-    Compressed(CompressedVecIterator<'a, I, T>),
-}
-
-impl<'a, I, T> Iterator for StoredVecIterator<'a, I, T>
-where
-    I: StoredIndex,
-    T: StoredCompressed,
-{
-    type Item = (I, T);
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        todo!()
-        // match self {
-        //     Self::Compressed(i) => i.next(),
-        //     Self::Raw(i) => i.next(),
-        // }
-    }
-}
-
-impl<I, T> BaseVecIterator for StoredVecIterator<'_, I, T>
-where
-    I: StoredIndex,
-    T: StoredCompressed,
-{
-    #[inline]
-    fn mut_index(&mut self) -> &mut usize {
-        match self {
-            Self::Compressed(iter) => iter.mut_index(),
-            Self::Raw(iter) => {
-                todo!();
-                // iter.mut_index()
-            }
-        }
-    }
-
-    fn len(&self) -> usize {
-        match self {
-            Self::Compressed(i) => i.len(),
-            Self::Raw(i) => {
-                todo!();
-                // i.len()
-            }
-        }
-    }
-
-    #[inline]
-    fn name(&self) -> &str {
-        match self {
-            Self::Compressed(i) => i.name(),
-            Self::Raw(i) => {
-                todo!()
-                // i.name()
-            }
-        }
-    }
-}
-
 impl<'a, I, T> IntoIterator for &'a StoredVec<I, T>
 where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    type Item = (I, T);
+    type Item = T;
     type IntoIter = StoredVecIterator<'a, I, T>;
 
     fn into_iter(self) -> Self::IntoIter {

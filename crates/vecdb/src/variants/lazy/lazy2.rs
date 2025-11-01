@@ -1,14 +1,14 @@
 use allocative::Allocative;
 
 use crate::{
-    AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BaseVecIterator,
-    BoxedVecIterator, CollectableVec, StoredIndex, StoredRaw, Version,
+    AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BoxedVecIterator,
+    CollectableVec, StoredIndex, StoredRaw, VecIterator, Version,
 };
 
 pub type ComputeFrom2<I, T, S1I, S1T, S2I, S2T> = for<'a> fn(
     I,
-    &mut dyn BaseVecIterator<Item = (S1I, S1T)>,
-    &mut dyn BaseVecIterator<Item = (S2I, S2T)>,
+    &mut dyn VecIterator<Item = (S1I, S1T)>,
+    &mut dyn VecIterator<Item = (S2I, S2T)>,
 ) -> Option<T>;
 
 #[derive(Clone, Allocative)]
@@ -89,7 +89,7 @@ where
     S2I: StoredIndex,
     S2T: StoredRaw,
 {
-    type Item = (I, T);
+    type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
         let index = I::from(self.index);
@@ -102,8 +102,7 @@ where
     }
 }
 
-impl<I, T, S1I, S1T, S2I, S2T> BaseVecIterator
-    for LazyVecFrom2Iterator<'_, I, T, S1I, S1T, S2I, S2T>
+impl<I, T, S1I, S1T, S2I, S2T> VecIterator for LazyVecFrom2Iterator<'_, I, T, S1I, S1T, S2I, S2T>
 where
     I: StoredIndex,
     T: StoredRaw,
@@ -112,30 +111,28 @@ where
     S2I: StoredIndex,
     S2T: StoredRaw,
 {
-    #[inline]
-    fn mut_index(&mut self) -> &mut usize {
-        &mut self.index
+    fn skip_optimized(self, n: usize) -> Self {
+        todo!();
     }
 
-    #[inline]
-    fn len(&self) -> usize {
-        let len1 = if self.source1.index_type_to_string() == I::to_string() {
-            self.source1.len()
-        } else {
-            usize::MAX
-        };
-        let len2 = if self.source2.index_type_to_string() == I::to_string() {
-            self.source2.len()
-        } else {
-            usize::MAX
-        };
-        len1.min(len2)
+    fn take_optimized(self, n: usize) -> Self {
+        todo!();
     }
 
-    #[inline]
-    fn name(&self) -> &str {
-        self.source1.name()
-    }
+    // #[inline]
+    // fn len(&self) -> usize {
+    //     let len1 = if self.source1.index_type_to_string() == I::to_string() {
+    //         self.source1.len()
+    //     } else {
+    //         usize::MAX
+    //     };
+    //     let len2 = if self.source2.index_type_to_string() == I::to_string() {
+    //         self.source2.len()
+    //     } else {
+    //         usize::MAX
+    //     };
+    //     len1.min(len2)
+    // }
 }
 
 impl<'a, I, T, S1I, S1T, S2I, S2T> IntoIterator for &'a LazyVecFrom2<I, T, S1I, S1T, S2I, S2T>

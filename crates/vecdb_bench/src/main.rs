@@ -8,25 +8,25 @@ fn main() {
             databases: vec![
                 Database::VecDb,
                 Database::VecDbOld,
-                Database::Fjall2,
                 Database::Fjall3,
+                Database::Fjall2,
                 Database::Redb,
                 Database::Lmdb,
             ],
             ..Default::default()
         },
-        BenchConfig {
-            write_count: 200_000_000,
-            databases: vec![
-                Database::VecDb,
-                Database::VecDbOld,
-                Database::Fjall2,
-                Database::Fjall3,
-                Database::Redb,
-                Database::Lmdb,
-            ],
-            ..Default::default()
-        },
+        // BenchConfig {
+        //     write_count: 200_000_000,
+        //     databases: vec![
+        //         Database::VecDb,
+        //         Database::VecDbOld,
+        //         Database::Fjall3,
+        //         Database::Fjall2,
+        //         Database::Redb,
+        //         Database::Lmdb,
+        //     ],
+        //     ..Default::default()
+        // },
     ];
     run(&configs).unwrap();
 }

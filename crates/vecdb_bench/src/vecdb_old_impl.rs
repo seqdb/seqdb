@@ -1,11 +1,7 @@
 use anyhow::Result;
 use rayon::prelude::*;
-use std::{
-    path::Path,
-    sync::atomic::{AtomicU64, Ordering},
-    thread,
-};
-use vecdb_old::{AnyStoredVec, AnyVec, Database, GenericStoredVec, RawVec, Version};
+use std::path::Path;
+use vecdb_old::{AnyStoredVec, Database, GenericStoredVec, RawVec, Version};
 
 use crate::database::DatabaseBenchmark;
 
@@ -39,10 +35,6 @@ impl DatabaseBenchmark for VecDbOldBench {
         Ok(())
     }
 
-    fn len(&self) -> Result<u64> {
-        Ok(self.vec.len() as u64)
-    }
-
     fn read_sequential(&self) -> Result<u64> {
         let mut sum = 0u64;
         let values = self.vec.iter();
@@ -51,38 +43,6 @@ impl DatabaseBenchmark for VecDbOldBench {
         }
 
         Ok(sum)
-    }
-
-    fn read_sequential_threaded(&self, num_threads: usize) -> Result<u64> {
-        let total_sum = AtomicU64::new(0);
-        let len = self.vec.len();
-        let chunk_size = len / num_threads;
-
-        thread::scope(|s| {
-            let handles: Vec<_> = (0..num_threads)
-                .map(|thread_id| {
-                    s.spawn(move || {
-                        let start = thread_id * chunk_size;
-
-                        let mut sum = 0u64;
-
-                        let values = self.vec.iter_at(start).take(chunk_size);
-                        for (_, value) in values {
-                            sum = sum.wrapping_add(value.into_owned());
-                        }
-                        sum
-                    })
-                })
-                .collect();
-
-            for handle in handles {
-                if let Ok(sum) = handle.join() {
-                    total_sum.fetch_add(sum, Ordering::Relaxed);
-                }
-            }
-        });
-
-        Ok(total_sum.load(Ordering::Relaxed))
     }
 
     fn read_random(&self, indices: &[u64]) -> Result<u64> {

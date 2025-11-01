@@ -12,7 +12,10 @@ where
         let len = self.len();
         let from = from.unwrap_or_default();
         let to = to.map_or(len, |to| to.min(len));
-        self.iter_at_(from).take(to - from).map(|(_, v)| v)
+        self.iter()
+            .skip_optimized(from)
+            .take_optimized(to - from)
+            .map(|(_, v)| v)
     }
 
     fn iter_signed_range(&self, from: Option<i64>, to: Option<i64>) -> impl Iterator<Item = T> {

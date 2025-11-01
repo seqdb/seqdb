@@ -6,21 +6,20 @@ use std::{
 
 use allocative::Allocative;
 use log::info;
-use parking_lot::{RwLock, RwLockReadGuard};
+use parking_lot::RwLock;
 use seqdb::{Database, Reader, Region};
 
 use crate::{
-    AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, AsInnerSlice, BaseVecIterator,
-    BoxedVecIterator, CollectableVec, Error, Format, FromInnerSlice, GenericStoredVec,
-    HEADER_OFFSET, Header, RawVec, Result, StoredCompressed, StoredIndex, VEC_PAGE_SIZE, Version,
-    variants::ImportOptions,
+    AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, AsInnerSlice, BoxedVecIterator,
+    CollectableVec, Error, Format, FromInnerSlice, GenericStoredVec, HEADER_OFFSET, Header, RawVec,
+    Result, StoredCompressed, StoredIndex, VEC_PAGE_SIZE, Version, variants::ImportOptions,
 };
 
 mod iterators;
 mod page;
 mod pages;
 
-use iterators::*;
+pub use iterators::*;
 use page::*;
 use pages::*;
 
@@ -144,21 +143,36 @@ where
     }
 
     #[inline]
-    pub fn iter(&self) -> CompressedVecIterator<'_, I, T> {
-        self.into_iter()
+    pub fn iter(&self) -> Result<CompressedVecIterator<'_, I, T>> {
+        CompressedVecIterator::new(self)
     }
 
     #[inline]
-    pub fn iter_at(&self, i: I) -> CompressedVecIterator<'_, I, T> {
-        self.iter_at_(i.to_usize())
+    pub fn clean_iter(&self) -> Result<CleanCompressedVecIterator<'_, I, T>> {
+        CleanCompressedVecIterator::new(self)
     }
 
     #[inline]
-    pub fn iter_at_(&self, i: usize) -> CompressedVecIterator<'_, I, T> {
-        let mut iter = self.into_iter();
-        iter.set_(i);
-        iter
+    pub fn dirty_iter(&self) -> Result<DirtyCompressedVecIterator<'_, I, T>> {
+        DirtyCompressedVecIterator::new(self)
     }
+
+    // #[inline]
+    // pub fn iter(&self) -> CompressedVecIterator<'_, I, T> {
+    //     self.into_iter()
+    // }
+
+    // #[inline]
+    // pub fn iter_at(&self, i: I) -> CompressedVecIterator<'_, I, T> {
+    //     self.iter_at_(i.to_usize())
+    // }
+
+    // #[inline]
+    // pub fn iter_at_(&self, i: usize) -> CompressedVecIterator<'_, I, T> {
+    //     let mut iter = self.into_iter();
+    //     iter.set_(i);
+    //     iter
+    // }
 
     fn pages_region_name(&self) -> String {
         Self::pages_region_name_(self.name())
@@ -437,107 +451,16 @@ where
     }
 }
 
-#[derive(Debug)]
-pub struct CompressedVecIterator<'a, I, T> {
-    vec: &'a CompressedVec<I, T>,
-    reader: Reader<'a>,
-    decoded: Option<(usize, Vec<T>)>,
-    pages: RwLockReadGuard<'a, Pages>,
-    stored_len: usize,
-    index: usize,
-}
-
-impl<I, T> CompressedVecIterator<'_, I, T>
-where
-    I: StoredIndex,
-    T: StoredCompressed,
-{
-    const SIZE_OF_T: usize = size_of::<T>();
-    const PER_PAGE: usize = MAX_COMPRESSED_PAGE_SIZE / Self::SIZE_OF_T;
-}
-
-impl<I, T> BaseVecIterator for CompressedVecIterator<'_, I, T>
-where
-    I: StoredIndex,
-    T: StoredCompressed,
-{
-    #[inline]
-    fn mut_index(&mut self) -> &mut usize {
-        &mut self.index
-    }
-
-    #[inline]
-    fn len(&self) -> usize {
-        self.vec.len()
-    }
-
-    #[inline]
-    fn name(&self) -> &str {
-        self.vec.name()
-    }
-}
-
-impl<'a, I, T> Iterator for CompressedVecIterator<'a, I, T>
-where
-    I: StoredIndex,
-    T: StoredCompressed,
-{
-    type Item = (I, T);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let i = self.index;
-        let stored_len = self.stored_len;
-
-        let result = if i >= stored_len {
-            self.vec.get_pushed(i, stored_len).map(|v| (I::from(i), *v))
-        } else {
-            let page_index = i / Self::PER_PAGE;
-
-            if self.decoded.as_ref().is_none_or(|b| b.0 != page_index) {
-                let values = CompressedVec::<I, T>::decode_page_(
-                    stored_len,
-                    page_index,
-                    &self.reader,
-                    &self.pages,
-                )
-                .unwrap();
-                self.decoded.replace((page_index, values));
-            }
-
-            self.decoded
-                .as_ref()
-                .unwrap()
-                .1
-                .get(i % Self::PER_PAGE)
-                .map(|v| (I::from(i), *v))
-        };
-
-        self.index += 1;
-
-        result
-    }
-}
-
 impl<'a, I, T> IntoIterator for &'a CompressedVec<I, T>
 where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    type Item = (I, T);
+    type Item = T;
     type IntoIter = CompressedVecIterator<'a, I, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let pages = self.pages.read();
-        let stored_len = self.stored_len();
-
-        CompressedVecIterator {
-            vec: self,
-            reader: self.create_static_reader(),
-            decoded: None,
-            pages,
-            index: 0,
-            stored_len,
-        }
+        self.iter().expect("CompressedVecIter::new(self) to work")
     }
 }
 
@@ -564,3 +487,94 @@ where
         CollectableVec::collect_range_string(self, from, to)
     }
 }
+
+// -------------
+
+// #[derive(Debug)]
+// pub struct CompressedVecIterator<'a, I, T> {
+//     vec: &'a CompressedVec<I, T>,
+//     reader: Reader<'a>,
+//     decoded: Option<(usize, Vec<T>)>,
+//     pages: RwLockReadGuard<'a, Pages>,
+//     stored_len: usize,
+//     index: usize,
+// }
+
+// impl<I, T> CompressedVecIterator<'_, I, T>
+// where
+//     I: StoredIndex,
+//     T: StoredCompressed,
+// {
+//     const SIZE_OF_T: usize = size_of::<T>();
+//     const PER_PAGE: usize = MAX_COMPRESSED_PAGE_SIZE / Self::SIZE_OF_T;
+// }
+
+// impl<I, T> VecIterator for CompressedVecIterator<'_, I, T>
+// where
+//     I: StoredIndex,
+//     T: StoredCompressed,
+// {
+//     fn skip_optimized(self, n: usize) -> Self {
+//         todo!();
+//     }
+
+//     fn take_optimized(self, n: usize) -> Self {
+//         todo!();
+//     }
+
+//     // #[inline]
+//     // fn mut_index(&mut self) -> &mut usize {
+//     //     &mut self.index
+//     // }
+
+//     // #[inline]
+//     // fn len(&self) -> usize {
+//     //     self.vec.len()
+//     // }
+
+//     // #[inline]
+//     // fn name(&self) -> &str {
+//     //     self.vec.name()
+//     // }
+// }
+
+// impl<'a, I, T> Iterator for CompressedVecIterator<'a, I, T>
+// where
+//     I: StoredIndex,
+//     T: StoredCompressed,
+// {
+//     type Item = (I, T);
+
+//     fn next(&mut self) -> Option<Self::Item> {
+//         let i = self.index;
+//         let stored_len = self.stored_len;
+
+//         let result = if i >= stored_len {
+//             self.vec.get_pushed(i, stored_len).map(|v| (I::from(i), *v))
+//         } else {
+//             let page_index = i / Self::PER_PAGE;
+
+//             if self.decoded.as_ref().is_none_or(|b| b.0 != page_index) {
+//                 let values = CompressedVec::<I, T>::decode_page_(
+//                     stored_len,
+//                     page_index,
+//                     &self.reader,
+//                     &self.pages,
+//                 )
+//                 .unwrap();
+//                 self.decoded.replace((page_index, values));
+//             }
+
+//             self.decoded
+//                 .as_ref()
+//                 .unwrap()
+//                 .1
+//                 .get(i % Self::PER_PAGE)
+//                 .map(|v| (I::from(i), *v))
+//         };
+
+//         self.index += 1;
+
+//         result
+//     }
+// }

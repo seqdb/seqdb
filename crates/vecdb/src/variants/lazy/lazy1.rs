@@ -1,12 +1,12 @@
 use allocative::Allocative;
 
 use crate::{
-    AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BaseVecIterator,
-    BoxedVecIterator, CollectableVec, StoredIndex, StoredRaw, Version,
+    AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BoxedVecIterator,
+    CollectableVec, StoredIndex, StoredRaw, VecIterator, Version,
 };
 
 pub type ComputeFrom1<I, T, S1I, S1T> =
-    for<'a> fn(I, &mut dyn BaseVecIterator<Item = (S1I, S1T)>) -> Option<T>;
+    for<'a> fn(I, &mut dyn VecIterator<Item = (S1I, S1T)>) -> Option<T>;
 
 #[derive(Clone, Allocative)]
 pub struct LazyVecFrom1<I, T, S1I, S1T>
@@ -67,7 +67,7 @@ where
     S1I: StoredIndex,
     S1T: StoredRaw,
 {
-    type Item = (I, T);
+    type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index >= self.len() {
@@ -82,27 +82,25 @@ where
     }
 }
 
-impl<I, T, S1I, S1T> BaseVecIterator for LazyVecFrom1Iterator<'_, I, T, S1I, S1T>
+impl<I, T, S1I, S1T> VecIterator for LazyVecFrom1Iterator<'_, I, T, S1I, S1T>
 where
     I: StoredIndex,
     T: StoredRaw,
     S1I: StoredIndex,
     S1T: StoredRaw,
 {
-    #[inline]
-    fn mut_index(&mut self) -> &mut usize {
-        &mut self.index
+    fn skip_optimized(self, n: usize) -> Self {
+        todo!();
     }
 
-    #[inline]
-    fn len(&self) -> usize {
-        self.source.len()
+    fn take_optimized(self, n: usize) -> Self {
+        todo!();
     }
 
-    #[inline]
-    fn name(&self) -> &str {
-        self.source.name()
-    }
+    // #[inline]
+    // fn len(&self) -> usize {
+    //     self.source.len()
+    // }
 }
 
 impl<'a, I, T, S1I, S1T> IntoIterator for &'a LazyVecFrom1<I, T, S1I, S1T>

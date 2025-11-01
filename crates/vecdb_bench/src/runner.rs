@@ -4,12 +4,11 @@ use rand::{Rng, SeedableRng};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
-use sysinfo::System;
 
 pub const WRITE_COUNT: u64 = 10_000_000;
 pub const RANDOM_READ_PERCENT: f64 = 0.01; // 1% of writes
 pub const RANDOM_SEED: u64 = 42;
-pub const NUM_ITERATIONS: usize = 1;
+pub const NUM_ITERATIONS: usize = 10;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Database {
@@ -67,9 +66,7 @@ pub struct BenchmarkResult {
     pub name: String,
     pub open_time: Duration,
     pub write_time: Duration,
-    pub len_time: Duration,
     pub linear_read_time: Duration,
-    pub seq_read_4t: Duration,
     pub random_read_time: Duration,
     pub random_read_rayon: Duration,
     pub disk_size: u64,
@@ -226,6 +223,7 @@ impl BenchmarkRunner {
 
         // Flush
         db.flush()?;
+
         drop(db);
 
         println!("{write_time:?}");
@@ -269,11 +267,7 @@ impl BenchmarkRunner {
                 "    {}",
                 BenchmarkResult::format_latency(result.config.write_count, result.write_time)
             );
-            println!(
-                "  len():       {}",
-                BenchmarkResult::format_duration(result.len_time)
-            );
-            println!("  Seq:");
+            println!("  Linear:");
             println!(
                 "    {}",
                 BenchmarkResult::format_throughput(
@@ -289,26 +283,10 @@ impl BenchmarkRunner {
                 "    {}",
                 BenchmarkResult::format_latency(result.config.write_count, result.linear_read_time)
             );
-            println!("  Seq 4t:");
-            println!(
-                "    {}",
-                BenchmarkResult::format_throughput(result.config.write_count, result.seq_read_4t)
-            );
-            println!(
-                "    {}",
-                BenchmarkResult::format_bandwidth(write_bytes, result.seq_read_4t)
-            );
-            println!(
-                "    {}",
-                BenchmarkResult::format_latency(result.config.write_count, result.seq_read_4t)
-            );
             println!("  Random:");
             println!(
                 "    {}",
-                BenchmarkResult::format_throughput(
-                    random_count as u64,
-                    result.random_read_time
-                )
+                BenchmarkResult::format_throughput(random_count as u64, result.random_read_time)
             );
             println!(
                 "    {}",
@@ -316,18 +294,12 @@ impl BenchmarkRunner {
             );
             println!(
                 "    {}",
-                BenchmarkResult::format_latency(
-                    random_count as u64,
-                    result.random_read_time
-                )
+                BenchmarkResult::format_latency(random_count as u64, result.random_read_time)
             );
             println!("  Random Rayon:");
             println!(
                 "    {}",
-                BenchmarkResult::format_throughput(
-                    random_count as u64,
-                    result.random_read_rayon
-                )
+                BenchmarkResult::format_throughput(random_count as u64, result.random_read_rayon)
             );
             println!(
                 "    {}",
@@ -335,13 +307,10 @@ impl BenchmarkRunner {
             );
             println!(
                 "    {}",
-                BenchmarkResult::format_latency(
-                    random_count as u64,
-                    result.random_read_rayon
-                )
+                BenchmarkResult::format_latency(random_count as u64, result.random_read_rayon)
             );
             println!(
-                "  Disk Size:   {}",
+                "  Disk Size:     {}",
                 BenchmarkResult::format_size(result.disk_size)
             );
             println!();
@@ -362,33 +331,6 @@ impl BenchmarkRunner {
             file,
             "Benchmark comparing vecdb against popular embedded databases: fjall, redb, and lmdb."
         )?;
-        writeln!(file)?;
-
-        // Get system information
-        let mut sys = System::new_all();
-        sys.refresh_all();
-
-        writeln!(file, "## System Information")?;
-        writeln!(file)?;
-
-        if let Some(cpu_brand) = sys.cpus().first().map(|cpu| cpu.brand()) {
-            writeln!(file, "- **CPU**: {}", cpu_brand)?;
-        }
-        writeln!(file, "- **CPU Cores**: {}", sys.cpus().len())?;
-        writeln!(
-            file,
-            "- **Total Memory**: {:.2} GB",
-            sys.total_memory() as f64 / (1024.0 * 1024.0 * 1024.0)
-        )?;
-
-        if let Some(os_name) = System::name() {
-            write!(file, "- **OS**: {}", os_name)?;
-            if let Some(os_version) = System::os_version() {
-                write!(file, " {}", os_version)?;
-            }
-            writeln!(file)?;
-        }
-
         writeln!(file)?;
 
         // Group results by run_index
@@ -427,14 +369,6 @@ impl BenchmarkRunner {
                 if config.num_iterations > 1 { "es" } else { "" }
             )?;
             writeln!(file)?;
-            writeln!(file, "**Random Seed**: {}", config.random_seed)?;
-            writeln!(file)?;
-
-            // List databases tested
-            write!(file, "**Databases**: ")?;
-            let db_names: Vec<_> = group_results.iter().map(|r| r.name.as_str()).collect();
-            writeln!(file, "{}", db_names.join(", "))?;
-            writeln!(file)?;
 
             writeln!(file, "### Results")?;
             writeln!(file)?;
@@ -460,9 +394,7 @@ impl BenchmarkRunner {
         // Find best values (min for time/size, max for throughput)
         let best_open = results.iter().map(|r| r.open_time).min().unwrap();
         let best_write = results.iter().map(|r| r.write_time).min().unwrap();
-        let best_len = results.iter().map(|r| r.len_time).min().unwrap();
         let best_linear = results.iter().map(|r| r.linear_read_time).min().unwrap();
-        let best_seq_4t = results.iter().map(|r| r.seq_read_4t).min().unwrap();
         let best_random = results.iter().map(|r| r.random_read_time).min().unwrap();
         let best_random_rayon = results.iter().map(|r| r.random_read_rayon).min().unwrap();
         let best_disk = results.iter().map(|r| r.disk_size).min().unwrap();
@@ -516,20 +448,8 @@ impl BenchmarkRunner {
         }
         writeln!(file)?;
 
-        // len() row
-        write!(file, "| **len()** |")?;
-        for result in results {
-            let len_str = BenchmarkResult::format_duration(result.len_time);
-            if result.len_time == best_len {
-                write!(file, " **{}** |", len_str)?;
-            } else {
-                write!(file, " {} |", len_str)?;
-            }
-        }
-        writeln!(file)?;
-
-        // Seq Read row
-        write!(file, "| **Seq** |")?;
+        // Linear Read row
+        write!(file, "| **Linear** |")?;
         for result in results {
             let info = format!(
                 "{}<br>{}<br>{}<br>{}",
@@ -546,39 +466,15 @@ impl BenchmarkRunner {
         }
         writeln!(file)?;
 
-        // Seq Read 4t row
-        write!(file, "| **Seq 4t** |")?;
-        for result in results {
-            let info = format!(
-                "{}<br>{}<br>{}<br>{}",
-                BenchmarkResult::format_duration(result.seq_read_4t),
-                BenchmarkResult::format_throughput(config.write_count, result.seq_read_4t),
-                BenchmarkResult::format_bandwidth(write_bytes, result.seq_read_4t),
-                BenchmarkResult::format_latency(config.write_count, result.seq_read_4t)
-            );
-            if result.seq_read_4t == best_seq_4t {
-                write!(file, " **{}** |", info)?;
-            } else {
-                write!(file, " {} |", info)?;
-            }
-        }
-        writeln!(file)?;
-
         // Random Read row
         write!(file, "| **Random** |")?;
         for result in results {
             let info = format!(
                 "{}<br>{}<br>{}<br>{}",
                 BenchmarkResult::format_duration(result.random_read_time),
-                BenchmarkResult::format_throughput(
-                    random_count as u64,
-                    result.random_read_time
-                ),
+                BenchmarkResult::format_throughput(random_count as u64, result.random_read_time),
                 BenchmarkResult::format_bandwidth(random_bytes, result.random_read_time),
-                BenchmarkResult::format_latency(
-                    random_count as u64,
-                    result.random_read_time
-                )
+                BenchmarkResult::format_latency(random_count as u64, result.random_read_time)
             );
             if result.random_read_time == best_random {
                 write!(file, " **{}** |", info)?;
@@ -594,15 +490,9 @@ impl BenchmarkRunner {
             let info = format!(
                 "{}<br>{}<br>{}<br>{}",
                 BenchmarkResult::format_duration(result.random_read_rayon),
-                BenchmarkResult::format_throughput(
-                    random_count as u64,
-                    result.random_read_rayon
-                ),
+                BenchmarkResult::format_throughput(random_count as u64, result.random_read_rayon),
                 BenchmarkResult::format_bandwidth(random_bytes, result.random_read_rayon),
-                BenchmarkResult::format_latency(
-                    random_count as u64,
-                    result.random_read_rayon
-                )
+                BenchmarkResult::format_latency(random_count as u64, result.random_read_rayon)
             );
             if result.random_read_rayon == best_random_rayon {
                 write!(file, " **{}** |", info)?;

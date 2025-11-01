@@ -1,15 +1,8 @@
-use std::{
-    path::Path,
-    sync::{
-        Arc,
-        atomic::{AtomicU64, Ordering},
-    },
-    thread,
-};
+use std::path::Path;
 
 use anyhow::Result;
 use rayon::prelude::*;
-use redb::{Database, ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition};
+use redb::{Builder, Database, ReadableDatabase, ReadableTable, TableDefinition};
 
 use crate::database::DatabaseBenchmark;
 
@@ -25,14 +18,13 @@ impl DatabaseBenchmark for RedbBench {
     }
 
     fn create(path: &Path) -> Result<Self> {
-        let db_path = path.join("bench.redb");
-        let db = Database::create(&db_path)?;
-        Ok(Self { db })
+        Self::open(path)
     }
 
     fn open(path: &Path) -> Result<Self> {
-        let db_path = path.join("bench.redb");
-        let db = Database::open(&db_path)?;
+        let db = Builder::new()
+            .set_cache_size(4 * 1024 * 1024 * 1024)
+            .create(path.join("bench.redb"))?;
         Ok(Self { db })
     }
 
@@ -48,12 +40,6 @@ impl DatabaseBenchmark for RedbBench {
         Ok(())
     }
 
-    fn len(&self) -> Result<u64> {
-        let read_txn = self.db.begin_read()?;
-        let table = read_txn.open_table(TABLE)?;
-        Ok(table.len()?)
-    }
-
     fn read_sequential(&self) -> Result<u64> {
         let mut sum = 0u64;
         let read_txn = self.db.begin_read()?;
@@ -65,49 +51,6 @@ impl DatabaseBenchmark for RedbBench {
         }
 
         Ok(sum)
-    }
-
-    fn read_sequential_threaded(&self, num_threads: usize) -> Result<u64> {
-        let total_sum = AtomicU64::new(0);
-        let db = Arc::new(&self.db);
-        let len = self.len()?;
-        let chunk_size = len / num_threads as u64;
-
-        thread::scope(|s| {
-            let handles: Vec<_> = (0..num_threads)
-                .map(|thread_id| {
-                    let db = db.clone();
-                    s.spawn(move || {
-                        let start = thread_id as u64 * chunk_size;
-                        let end = if thread_id == num_threads - 1 {
-                            len
-                        } else {
-                            (thread_id as u64 + 1) * chunk_size
-                        };
-
-                        let mut sum = 0u64;
-                        if let Ok(read_txn) = db.begin_read()
-                            && let Ok(table) = read_txn.open_table(TABLE)
-                        {
-                            for idx in start..end {
-                                if let Ok(Some(value)) = table.get(idx) {
-                                    sum = sum.wrapping_add(value.value());
-                                }
-                            }
-                        }
-                        sum
-                    })
-                })
-                .collect();
-
-            for handle in handles {
-                if let Ok(sum) = handle.join() {
-                    total_sum.fetch_add(sum, Ordering::Relaxed);
-                }
-            }
-        });
-
-        Ok(total_sum.load(Ordering::Relaxed))
     }
 
     fn read_random(&self, indices: &[u64]) -> Result<u64> {
