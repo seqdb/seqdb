@@ -443,4 +443,107 @@ mod tests {
             assert_eq!(val, i as i32);
         }
     }
+
+    #[test]
+    fn test_clean_iter_multiple_skip_take() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..1000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        // Skip 100, take 200, skip 50 more, take 100 more
+        let collected: Vec<i32> = vec.clean_iter().unwrap()
+            .skip(100)
+            .take(200)
+            .skip(50)
+            .take(100)
+            .collect();
+
+        assert_eq!(collected.len(), 100);
+        assert_eq!(collected[0], 150);
+        assert_eq!(collected[99], 249);
+    }
+
+    #[test]
+    fn test_clean_iter_set_position_multiple_times() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..1000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let mut iter = vec.clean_iter().unwrap();
+
+        iter.set_position_(100);
+        assert_eq!(iter.next(), Some(100));
+
+        iter.set_position_(500);
+        assert_eq!(iter.next(), Some(500));
+
+        iter.set_position_(50);
+        assert_eq!(iter.next(), Some(50));
+    }
+
+    #[test]
+    fn test_clean_iter_skip_all() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..100 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let mut iter = vec.clean_iter().unwrap().skip(100);
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_clean_iter_take_zero() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..100 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let collected: Vec<i32> = vec.clean_iter().unwrap().take(0).collect();
+        assert_eq!(collected.len(), 0);
+    }
+
+    #[test]
+    fn test_clean_iter_nth_beyond_end() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..10 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let mut iter = vec.clean_iter().unwrap();
+        assert_eq!(iter.nth(20), None);
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_clean_iter_size_hint_consistency() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..100 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let mut iter = vec.clean_iter().unwrap();
+
+        for i in 0..100 {
+            let (lower, upper) = iter.size_hint();
+            assert_eq!(lower, 100 - i);
+            assert_eq!(upper, Some(100 - i));
+            assert_eq!(iter.len(), 100 - i);
+            iter.next();
+        }
+    }
 }

@@ -171,3 +171,256 @@ where
     T: StoredCompressed,
 {
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{AnyStoredVec, CompressedVec, GenericStoredVec, Version};
+    use seqdb::Database;
+    use tempfile::TempDir;
+
+    fn setup() -> (TempDir, Database, CompressedVec<usize, i32>) {
+        let temp = TempDir::new().unwrap();
+        let db = Database::open(&temp.path().join("test.db")).unwrap();
+        let vec = CompressedVec::import(&db, "test", Version::ONE).unwrap();
+        (temp, db, vec)
+    }
+
+    #[test]
+    fn test_compressed_dirty_iter_only_stored() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..1000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let collected: Vec<i32> = vec.dirty_iter().unwrap().collect();
+        assert_eq!(collected.len(), 1000);
+        assert_eq!(collected[0], 0);
+        assert_eq!(collected[999], 999);
+    }
+
+    #[test]
+    fn test_compressed_dirty_iter_only_pushed() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..500 {
+            vec.push(i);
+        }
+        // Don't flush
+
+        let collected: Vec<i32> = vec.dirty_iter().unwrap().collect();
+        assert_eq!(collected.len(), 500);
+
+        for (i, &val) in collected.iter().enumerate() {
+            assert_eq!(val, i as i32);
+        }
+    }
+
+    #[test]
+    fn test_compressed_dirty_iter_stored_and_pushed() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..5000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        for i in 5000..10000 {
+            vec.push(i);
+        }
+
+        let collected: Vec<i32> = vec.dirty_iter().unwrap().collect();
+        assert_eq!(collected.len(), 10000);
+
+        for (i, &val) in collected.iter().enumerate() {
+            assert_eq!(val, i as i32);
+        }
+    }
+
+    #[test]
+    fn test_compressed_dirty_iter_skip_across_boundary() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..5000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        for i in 5000..10000 {
+            vec.push(i);
+        }
+
+        // Skip from stored into pushed
+        let collected: Vec<i32> = vec.dirty_iter().unwrap().skip(4500).collect();
+        assert_eq!(collected.len(), 5500);
+        assert_eq!(collected[0], 4500);
+        assert_eq!(collected[5499], 9999);
+    }
+
+    #[test]
+    fn test_compressed_dirty_iter_take_across_boundary() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..5000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        for i in 5000..10000 {
+            vec.push(i);
+        }
+
+        // Take from stored through pushed
+        let collected: Vec<i32> = vec.dirty_iter().unwrap().skip(4000).take(2000).collect();
+
+        assert_eq!(collected.len(), 2000);
+        assert_eq!(collected[0], 4000);
+        assert_eq!(collected[1999], 5999);
+    }
+
+    #[test]
+    fn test_compressed_dirty_iter_nth_across_boundary() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..5000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        for i in 5000..7000 {
+            vec.push(i);
+        }
+
+        let mut iter = vec.dirty_iter().unwrap();
+        assert_eq!(iter.nth(4990), Some(4990)); // In stored
+        assert_eq!(iter.next(), Some(4991)); // In stored
+        assert_eq!(iter.nth(7), Some(4999)); // In stored
+        assert_eq!(iter.next(), Some(5000)); // In pushed
+        assert_eq!(iter.next(), Some(5001)); // In pushed
+    }
+
+    #[test]
+    fn test_compressed_dirty_iter_set_position_to_pushed() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..5000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        for i in 5000..10000 {
+            vec.push(i);
+        }
+
+        let mut iter = vec.dirty_iter().unwrap();
+        iter.set_position_(7500); // Into pushed region
+        assert_eq!(iter.next(), Some(7500));
+        assert_eq!(iter.next(), Some(7501));
+    }
+
+    #[test]
+    fn test_compressed_dirty_iter_last_in_pushed() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..5000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        for i in 5000..10000 {
+            vec.push(i);
+        }
+
+        let iter = vec.dirty_iter().unwrap();
+        assert_eq!(iter.last(), Some(9999));
+    }
+
+    #[test]
+    fn test_compressed_dirty_iter_last_in_stored() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..5000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let iter = vec.dirty_iter().unwrap();
+        assert_eq!(iter.last(), Some(4999));
+    }
+
+    #[test]
+    fn test_compressed_dirty_iter_exact_size_with_pushed() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..5000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        for i in 5000..7500 {
+            vec.push(i);
+        }
+
+        let mut iter = vec.dirty_iter().unwrap();
+        assert_eq!(iter.len(), 7500);
+
+        iter.next();
+        assert_eq!(iter.len(), 7499);
+
+        iter.nth(4999); // Cross boundary
+        assert_eq!(iter.len(), 2499);
+    }
+
+    #[test]
+    fn test_compressed_dirty_iter_large_dataset_boundary() {
+        let (_temp, _db, mut vec) = setup();
+
+        // Large stored portion
+        for i in 0..10000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        // Small pushed portion
+        for i in 10000..10100 {
+            vec.push(i);
+        }
+
+        let collected: Vec<i32> = vec.dirty_iter().unwrap().collect();
+        assert_eq!(collected.len(), 10100);
+
+        for (i, &val) in collected.iter().enumerate() {
+            assert_eq!(val, i as i32);
+        }
+    }
+
+    #[test]
+    fn test_compressed_dirty_iter_skip_take_complex() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..8000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        for i in 8000..12000 {
+            vec.push(i);
+        }
+
+        // Complex skip/take across boundary
+        let collected: Vec<i32> = vec
+            .dirty_iter()
+            .unwrap()
+            .skip(7000)
+            .take(3000)
+            .skip(500)
+            .take(1000)
+            .collect();
+
+        assert_eq!(collected.len(), 1000);
+        assert_eq!(collected[0], 7500);
+        assert_eq!(collected[999], 8499);
+    }
+}

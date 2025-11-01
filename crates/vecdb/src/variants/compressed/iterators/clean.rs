@@ -509,4 +509,98 @@ mod tests {
         }
         assert_eq!(iter.next(), None);
     }
+
+    #[test]
+    fn test_compressed_clean_iter_multiple_set_position() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..10000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let mut iter = vec.clean_iter().unwrap();
+
+        // Jump to different pages
+        iter.set_position_(1000);
+        assert_eq!(iter.next(), Some(1000));
+
+        iter.set_position_(5000);
+        assert_eq!(iter.next(), Some(5000));
+
+        iter.set_position_(100);
+        assert_eq!(iter.next(), Some(100));
+    }
+
+    #[test]
+    fn test_compressed_clean_iter_buffer_efficiency() {
+        let (_temp, _db, mut vec) = setup();
+
+        // Push enough data to fill multiple pages
+        for i in 0..20000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        // Sequential iteration should reuse buffer efficiently
+        let collected: Vec<i32> = vec.clean_iter().unwrap().collect();
+        assert_eq!(collected.len(), 20000);
+
+        for (i, &val) in collected.iter().enumerate() {
+            assert_eq!(val, i as i32);
+        }
+    }
+
+    #[test]
+    fn test_compressed_clean_iter_skip_take_multiple() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..10000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let collected: Vec<i32> = vec.clean_iter().unwrap()
+            .skip(1000)
+            .take(5000)
+            .skip(500)
+            .take(2000)
+            .collect();
+
+        assert_eq!(collected.len(), 2000);
+        assert_eq!(collected[0], 1500);
+        assert_eq!(collected[1999], 3499);
+    }
+
+    #[test]
+    fn test_compressed_clean_iter_nth_beyond_end() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..100 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let mut iter = vec.clean_iter().unwrap();
+        assert_eq!(iter.nth(200), None);
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_compressed_clean_iter_set_end_middle_of_page() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..5000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let mut iter = vec.clean_iter().unwrap();
+        iter.set_end_(2500);  // Middle of a page
+
+        let collected: Vec<i32> = iter.collect();
+        assert_eq!(collected.len(), 2500);
+        assert_eq!(collected[2499], 2499);
+    }
 }
+
