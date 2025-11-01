@@ -225,24 +225,6 @@ where
     }
 }
 
-impl<I, T> ExactSizeIterator for CleanRawVecIterator<'_, I, T>
-where
-    I: StoredIndex,
-    T: StoredRaw,
-{
-    #[inline(always)]
-    fn len(&self) -> usize {
-        self.remaining()
-    }
-}
-
-impl<I, T> FusedIterator for CleanRawVecIterator<'_, I, T>
-where
-    I: StoredIndex,
-    T: StoredRaw,
-{
-}
-
 impl<I, T> VecIterator for CleanRawVecIterator<'_, I, T>
 where
     I: StoredIndex,
@@ -271,18 +253,6 @@ where
         let byte_offset = self.start_offset + Self::index_to_bytes(i);
         self.end_offset = self.end_offset.min(byte_offset);
     }
-
-    fn skip_optimized(mut self, n: usize) -> Self {
-        self.skip_bytes(Self::index_to_bytes(n));
-        self
-    }
-
-    fn take_optimized(mut self, n: usize) -> Self {
-        self.end_offset = self
-            .end_offset
-            .min(self.file_offset.saturating_add(Self::index_to_bytes(n)));
-        self
-    }
 }
 
 impl<I, T> VecIteratorExtended for CleanRawVecIterator<'_, I, T>
@@ -292,4 +262,185 @@ where
 {
     type I = I;
     type T = T;
+}
+
+impl<I, T> ExactSizeIterator for CleanRawVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredRaw,
+{
+    #[inline(always)]
+    fn len(&self) -> usize {
+        self.remaining()
+    }
+}
+
+impl<I, T> FusedIterator for CleanRawVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredRaw,
+{
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{GenericStoredVec, RawVec, Version};
+    use seqdb::Database;
+    use tempfile::TempDir;
+
+    fn setup() -> (TempDir, Database, RawVec<usize, i32>) {
+        let temp = TempDir::new().unwrap();
+        let db = Database::open(&temp.path().join("test.db")).unwrap();
+        let vec = RawVec::import(&db, "test", Version::ONE).unwrap();
+        (temp, db, vec)
+    }
+
+    #[test]
+    fn test_clean_iter_basic() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..100 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let collected: Vec<i32> = vec.clean_iter().unwrap().collect();
+        assert_eq!(collected.len(), 100);
+        assert_eq!(collected[0], 0);
+        assert_eq!(collected[99], 99);
+    }
+
+    #[test]
+    fn test_clean_iter_nth() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..100 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let mut iter = vec.clean_iter().unwrap();
+        assert_eq!(iter.next(), Some(0));
+        assert_eq!(iter.nth(9), Some(10));
+        assert_eq!(iter.next(), Some(11));
+    }
+
+    #[test]
+    fn test_clean_iter_skip() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..100 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let iter = vec.clean_iter().unwrap().skip(50);
+        let collected: Vec<i32> = iter.collect();
+
+        assert_eq!(collected.len(), 50);
+        assert_eq!(collected[0], 50);
+    }
+
+    #[test]
+    fn test_clean_iter_take() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..100 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let iter = vec.clean_iter().unwrap().take(25);
+        let collected: Vec<i32> = iter.collect();
+
+        assert_eq!(collected.len(), 25);
+        assert_eq!(collected[24], 24);
+    }
+
+    #[test]
+    fn test_clean_iter_set_position() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..100 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let mut iter = vec.clean_iter().unwrap();
+        iter.set_position_(50);
+        assert_eq!(iter.next(), Some(50));
+        assert_eq!(iter.next(), Some(51));
+    }
+
+    #[test]
+    fn test_clean_iter_set_end() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..100 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let mut iter = vec.clean_iter().unwrap();
+        iter.set_end_(50);
+        let collected: Vec<i32> = iter.collect();
+
+        assert_eq!(collected.len(), 50);
+    }
+
+    #[test]
+    fn test_clean_iter_last() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..100 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let iter = vec.clean_iter().unwrap();
+        assert_eq!(iter.last(), Some(99));
+    }
+
+    #[test]
+    fn test_clean_iter_last_empty() {
+        let (_temp, _db, vec) = setup();
+
+        let iter = vec.clean_iter().unwrap();
+        assert_eq!(iter.last(), None);
+    }
+
+    #[test]
+    fn test_clean_iter_exact_size() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..100 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let mut iter = vec.clean_iter().unwrap();
+        assert_eq!(iter.len(), 100);
+
+        iter.next();
+        assert_eq!(iter.len(), 99);
+    }
+
+    #[test]
+    fn test_clean_iter_buffer_crossing() {
+        let (_temp, _db, mut vec) = setup();
+
+        // Push enough to cross buffer boundaries
+        for i in 0..10000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let collected: Vec<i32> = vec.clean_iter().unwrap().collect();
+        assert_eq!(collected.len(), 10000);
+
+        for (i, &val) in collected.iter().enumerate() {
+            assert_eq!(val, i as i32);
+        }
+    }
 }

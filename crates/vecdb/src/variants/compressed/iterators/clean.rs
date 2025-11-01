@@ -251,24 +251,6 @@ where
     }
 }
 
-impl<I, T> ExactSizeIterator for CleanCompressedVecIterator<'_, I, T>
-where
-    I: StoredIndex,
-    T: StoredCompressed,
-{
-    #[inline(always)]
-    fn len(&self) -> usize {
-        self.remaining()
-    }
-}
-
-impl<I, T> FusedIterator for CleanCompressedVecIterator<'_, I, T>
-where
-    I: StoredIndex,
-    T: StoredCompressed,
-{
-}
-
 impl<I, T> VecIterator for CleanCompressedVecIterator<'_, I, T>
 where
     I: StoredIndex,
@@ -297,17 +279,6 @@ where
     fn set_end_(&mut self, i: usize) {
         self.set_absolute_end(i);
     }
-
-    fn skip_optimized(mut self, n: usize) -> Self {
-        self.index = self.index.saturating_add(n).min(self.end_index);
-        self
-    }
-
-    fn take_optimized(mut self, n: usize) -> Self {
-        let absolute_end = self.index.saturating_add(n);
-        self.set_absolute_end(absolute_end);
-        self
-    }
 }
 
 impl<I, T> VecIteratorExtended for CleanCompressedVecIterator<'_, I, T>
@@ -317,4 +288,225 @@ where
 {
     type I = I;
     type T = T;
+}
+
+impl<I, T> ExactSizeIterator for CleanCompressedVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredCompressed,
+{
+    #[inline(always)]
+    fn len(&self) -> usize {
+        self.remaining()
+    }
+}
+
+impl<I, T> FusedIterator for CleanCompressedVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredCompressed,
+{
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{CompressedVec, Version};
+    use seqdb::Database;
+    use tempfile::TempDir;
+
+    fn setup() -> (TempDir, Database, CompressedVec<usize, i32>) {
+        let temp = TempDir::new().unwrap();
+        let db = Database::open(&temp.path().join("test.db")).unwrap();
+        let vec = CompressedVec::import(&db, "test", Version::ONE).unwrap();
+        (temp, db, vec)
+    }
+
+    #[test]
+    fn test_compressed_clean_iter_basic() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..100 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let collected: Vec<i32> = vec.clean_iter().unwrap().collect();
+        assert_eq!(collected.len(), 100);
+        assert_eq!(collected[0], 0);
+        assert_eq!(collected[99], 99);
+    }
+
+    #[test]
+    fn test_compressed_clean_iter_large() {
+        let (_temp, _db, mut vec) = setup();
+
+        // Push enough to span multiple pages
+        for i in 0..10000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let collected: Vec<i32> = vec.clean_iter().unwrap().collect();
+        assert_eq!(collected.len(), 10000);
+
+        for (i, &val) in collected.iter().enumerate() {
+            assert_eq!(val, i as i32);
+        }
+    }
+
+    #[test]
+    fn test_compressed_clean_iter_nth() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..1000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let mut iter = vec.clean_iter().unwrap();
+        assert_eq!(iter.next(), Some(0));
+        assert_eq!(iter.nth(99), Some(100));
+        assert_eq!(iter.next(), Some(101));
+    }
+
+    #[test]
+    fn test_compressed_clean_iter_skip_across_pages() {
+        let (_temp, _db, mut vec) = setup();
+
+        // Push enough to span multiple pages
+        for i in 0..10000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let iter = vec.clean_iter().unwrap().skip(5000);
+        let collected: Vec<i32> = iter.collect();
+
+        assert_eq!(collected.len(), 5000);
+        assert_eq!(collected[0], 5000);
+        assert_eq!(collected[4999], 9999);
+    }
+
+    #[test]
+    fn test_compressed_clean_iter_take() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..1000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let iter = vec.clean_iter().unwrap().take(100);
+        let collected: Vec<i32> = iter.collect();
+
+        assert_eq!(collected.len(), 100);
+        assert_eq!(collected[0], 0);
+        assert_eq!(collected[99], 99);
+    }
+
+    #[test]
+    fn test_compressed_clean_iter_skip_take_combined() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..5000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let iter = vec.clean_iter().unwrap().skip(1000).take(2000);
+        let collected: Vec<i32> = iter.collect();
+
+        assert_eq!(collected.len(), 2000);
+        assert_eq!(collected[0], 1000);
+        assert_eq!(collected[1999], 2999);
+    }
+
+    #[test]
+    fn test_compressed_clean_iter_set_position() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..5000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let mut iter = vec.clean_iter().unwrap();
+        iter.set_position_(2500);
+        assert_eq!(iter.next(), Some(2500));
+        assert_eq!(iter.next(), Some(2501));
+    }
+
+    #[test]
+    fn test_compressed_clean_iter_set_position_same_page() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..1000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let mut iter = vec.clean_iter().unwrap();
+        iter.next(); // Decode first page
+        iter.set_position_(50); // Should reuse same page
+        assert_eq!(iter.next(), Some(50));
+    }
+
+    #[test]
+    fn test_compressed_clean_iter_last() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..1000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let iter = vec.clean_iter().unwrap();
+        assert_eq!(iter.last(), Some(999));
+    }
+
+    #[test]
+    fn test_compressed_clean_iter_last_empty() {
+        let (_temp, _db, vec) = setup();
+
+        let iter = vec.clean_iter().unwrap();
+        assert_eq!(iter.last(), None);
+    }
+
+    #[test]
+    fn test_compressed_clean_iter_exact_size() {
+        let (_temp, _db, mut vec) = setup();
+
+        for i in 0..1000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        let mut iter = vec.clean_iter().unwrap();
+        assert_eq!(iter.len(), 1000);
+
+        iter.next();
+        assert_eq!(iter.len(), 999);
+
+        iter.nth(100);
+        assert_eq!(iter.len(), 898);
+    }
+
+    #[test]
+    fn test_compressed_clean_iter_page_boundaries() {
+        let (_temp, _db, mut vec) = setup();
+
+        // Push data that spans multiple pages
+        for i in 0..10000 {
+            vec.push(i);
+        }
+        vec.flush().unwrap();
+
+        // Iterate and ensure no gaps at page boundaries
+        let mut iter = vec.clean_iter().unwrap();
+        for i in 0..10000 {
+            assert_eq!(iter.next(), Some(i));
+        }
+        assert_eq!(iter.next(), None);
+    }
 }

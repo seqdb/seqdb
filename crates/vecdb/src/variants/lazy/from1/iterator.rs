@@ -1,3 +1,5 @@
+use std::iter::FusedIterator;
+
 use crate::{
     BoxedVecIterator, LazyVecFrom1, StoredIndex, StoredRaw, VecIterator, VecIteratorExtended,
 };
@@ -6,10 +8,29 @@ pub struct LazyVecFrom1Iterator<'a, I, T, S1I, S1T>
 where
     S1T: Clone,
 {
-    pub(crate) lazy: &'a LazyVecFrom1<I, T, S1I, S1T>,
-    pub(crate) source: BoxedVecIterator<'a, S1I, S1T>,
-    pub(crate) index: usize,
-    pub(crate) end_index: usize,
+    lazy: &'a LazyVecFrom1<I, T, S1I, S1T>,
+    source: BoxedVecIterator<'a, S1I, S1T>,
+    index: usize,
+    end_index: usize,
+}
+
+impl<'a, I, T, S1I, S1T> LazyVecFrom1Iterator<'a, I, T, S1I, S1T>
+where
+    I: StoredIndex,
+    T: StoredRaw + 'a,
+    S1I: StoredIndex,
+    S1T: StoredRaw,
+{
+    #[inline]
+    pub fn new(lazy: &'a LazyVecFrom1<I, T, S1I, S1T>) -> Self {
+        let len = lazy.source.len();
+        LazyVecFrom1Iterator {
+            lazy,
+            source: lazy.source.iter(),
+            index: 0,
+            end_index: len,
+        }
+    }
 }
 
 impl<'a, I, T, S1I, S1T> Iterator for LazyVecFrom1Iterator<'a, I, T, S1I, S1T>
@@ -36,6 +57,45 @@ where
 
         opt
     }
+
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<T> {
+        if n == 0 {
+            return self.next();
+        }
+
+        let new_index = self.index.saturating_add(n);
+        if new_index >= self.end_index {
+            self.index = self.end_index;
+            return None;
+        }
+
+        self.index = new_index;
+        self.source.nth(n - 1);
+        self.next()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.end_index.saturating_sub(self.index);
+        (remaining, Some(remaining))
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        self.len()
+    }
+
+    #[inline]
+    fn last(mut self) -> Option<T> {
+        let last_index = self.end_index.checked_sub(1)?;
+        if self.index > last_index {
+            return None;
+        }
+
+        self.index = last_index;
+        self.next()
+    }
 }
 
 impl<I, T, S1I, S1T> VecIterator for LazyVecFrom1Iterator<'_, I, T, S1I, S1T>
@@ -54,19 +114,6 @@ where
         self.end_index = i.min(self.end_index);
         self.source.set_end_(i);
     }
-
-    fn skip_optimized(mut self, n: usize) -> Self {
-        self.index = self.index.saturating_add(n).min(self.end_index);
-        self.source = self.source.skip_optimized(n);
-        self
-    }
-
-    fn take_optimized(mut self, n: usize) -> Self {
-        let absolute_end = self.index.saturating_add(n);
-        self.end_index = absolute_end.min(self.end_index);
-        self.source = self.source.take_optimized(n);
-        self
-    }
 }
 
 impl<I, T, S1I, S1T> VecIteratorExtended for LazyVecFrom1Iterator<'_, I, T, S1I, S1T>
@@ -78,4 +125,26 @@ where
 {
     type I = I;
     type T = T;
+}
+
+impl<'a, I, T, S1I, S1T> ExactSizeIterator for LazyVecFrom1Iterator<'a, I, T, S1I, S1T>
+where
+    I: StoredIndex,
+    T: StoredRaw + 'a,
+    S1I: StoredIndex,
+    S1T: StoredRaw,
+{
+    #[inline(always)]
+    fn len(&self) -> usize {
+        self.end_index.saturating_sub(self.index)
+    }
+}
+
+impl<'a, I, T, S1I, S1T> FusedIterator for LazyVecFrom1Iterator<'a, I, T, S1I, S1T>
+where
+    I: StoredIndex,
+    T: StoredRaw + 'a,
+    S1I: StoredIndex,
+    S1T: StoredRaw,
+{
 }

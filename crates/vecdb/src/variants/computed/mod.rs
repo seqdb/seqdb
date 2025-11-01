@@ -330,12 +330,7 @@ where
     type IntoIter = ComputedVecIterator<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        match self {
-            ComputedVec::Eager { vec, .. } => ComputedVecIterator::Eager(vec.into_iter()),
-            ComputedVec::LazyFrom1(v) => ComputedVecIterator::LazyFrom1(v.into_iter()),
-            ComputedVec::LazyFrom2(v) => ComputedVecIterator::LazyFrom2(v.into_iter()),
-            ComputedVec::LazyFrom3(v) => ComputedVecIterator::LazyFrom3(v.into_iter()),
-        }
+        ComputedVecIterator::new(self)
     }
 }
 

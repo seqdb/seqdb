@@ -72,6 +72,35 @@ where
     }
 }
 
+impl<I, T> VecIterator for StoredVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredCompressed,
+{
+    fn set_position_(&mut self, i: usize) {
+        match self {
+            Self::Raw(iter) => iter.set_position_(i),
+            Self::Compressed(iter) => iter.set_position_(i),
+        };
+    }
+
+    fn set_end_(&mut self, i: usize) {
+        match self {
+            Self::Raw(iter) => iter.set_end_(i),
+            Self::Compressed(iter) => iter.set_end_(i),
+        };
+    }
+}
+
+impl<I, T> VecIteratorExtended for StoredVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredCompressed,
+{
+    type I = I;
+    type T = T;
+}
+
 impl<I, T> ExactSizeIterator for StoredVecIterator<'_, I, T>
 where
     I: StoredIndex,
@@ -91,47 +120,4 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-}
-
-impl<I, T> VecIterator for StoredVecIterator<'_, I, T>
-where
-    I: StoredIndex,
-    T: StoredCompressed,
-{
-    fn set_position_(&mut self, i: usize) {
-        match self {
-            Self::Raw(iter) => iter.set_position_(i),
-            Self::Compressed(iter) => iter.set_position_(i),
-        };
-    }
-
-    fn set_end_(&mut self, i: usize) {
-        match self {
-            Self::Raw(iter) => iter.set_end_(i),
-            Self::Compressed(iter) => iter.set_end_(i),
-        };
-    }
-
-    fn skip_optimized(self, n: usize) -> Self {
-        match self {
-            Self::Raw(iter) => Self::Raw(iter.skip_optimized(n)),
-            Self::Compressed(iter) => Self::Compressed(iter.skip_optimized(n)),
-        }
-    }
-
-    fn take_optimized(self, n: usize) -> Self {
-        match self {
-            Self::Raw(iter) => Self::Raw(iter.take_optimized(n)),
-            Self::Compressed(iter) => Self::Compressed(iter.take_optimized(n)),
-        }
-    }
-}
-
-impl<I, T> VecIteratorExtended for StoredVecIterator<'_, I, T>
-where
-    I: StoredIndex,
-    T: StoredCompressed,
-{
-    type I = I;
-    type T = T;
 }

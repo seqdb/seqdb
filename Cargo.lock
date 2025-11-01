@@ -1718,6 +1718,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sonic-rs",
+ "tempfile",
  "vecdb_derive",
  "zerocopy",
 ]

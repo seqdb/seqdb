@@ -126,24 +126,6 @@ where
     }
 }
 
-impl<I, T> ExactSizeIterator for DirtyCompressedVecIterator<'_, I, T>
-where
-    I: StoredIndex,
-    T: StoredCompressed,
-{
-    #[inline(always)]
-    fn len(&self) -> usize {
-        self.remaining()
-    }
-}
-
-impl<I, T> FusedIterator for DirtyCompressedVecIterator<'_, I, T>
-where
-    I: StoredIndex,
-    T: StoredCompressed,
-{
-}
-
 impl<I, T> VecIterator for DirtyCompressedVecIterator<'_, I, T>
 where
     I: StoredIndex,
@@ -161,21 +143,6 @@ where
     fn set_end_(&mut self, i: usize) {
         self.set_absolute_end(i);
     }
-
-    fn skip_optimized(mut self, n: usize) -> Self {
-        let stored_skip = n.min(self.inner.stored_len.saturating_sub(self.index));
-        if stored_skip > 0 {
-            self.inner = self.inner.skip_optimized(stored_skip);
-        }
-        self.index = self.index.saturating_add(n).min(self.vec_len());
-        self
-    }
-
-    fn take_optimized(mut self, n: usize) -> Self {
-        let absolute_end = self.index.saturating_add(n);
-        self.set_absolute_end(absolute_end);
-        self
-    }
 }
 
 impl<I, T> VecIteratorExtended for DirtyCompressedVecIterator<'_, I, T>
@@ -185,4 +152,22 @@ where
 {
     type I = I;
     type T = T;
+}
+
+impl<I, T> ExactSizeIterator for DirtyCompressedVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredCompressed,
+{
+    #[inline(always)]
+    fn len(&self) -> usize {
+        self.remaining()
+    }
+}
+
+impl<I, T> FusedIterator for DirtyCompressedVecIterator<'_, I, T>
+where
+    I: StoredIndex,
+    T: StoredCompressed,
+{
 }

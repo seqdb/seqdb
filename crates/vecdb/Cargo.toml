@@ -28,5 +28,8 @@ sonic-rs = "0.5.5"
 vecdb_derive = { workspace = true, optional = true }
 zerocopy = { workspace = true }
 
+[dev-dependencies]
+tempfile = "3.23.0"
+
 [package.metadata.docs.rs]
 all-features = true

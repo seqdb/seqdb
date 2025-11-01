@@ -18,39 +18,6 @@ seqdb is a lightweight storage engine designed for applications that need to sto
 - **Cross-platform hole punching**: Supports Linux, macOS, and FreeBSD
 - **Thread-safe**: Concurrent access using RwLocks
 
-## Usage
-
-```rust
-use std::{fs, path::Path};
-use seqdb::{Database, PAGE_SIZE, Result};
-
-fn main() -> Result<()> {
-    // Create or open a database
-    let database = Database::open(Path::new("my_db"))?;
-
-    // Create a region
-    let (region_id, _) = database.create_region_if_needed("my_region")?;
-
-    // Write data to the region
-    database.write_all_to_region(region_id.into(), b"Hello, world!")?;
-
-    // Write at a specific offset
-    database.write_all_to_region_at(region_id.into(), b"Hi", 0)?;
-
-    // Read data using a reader
-    let reader = database.create_region_reader(region_id.into())?;
-    let data = reader.read_all();
-
-    // Truncate region to specific length
-    database.truncate_region(region_id.into(), 5)?;
-
-    // Flush changes and reclaim space
-    database.flush_then_punch()?;
-
-    Ok(())
-}
-```
-
 ## Core Types
 
 - **`Database`**: Main entry point for database operations
