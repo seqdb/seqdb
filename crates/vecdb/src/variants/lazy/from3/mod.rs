@@ -2,14 +2,18 @@ use allocative::Allocative;
 
 use crate::{
     AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BoxedVecIterator,
-    CollectableVec, StoredIndex, StoredRaw, VecIterator, Version,
+    CollectableVec, StoredIndex, StoredRaw, VecIteratorExtended, Version,
 };
+
+mod iterator;
+
+pub use iterator::*;
 
 pub type ComputeFrom3<I, T, S1I, S1T, S2I, S2T, S3I, S3T> = for<'a> fn(
     I,
-    &mut dyn VecIterator<Item = (S1I, S1T)>,
-    &mut dyn VecIterator<Item = (S2I, S2T)>,
-    &mut dyn VecIterator<Item = (S3I, S3T)>,
+    &mut dyn VecIteratorExtended<I = S1I, T = S1T, Item = S1T>,
+    &mut dyn VecIteratorExtended<I = S2I, T = S2T, Item = S2T>,
+    &mut dyn VecIteratorExtended<I = S3I, T = S3T, Item = S3T>,
 ) -> Option<T>;
 
 #[derive(Clone, Allocative)]
@@ -78,91 +82,6 @@ where
     }
 }
 
-pub struct LazyVecFrom3Iterator<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T>
-where
-    S1T: Clone,
-    S2T: Clone,
-    S3T: Clone,
-{
-    lazy: &'a LazyVecFrom3<I, T, S1I, S1T, S2I, S2T, S3I, S3T>,
-    source1: BoxedVecIterator<'a, S1I, S1T>,
-    source2: BoxedVecIterator<'a, S2I, S2T>,
-    source3: BoxedVecIterator<'a, S3I, S3T>,
-    index: usize,
-}
-
-impl<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T> Iterator
-    for LazyVecFrom3Iterator<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T>
-where
-    I: StoredIndex,
-    T: StoredRaw + 'a,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
-    S3I: StoredIndex,
-    S3T: StoredRaw,
-{
-    type Item = T;
-
-    #[inline(always)]
-    fn next(&mut self) -> Option<Self::Item> {
-        let index = I::from(self.index);
-        let opt = (self.lazy.compute)(
-            index,
-            &mut *self.source1,
-            &mut *self.source2,
-            &mut *self.source3,
-        )
-        .map(|v| (index, v));
-        if opt.is_some() {
-            self.index += 1;
-        }
-        opt
-    }
-}
-
-impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> VecIterator
-    for LazyVecFrom3Iterator<'_, I, T, S1I, S1T, S2I, S2T, S3I, S3T>
-where
-    I: StoredIndex,
-    T: StoredRaw,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
-    S3I: StoredIndex,
-    S3T: StoredRaw,
-{
-    fn skip_optimized(self, n: usize) -> Self {
-        todo!();
-    }
-
-    fn take_optimized(self, n: usize) -> Self {
-        todo!();
-    }
-
-    // #[inline]
-    // fn len(&self) -> usize {
-    //     let len1 = if self.source1.index_type_to_string() == I::to_string() {
-    //         self.source1.len()
-    //     } else {
-    //         usize::MAX
-    //     };
-    //     let len2 = if self.source2.index_type_to_string() == I::to_string() {
-    //         self.source2.len()
-    //     } else {
-    //         usize::MAX
-    //     };
-    //     let len3 = if self.source3.index_type_to_string() == I::to_string() {
-    //         self.source3.len()
-    //     } else {
-    //         usize::MAX
-    //     };
-    //     len1.min(len2).min(len3)
-    // }
-}
-
 impl<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T> IntoIterator
     for &'a LazyVecFrom3<I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where
@@ -175,7 +94,7 @@ where
     S3I: StoredIndex,
     S3T: StoredRaw,
 {
-    type Item = (I, T);
+    type Item = T;
     type IntoIter = LazyVecFrom3Iterator<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T>;
 
     fn into_iter(self) -> Self::IntoIter {

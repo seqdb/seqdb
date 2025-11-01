@@ -1,7 +1,7 @@
-mod lazy1;
-mod lazy2;
-mod lazy3;
+mod from1;
+mod from2;
+mod from3;
 
-pub use lazy1::*;
-pub use lazy2::*;
-pub use lazy3::*;
+pub use from1::*;
+pub use from2::*;
+pub use from3::*;

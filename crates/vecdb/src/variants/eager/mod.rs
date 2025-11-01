@@ -86,8 +86,9 @@ where
     {
         self.validate_computed_version_or_reset(Version::ZERO + self.inner_version() + version)?;
 
-        let index = max_from.min(I::from(self.len()));
-        (index.to_usize()..to).try_for_each(|i| {
+        let from = max_from.to_usize().min(self.len());
+
+        (from..to).try_for_each(|i| {
             let (i, v) = t(I::from(i));
             self.forced_push_at(i, v, exit)
         })?;
@@ -144,9 +145,10 @@ where
             Version::ZERO + self.inner_version() + other.version(),
         )?;
 
-        let index = max_from.min(A::from(self.len()));
-        other.iter().skip_optimized(index).try_for_each(|(a, b)| {
-            let (i, v) = t((a, b, self));
+        let skip = max_from.to_usize().min(self.len());
+
+        other.iter().enumerate().skip(skip).try_for_each(|(a, b)| {
+            let (i, v) = t((A::from(a), b, self));
             self.forced_push_at(i, v, exit)
         })?;
 
@@ -171,12 +173,18 @@ where
             Version::ZERO + self.inner_version() + other1.version() + other2.version(),
         )?;
 
-        let index = max_from.min(A::from(self.len()));
-        let mut iter2 = other2.iter().skip_optimized(index);
-        other1.iter().skip_optimized(index).try_for_each(|(a, b)| {
-            let (i, v) = t((a, b, iter2.unwrap_get_inner(a), self));
-            self.forced_push_at(i, v, exit)
-        })?;
+        let skip = max_from.to_usize().min(self.len());
+
+        let mut iter2 = other2.iter().skip(skip);
+
+        other1
+            .iter()
+            .enumerate()
+            .skip(skip)
+            .try_for_each(|(a, b)| {
+                let (i, v) = t((A::from(a), b, iter2.next().unwrap(), self));
+                self.forced_push_at(i, v, exit)
+            })?;
 
         self.safe_flush(exit)
     }
@@ -205,19 +213,25 @@ where
                 + other3.version(),
         )?;
 
-        let index = max_from.min(A::from(self.len()));
-        let mut iter2 = other2.iter().skip_optimized(index);
-        let mut iter3 = other3.iter().skip_optimized(index);
-        other1.iter().skip_optimized(index).try_for_each(|(a, b)| {
-            let (i, v) = t((
-                a,
-                b,
-                iter2.unwrap_get_inner(a),
-                iter3.unwrap_get_inner(a),
-                self,
-            ));
-            self.forced_push_at(i, v, exit)
-        })?;
+        let skip = max_from.to_usize().min(self.len());
+
+        let mut iter2 = other2.iter().skip(skip);
+        let mut iter3 = other3.iter().skip(skip);
+
+        other1
+            .iter()
+            .enumerate()
+            .skip(skip)
+            .try_for_each(|(a, b)| {
+                let (i, v) = t((
+                    A::from(a),
+                    b,
+                    iter2.next().unwrap(),
+                    iter3.next().unwrap(),
+                    self,
+                ));
+                self.forced_push_at(i, v, exit)
+            })?;
 
         self.safe_flush(exit)
     }
@@ -232,20 +246,13 @@ where
     where
         T: Add<Output = T>,
     {
-        self.validate_computed_version_or_reset(
-            Version::ZERO + self.inner_version() + added.version() + adder.version(),
-        )?;
-
-        let index = max_from.min(I::from(self.len()));
-        let mut adder_iter = adder.iter();
-
-        added.iter().skip_optimized(index).try_for_each(|(i, v)| {
-            let v = v + adder_iter.unwrap_get_inner(i);
-
-            self.forced_push_at(i, v, exit)
-        })?;
-
-        self.safe_flush(exit)
+        self.compute_transform2(
+            max_from,
+            added,
+            adder,
+            |(i, v1, v2, ..)| (i, (v1 + v2)),
+            exit,
+        )
     }
 
     pub fn compute_subtract(
@@ -258,23 +265,55 @@ where
     where
         T: CheckedSub,
     {
-        self.validate_computed_version_or_reset(
-            Version::ZERO + self.inner_version() + subtracted.version() + subtracter.version(),
-        )?;
+        self.compute_transform2(
+            max_from,
+            subtracted,
+            subtracter,
+            |(i, v1, v2, ..)| (i, (v1.checked_sub(v2).unwrap())),
+            exit,
+        )
+    }
 
-        let index = max_from.min(I::from(self.len()));
-        let mut subtracter_iter = subtracter.iter();
+    pub fn compute_multiply<T2, T3>(
+        &mut self,
+        max_from: I,
+        multiplied: &impl AnyIterableVec<I, T2>,
+        multiplier: &impl AnyIterableVec<I, T3>,
+        exit: &Exit,
+    ) -> Result<()>
+    where
+        T2: StoredRaw,
+        T3: StoredRaw,
+        T: From<T2> + Mul<T3, Output = T>,
+    {
+        self.compute_transform2(
+            max_from,
+            multiplied,
+            multiplier,
+            |(i, v1, v2, ..)| (i, T::from(v1) * v2),
+            exit,
+        )
+    }
 
-        subtracted
-            .iter()
-            .skip_optimized(index)
-            .try_for_each(|(i, v)| {
-                let v = v.checked_sub(subtracter_iter.unwrap_get_inner(i)).unwrap();
-
-                self.forced_push_at(i, v, exit)
-            })?;
-
-        self.safe_flush(exit)
+    pub fn compute_divide<T2, T3>(
+        &mut self,
+        max_from: I,
+        divided: &impl AnyIterableVec<I, T2>,
+        divider: &impl AnyIterableVec<I, T3>,
+        exit: &Exit,
+    ) -> Result<()>
+    where
+        T2: StoredRaw,
+        T3: StoredRaw,
+        T: From<T2> + Mul<usize, Output = T> + Div<T3, Output = T> + CheckedSub<usize>,
+    {
+        self.compute_transform2(
+            max_from,
+            divided,
+            divider,
+            |(i, v1, v2, ..)| (i, T::from(v1) / v2),
+            exit,
+        )
     }
 
     pub fn compute_all_time_high<T2>(
@@ -287,30 +326,25 @@ where
         T: From<T2> + Ord,
         T2: StoredRaw,
     {
-        self.validate_computed_version_or_reset(
-            Version::ZERO + self.inner_version() + source.version(),
-        )?;
-
-        let index = max_from.min(I::from(self.len()));
-
         let mut prev = None;
-
-        source.iter().skip_optimized(index).try_for_each(|(i, v)| {
-            if prev.is_none() {
-                let i = i.to_usize();
-                prev.replace(if i > 0 {
-                    self.into_iter().unwrap_get_inner_(i - 1)
-                } else {
-                    T::from(source.iter().unwrap_get_inner_(0))
-                });
-            }
-            let max = prev.unwrap().max(T::from(v));
-            prev.replace(max);
-
-            self.forced_push_at(i, max, exit)
-        })?;
-
-        self.safe_flush(exit)
+        self.compute_transform(
+            max_from,
+            source,
+            |(i, v, this)| {
+                if prev.is_none() {
+                    let i = i.to_usize();
+                    prev.replace(if i > 0 {
+                        this.into_iter().nth(i - 1).unwrap()
+                    } else {
+                        T::from(source.iter().next().unwrap())
+                    });
+                }
+                let max = prev.unwrap().max(T::from(v));
+                prev.replace(max);
+                (i, max)
+            },
+            exit,
+        )
     }
 
     pub fn compute_all_time_low<T2>(
@@ -337,99 +371,31 @@ where
         T: From<T2> + Ord + Default,
         T2: StoredRaw,
     {
-        self.validate_computed_version_or_reset(
-            Version::ONE + self.inner_version() + source.version(),
-        )?;
-
-        let index = max_from.min(I::from(self.len()));
-
         let mut prev = None;
+        self.compute_transform(
+            max_from,
+            source,
+            |(i, v, this)| {
+                if prev.is_none() {
+                    let i = i.to_usize();
+                    prev.replace(if i > 0 {
+                        this.iter().nth(i - 1).unwrap()
+                    } else {
+                        T::from(source.iter().next().unwrap())
+                    });
+                }
+                let v = T::from(v);
+                let min = prev.unwrap().min(v);
 
-        source.iter().skip_optimized(index).try_for_each(|(i, v)| {
-            if prev.is_none() {
-                let i = i.to_usize();
-                prev.replace(if i > 0 {
-                    self.into_iter().unwrap_get_inner_(i - 1)
+                prev.replace(if !exclude_default || min != T::default() {
+                    min
                 } else {
-                    T::from(source.iter().unwrap_get_inner_(0))
+                    prev.unwrap().max(v)
                 });
-            }
-            let v = T::from(v);
-            let min = prev.unwrap().min(v);
-
-            prev.replace(if !exclude_default || min != T::default() {
-                min
-            } else {
-                prev.unwrap().max(v)
-            });
-
-            self.forced_push_at(i, min, exit)
-        })?;
-
-        self.safe_flush(exit)
-    }
-
-    pub fn compute_multiply<T2, T3>(
-        &mut self,
-        max_from: I,
-        multiplied: &impl AnyIterableVec<I, T2>,
-        multiplier: &impl AnyIterableVec<I, T3>,
-        exit: &Exit,
-    ) -> Result<()>
-    where
-        T2: StoredRaw,
-        T3: StoredRaw,
-        T: From<T2> + Mul<T3, Output = T>,
-    {
-        self.validate_computed_version_or_reset(
-            Version::ZERO + self.inner_version() + multiplied.version() + multiplier.version(),
-        )?;
-
-        let index = max_from.min(I::from(self.len()));
-        let mut multiplier_iter = multiplier.iter();
-
-        multiplied
-            .iter()
-            .skip_optimized(index)
-            .try_for_each(|(i, v)| {
-                let multiplied = T::from(v);
-                let multiplier = multiplier_iter.unwrap_get_inner(i);
-                let result = multiplied * multiplier;
-                self.forced_push_at(i, result, exit)
-            })?;
-
-        self.safe_flush(exit)
-    }
-
-    pub fn compute_divide<T2, T3>(
-        &mut self,
-        max_from: I,
-        divided: &impl AnyIterableVec<I, T2>,
-        divider: &impl AnyIterableVec<I, T3>,
-        exit: &Exit,
-    ) -> Result<()>
-    where
-        T2: StoredRaw,
-        T3: StoredRaw,
-        T: From<T2> + Mul<usize, Output = T> + Div<T3, Output = T> + CheckedSub<usize>,
-    {
-        self.validate_computed_version_or_reset(
-            Version::ONE + self.inner_version() + divided.version() + divider.version(),
-        )?;
-
-        let index = max_from.min(I::from(self.len()));
-
-        let mut divider_iter = divider.iter();
-        divided
-            .iter()
-            .skip_optimized(index)
-            .try_for_each(|(i, divided)| {
-                let divided = T::from(divided);
-                let divider = divider_iter.unwrap_get_inner(i);
-                self.forced_push_at(i, divided / divider, exit)
-            })?;
-
-        self.safe_flush(exit)
+                (i, min)
+            },
+            exit,
+        )
     }
 
     pub fn compute_percentage<T2, T3>(
@@ -475,34 +441,26 @@ where
         T3: StoredRaw,
         T: From<T2> + From<T3> + Mul<usize, Output = T> + Div<T, Output = T> + CheckedSub<usize>,
     {
-        self.validate_computed_version_or_reset(
-            Version::ONE + self.inner_version() + divided.version() + divider.version(),
-        )?;
-
-        let index = max_from.min(I::from(self.len()));
         let multiplier = 100;
-
-        let mut divider_iter = divider.iter();
-        divided
-            .iter()
-            .skip_optimized(index)
-            .try_for_each(|(i, divided)| {
-                let divided = T::from(divided);
-                let divider = T::from(divider_iter.unwrap_get_inner(i));
-
+        self.compute_transform2(
+            max_from,
+            divided,
+            divider,
+            |(i, v1, v2, ..)| {
+                let divided = T::from(v1);
+                let divider = T::from(v2);
                 let v = divided * multiplier;
-
                 let mut v = v / divider;
                 if as_difference {
                     v = v.checked_sub(multiplier).unwrap();
                 }
-                self.forced_push_at(i, v, exit)
-            })?;
-
-        self.safe_flush(exit)
+                (i, v)
+            },
+            exit,
+        )
     }
 
-    pub fn compute_inverse_more_to_less(
+    pub fn compute_coarser(
         &mut self,
         max_from: T,
         other: &impl AnyIterableVec<T, I>,
@@ -516,17 +474,24 @@ where
             Version::ZERO + self.inner_version() + other.version(),
         )?;
 
-        let index =
-            max_from.min(VecIterator::last(self.into_iter()).map_or_else(T::default, |(_, v)| v));
+        let skip = max_from
+            .to_usize()
+            .min(self.iter().last().map_or(0_usize, |v| v.to_usize()));
+
         let mut prev_i = None;
         other
             .iter()
-            .skip_optimized(index)
+            .enumerate()
+            .skip(skip)
             .try_for_each(|(v, i)| -> Result<()> {
+                let v = T::from(v);
                 if prev_i.is_some_and(|prev_i| prev_i == i) {
                     return Ok(());
                 }
-                if self.iter().get_inner(i).is_none_or(|old_v| old_v > v) {
+                if self
+                    .one_shot_get_pushed_or_read(i)?
+                    .is_none_or(|old_v| old_v > v)
+                {
                     self.forced_push_at(i, v, exit)?;
                 }
                 prev_i.replace(i);
@@ -536,41 +501,42 @@ where
         self.safe_flush(exit)
     }
 
-    pub fn compute_inverse_less_to_more<T2>(
-        &mut self,
-        max_from: T,
-        first_indexes: &impl AnyIterableVec<T, I>,
-        indexes_count: &impl AnyIterableVec<T, T2>,
-        exit: &Exit,
-    ) -> Result<()>
-    where
-        I: StoredRaw,
-        T: StoredIndex,
-        T2: StoredRaw,
-        usize: From<T2>,
-    {
-        self.validate_computed_version_or_reset(
-            Version::ZERO
-                + self.inner_version()
-                + first_indexes.version()
-                + indexes_count.version(),
-        )?;
+    // pub fn compute_granular<T2>(
+    //     &mut self,
+    //     max_from: T,
+    //     first_indexes: &impl AnyIterableVec<T, I>,
+    //     indexes_count: &impl AnyIterableVec<T, T2>,
+    //     exit: &Exit,
+    // ) -> Result<()>
+    // where
+    //     I: StoredRaw,
+    //     T: StoredIndex,
+    //     T2: StoredRaw,
+    //     usize: From<T2>,
+    // {
+    //     self.validate_computed_version_or_reset(
+    //         Version::ZERO
+    //             + self.inner_version()
+    //             + first_indexes.version()
+    //             + indexes_count.version(),
+    //     )?;
 
-        let mut indexes_count_iter = indexes_count.iter();
+    //     let mut indexes_count_iter = indexes_count.iter();
 
-        let index = max_from.min(T::from(self.len()));
-        first_indexes
-            .iter()
-            .skip_optimized(index)
-            .try_for_each(|(value, first_index)| {
-                let first_index = first_index.to_usize();
-                let count = usize::from(indexes_count_iter.unwrap_get_inner(value));
-                (first_index..first_index + count)
-                    .try_for_each(|index| self.forced_push_at(I::from(index), value, exit))
-            })?;
+    //     let index = max_from.to_usize().min(self.len());
+    //     first_indexes
+    //         .iter()
+    //         .enumerate()
+    //         .skip(skip)
+    //         .try_for_each(|(value, first_index)| {
+    //             let first_index = first_index.to_usize();
+    //             let count = usize::from(indexes_count_iter.unsafe_get_(value));
+    //             (first_index..first_index + count)
+    //                 .try_for_each(|index| self.forced_push_at_(index, value, exit))
+    //         })?;
 
-        self.safe_flush(exit)
-    }
+    //     self.safe_flush(exit)
+    // }
 
     pub fn compute_count_from_indexes<T2, T3>(
         &mut self,
@@ -653,13 +619,14 @@ where
         )?;
 
         let mut other_iter = first_indexes.iter();
-        let index = max_from.min(I::from(self.len()));
+        let skip = max_from.to_usize().min(self.len());
         first_indexes
             .iter()
-            .skip_optimized(index)
+            .enumerate()
+            .skip(skip)
             .try_for_each(|(i, first_index)| {
                 let end = other_iter
-                    .get_inner(i + 1)
+                    .get_(i + 1)
                     .map(|v| v.to_usize())
                     .unwrap_or_else(|| other_to_else.len());
 
@@ -669,7 +636,7 @@ where
                 } else {
                     range.count()
                 };
-                self.forced_push_at(i, T::from(T2::from(count)), exit)
+                self.forced_push_at_(i, T::from(T2::from(count)), exit)
             })?;
 
         self.safe_flush(exit)
@@ -695,14 +662,15 @@ where
         )?;
 
         let mut other_to_self_iter = other_to_self.iter();
-        let index = max_from.min(I::from(self.len()));
+        let skip = max_from.to_usize().min(self.len());
         self_to_other
             .iter()
-            .skip_optimized(index)
+            .enumerate()
+            .skip(skip)
             .try_for_each(|(i, other)| {
-                self.forced_push_at(
+                self.forced_push_at_(
                     i,
-                    T::from(other_to_self_iter.unwrap_get_inner(other) == i),
+                    T::from(other_to_self_iter.unsafe_get(other).to_usize() == i),
                     exit,
                 )
             })?;
@@ -725,11 +693,14 @@ where
             Version::ZERO + self.inner_version() + source.version(),
         )?;
 
-        let index = max_from.min(I::from(self.len()));
+        let skip = max_from.to_usize().min(self.len());
+
         let mut prev = VecDeque::new();
+
         source
             .iter()
-            .skip_optimized_((index.to_usize()).checked_sub(window).unwrap_or_default())
+            .enumerate()
+            .skip(skip.checked_sub(window).unwrap_or_default())
             .try_for_each(|(i, value)| {
                 let value = value;
 
@@ -742,13 +713,13 @@ where
 
                 prev.push_back(value);
 
-                if i < index {
+                if i < skip {
                     return Ok(());
                 }
 
                 let v = prev.iter().max().cloned().unwrap();
 
-                self.forced_push_at(i, T::from(v), exit)
+                self.forced_push_at_(i, T::from(v), exit)
             })?;
 
         self.safe_flush(exit)
@@ -769,11 +740,14 @@ where
             Version::ZERO + self.inner_version() + source.version(),
         )?;
 
-        let index = max_from.min(I::from(self.len()));
+        let skip = max_from.to_usize().min(self.len());
+
         let mut prev = VecDeque::new();
+
         source
             .iter()
-            .skip_optimized_((index.to_usize()).checked_sub(window).unwrap_or_default())
+            .enumerate()
+            .skip(skip.checked_sub(window).unwrap_or_default())
             .try_for_each(|(i, value)| {
                 let value = value;
 
@@ -786,13 +760,13 @@ where
 
                 prev.push_back(value);
 
-                if i < index {
+                if i < skip {
                     return Ok(());
                 }
 
                 let v = prev.iter().min().cloned().unwrap();
 
-                self.forced_push_at(i, T::from(v), exit)
+                self.forced_push_at_(i, T::from(v), exit)
             })?;
 
         self.safe_flush(exit)
@@ -813,19 +787,20 @@ where
             Version::ONE + self.inner_version() + source.version(),
         )?;
 
-        let index = max_from.min(I::from(self.len()));
+        let skip = max_from.to_usize().min(self.len());
         let mut prev = None;
         let mut other_iter = source.iter();
         source
             .iter()
-            .skip_optimized(index)
+            .enumerate()
+            .skip(skip)
             .try_for_each(|(i, value)| {
                 let value = T::from(value);
 
                 if prev.is_none() {
                     let i = i.to_usize();
                     prev.replace(if i > 0 {
-                        self.into_iter().unwrap_get_inner_(i - 1)
+                        self.into_iter().unsafe_get_(i - 1)
                     } else {
                         T::default()
                     });
@@ -836,16 +811,15 @@ where
 
                 let sum = if processed_values_count > len {
                     let prev_sum = prev.unwrap();
-                    let value_to_subtract = T::from(
-                        other_iter.unwrap_get_inner_(i.to_usize().checked_sub(len).unwrap()),
-                    );
+                    let value_to_subtract =
+                        T::from(other_iter.unsafe_get_(i.to_usize().checked_sub(len).unwrap()));
                     prev_sum.checked_sub(value_to_subtract).unwrap() + value
                 } else {
                     prev.unwrap() + value
                 };
 
                 prev.replace(sum);
-                self.forced_push_at(i, sum, exit)
+                self.forced_push_at_(i, sum, exit)
             })?;
 
         self.safe_flush(exit)
@@ -874,19 +848,20 @@ where
 
         let mut indexes_count_iter = indexes_count.iter();
         let mut source_iter = source.iter();
-        let index = max_from.min(I::from(self.len()));
+        let skip = max_from.to_usize().min(self.len());
         first_indexes
             .iter()
-            .skip_optimized(index)
+            .enumerate()
+            .skip(skip)
             .try_for_each(|(i, first_index)| {
-                let count = usize::from(indexes_count_iter.unwrap_get_inner(i));
+                let count = usize::from(indexes_count_iter.unsafe_get_(i));
                 let first_index = first_index.to_usize();
                 let range = first_index..first_index + count;
                 let mut sum = T::from(0_usize);
                 range.into_iter().for_each(|i| {
-                    sum = sum + source_iter.unwrap_get_inner(T2::from(i));
+                    sum = sum + source_iter.unsafe_get_(i);
                 });
-                self.forced_push_at(i, sum, exit)
+                self.forced_push_at_(i, sum, exit)
             })?;
 
         self.safe_flush(exit)
@@ -911,18 +886,19 @@ where
 
         let mut others_iter = others[1..].iter().map(|v| v.iter()).collect::<Vec<_>>();
 
-        let index = max_from.min(I::from(self.len()));
+        let skip = max_from.to_usize().min(self.len());
         others
             .first()
             .unwrap()
             .iter()
-            .skip_optimized(index)
+            .enumerate()
+            .skip(skip)
             .try_for_each(|(i, v)| {
                 let mut sum = v;
                 others_iter.iter_mut().for_each(|iter| {
-                    sum = sum + iter.unwrap_get_inner(i);
+                    sum = sum + iter.unsafe_get_(i);
                 });
-                self.forced_push_at(i, sum, exit)
+                self.forced_push_at_(i, sum, exit)
             })?;
 
         self.safe_flush(exit)
@@ -947,20 +923,22 @@ where
 
         let mut others_iter = others[1..].iter().map(|v| v.iter()).collect::<Vec<_>>();
 
-        let index = max_from.min(I::from(self.len()));
+        let skip = max_from.to_usize().min(self.len());
+
         others
             .first()
             .unwrap()
             .iter()
-            .skip_optimized(index)
+            .enumerate()
+            .skip(skip)
             .try_for_each(|(i, v)| {
                 let min = v;
                 let min = others_iter
                     .iter_mut()
-                    .map(|iter| iter.unwrap_get_inner(i))
+                    .map(|iter| iter.unsafe_get_(i))
                     .min()
                     .map_or(min, |min2| min.min(min2));
-                self.forced_push_at(i, min, exit)
+                self.forced_push_at_(i, min, exit)
             })?;
 
         self.safe_flush(exit)
@@ -985,20 +963,22 @@ where
 
         let mut others_iter = others[1..].iter().map(|v| v.iter()).collect::<Vec<_>>();
 
-        let index = max_from.min(I::from(self.len()));
+        let skip = max_from.to_usize().min(self.len());
+
         others
             .first()
             .unwrap()
             .iter()
-            .skip_optimized(index)
+            .enumerate()
+            .skip(skip)
             .try_for_each(|(i, v)| {
                 let max = v;
                 let max = others_iter
                     .iter_mut()
-                    .map(|iter| iter.unwrap_get_inner(i))
+                    .map(|iter| iter.unsafe_get_(i))
                     .max()
                     .map_or(max, |max2| max.max(max2));
-                self.forced_push_at(i, max, exit)
+                self.forced_push_at_(i, max, exit)
             })?;
 
         self.safe_flush(exit)
@@ -1036,13 +1016,16 @@ where
             Version::ONE + self.inner_version() + source.version(),
         )?;
 
-        let index = max_from.min(I::from(self.len()));
+        let skip = max_from.to_usize().min(self.len());
         let mut prev = None;
-        let min_prev_i = min_i.unwrap_or_default().to_usize();
+        let min_i = min_i.map(|i| i.to_usize());
+        let min_prev_i = min_i.unwrap_or_default();
         let mut other_iter = source.iter();
+
         source
             .iter()
-            .skip_optimized(index)
+            .enumerate()
+            .skip(skip)
             .try_for_each(|(i, value)| {
                 let value = value;
 
@@ -1050,7 +1033,7 @@ where
                     if prev.is_none() {
                         let i = i.to_usize();
                         prev.replace(if i > min_prev_i {
-                            self.into_iter().unwrap_get_inner_(i - 1)
+                            self.into_iter().unsafe_get_(i - 1)
                         } else {
                             T::from(0.0)
                         });
@@ -1064,7 +1047,7 @@ where
                     let sma = T::from(if processed_values_count > sma {
                         let prev_sum = f32::from(prev.unwrap()) * len as f32;
                         let value_to_subtract = f32::from(
-                            other_iter.unwrap_get_inner_(i.to_usize().checked_sub(sma).unwrap()),
+                            other_iter.unsafe_get_(i.to_usize().checked_sub(sma).unwrap()),
                         );
                         (prev_sum - value_to_subtract + value) / len as f32
                     } else {
@@ -1072,9 +1055,9 @@ where
                     });
 
                     prev.replace(sma);
-                    self.forced_push_at(i, sma, exit)
+                    self.forced_push_at_(i, sma, exit)
                 } else {
-                    self.forced_push_at(i, T::from(f32::NAN), exit)
+                    self.forced_push_at_(i, T::from(f32::NAN), exit)
                 }
             })?;
 
@@ -1117,12 +1100,15 @@ where
         let k = smoothing / (ema as f32 + 1.0);
         let _1_minus_k = 1.0 - k;
 
-        let index = max_from.min(I::from(self.len()));
+        let skip = max_from.to_usize().min(self.len());
         let mut prev = None;
-        let min_prev_i = min_i.unwrap_or_default().to_usize();
+        let min_i = min_i.map(|i| i.to_usize());
+        let min_prev_i = min_i.unwrap_or_default();
+
         source
             .iter()
-            .skip_optimized(index)
+            .enumerate()
+            .skip(skip)
             .try_for_each(|(index, value)| {
                 let value = value;
 
@@ -1131,7 +1117,7 @@ where
 
                     if prev.is_none() {
                         prev.replace(if i > min_prev_i {
-                            self.into_iter().unwrap_get_inner_(i - 1)
+                            self.into_iter().unsafe_get_(i - 1)
                         } else {
                             T::from(0.0)
                         });
@@ -1152,9 +1138,9 @@ where
                     };
 
                     prev.replace(ema);
-                    self.forced_push_at(index, ema, exit)
+                    self.forced_push_at_(index, ema, exit)
                 } else {
-                    self.forced_push_at(index, T::from(f32::NAN), exit)
+                    self.forced_push_at_(index, T::from(f32::NAN), exit)
                 }
             })?;
 
@@ -1178,17 +1164,18 @@ where
             Version::ZERO + self.inner_version() + source.version(),
         )?;
 
-        let index = max_from.min(I::from(self.len()));
+        let skip = max_from.to_usize().min(self.len());
         let mut source_iter = source.iter();
-        (index.to_usize()..source.len()).try_for_each(|i| {
-            let i = I::from(i);
+
+        (skip.to_usize()..source.len()).try_for_each(|i| {
+            let i = i;
 
             let previous_value = i
-                .checked_sub(I::from(len))
-                .map(|prev_i| f32::from(source_iter.unwrap_get_inner(prev_i)))
+                .checked_sub(len)
+                .map(|prev_i| f32::from(source_iter.unsafe_get_(prev_i)))
                 .unwrap_or(f32::NAN);
 
-            self.forced_push_at(i, T::from(previous_value), exit)
+            self.forced_push_at_(i, T::from(previous_value), exit)
         })?;
 
         self.safe_flush(exit)
@@ -1209,18 +1196,20 @@ where
             Version::ZERO + self.inner_version() + source.version(),
         )?;
 
-        let index = max_from.min(I::from(self.len()));
+        let skip = max_from.to_usize().min(self.len());
         let mut source_iter = source.iter();
+
         source
             .iter()
-            .skip_optimized(index)
+            .enumerate()
+            .skip(skip)
             .try_for_each(|(i, current)| {
                 let prev = i
-                    .checked_sub(I::from(len))
-                    .map(|prev_i| source_iter.unwrap_get_inner(prev_i))
+                    .checked_sub(len)
+                    .map(|prev_i| source_iter.unsafe_get_(prev_i))
                     .unwrap_or_default();
 
-                self.forced_push_at(i, current.checked_sub(prev).unwrap(), exit)
+                self.forced_push_at_(i, current.checked_sub(prev).unwrap(), exit)
             })?;
 
         self.safe_flush(exit)
@@ -1243,21 +1232,25 @@ where
             Version::ZERO + self.inner_version() + source.version(),
         )?;
 
-        let index = max_from.min(I::from(self.len()));
+        let skip = max_from.to_usize().min(self.len());
         let mut source_iter = source.iter();
-        source.iter().skip_optimized(index).try_for_each(|(i, b)| {
-            let previous_value = f32::from(
-                i.checked_sub(I::from(len))
-                    .map(|prev_i| source_iter.unwrap_get_inner(prev_i))
-                    .unwrap_or_default(),
-            );
+        source
+            .iter()
+            .enumerate()
+            .skip(skip)
+            .try_for_each(|(i, b)| {
+                let previous_value = f32::from(
+                    i.checked_sub(len)
+                        .map(|prev_i| source_iter.unsafe_get_(prev_i))
+                        .unwrap_or_default(),
+                );
 
-            let last_value = f32::from(b);
+                let last_value = f32::from(b);
 
-            let percentage_change = ((last_value / previous_value) - 1.0) * 100.0;
+                let percentage_change = ((last_value / previous_value) - 1.0) * 100.0;
 
-            self.forced_push_at(i, T::from(percentage_change), exit)
-        })?;
+                self.forced_push_at_(i, T::from(percentage_change), exit)
+            })?;
 
         self.safe_flush(exit)
     }
@@ -1284,17 +1277,18 @@ where
         }
 
         let years = days / 365;
-        let index = max_from.min(I::from(self.len()));
+        let skip = max_from.to_usize().min(self.len());
         percentage_returns
             .iter()
-            .skip_optimized(index)
+            .enumerate()
+            .skip(skip)
             .try_for_each(|(i, percentage)| {
                 let percentage = percentage;
 
                 let cagr = (((f32::from(percentage) / 100.0 + 1.0).powf(1.0 / years as f32)) - 1.0)
                     * 100.0;
 
-                self.forced_push_at(i, T::from(cagr), exit)
+                self.forced_push_at_(i, T::from(cagr), exit)
             })?;
 
         self.safe_flush(exit)
@@ -1323,8 +1317,8 @@ where
             max_from,
             source,
             |(i, ratio, ..)| {
-                let sma = sma_iter.unwrap_get_inner(i);
-                let sd = sd_iter.unwrap_get_inner(i);
+                let sma = sma_iter.unsafe_get(i);
+                let sd = sd_iter.unsafe_get(i);
                 (i, (ratio - sma) / sd)
             },
             exit,

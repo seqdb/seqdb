@@ -1,17 +1,18 @@
 use crate::{
     AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BoxedVecIterator,
-    CollectableVec, Exit, Format, Result, StoredCompressed, StoredIndex, StoredRaw, VecIterator,
-    Version, variants::ImportOptions,
+    CollectableVec, Exit, Format, Result, StoredCompressed, StoredIndex, StoredRaw, Version,
+    variants::ImportOptions,
 };
 
 use super::{
-    ComputeFrom1, ComputeFrom2, ComputeFrom3, EagerVec, LazyVecFrom1, LazyVecFrom1Iterator,
-    LazyVecFrom2, LazyVecFrom2Iterator, LazyVecFrom3, LazyVecFrom3Iterator, StoredVecIterator,
+    ComputeFrom1, ComputeFrom2, ComputeFrom3, EagerVec, LazyVecFrom1, LazyVecFrom2, LazyVecFrom3,
 };
 
 mod computation;
+mod iterator;
 
 pub use computation::*;
+pub use iterator::*;
 use seqdb::Database;
 
 #[derive(Clone)]
@@ -313,73 +314,6 @@ where
     }
 }
 
-pub enum ComputedVecIterator<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T>
-where
-    S1T: Clone,
-    S2T: Clone,
-    S3T: Clone,
-{
-    Eager(StoredVecIterator<'a, I, T>),
-    LazyFrom1(LazyVecFrom1Iterator<'a, I, T, S1I, S1T>),
-    LazyFrom2(LazyVecFrom2Iterator<'a, I, T, S1I, S1T, S2I, S2T>),
-    LazyFrom3(LazyVecFrom3Iterator<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T>),
-}
-
-impl<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T> Iterator
-    for ComputedVecIterator<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T>
-where
-    I: StoredIndex,
-    T: StoredCompressed,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
-    S3I: StoredIndex,
-    S3T: StoredRaw,
-{
-    type Item = T;
-
-    #[inline(always)]
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            Self::Eager(i) => i.next(),
-            Self::LazyFrom1(i) => i.next(),
-            Self::LazyFrom2(i) => i.next(),
-            Self::LazyFrom3(i) => i.next(),
-        }
-    }
-}
-
-impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> VecIterator
-    for ComputedVecIterator<'_, I, T, S1I, S1T, S2I, S2T, S3I, S3T>
-where
-    I: StoredIndex,
-    T: StoredCompressed,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
-    S3I: StoredIndex,
-    S3T: StoredRaw,
-{
-    fn skip_optimized(self, n: usize) -> Self {
-        todo!();
-    }
-
-    fn take_optimized(self, n: usize) -> Self {
-        todo!();
-    }
-
-    // fn len(&self) -> usize {
-    //     match self {
-    //         Self::Eager(i) => i.len(),
-    //         Self::LazyFrom1(i) => i.len(),
-    //         Self::LazyFrom2(i) => i.len(),
-    //         Self::LazyFrom3(i) => i.len(),
-    //     }
-    // }
-}
-
 impl<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T> IntoIterator
     for &'a ComputedVec<I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where
@@ -392,7 +326,7 @@ where
     S3I: StoredIndex,
     S3T: StoredRaw,
 {
-    type Item = (I, T);
+    type Item = T;
     type IntoIter = ComputedVecIterator<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T>;
 
     fn into_iter(self) -> Self::IntoIter {

@@ -9,7 +9,7 @@ use log::info;
 use seqdb::{Reader, RegionReader};
 use zerocopy::FromBytes;
 
-use crate::{_TO_, AnyStoredVec, Error, Exit, Result, Stamp, Version};
+use crate::{AnyStoredVec, Error, Exit, Result, SEPARATOR, Stamp, Version};
 
 const ONE_KIB: usize = 1024;
 const ONE_MIB: usize = ONE_KIB * ONE_KIB;
@@ -52,8 +52,16 @@ where
         self.read_(index, reader).unwrap()
     }
     #[inline]
+    fn one_shot_read(&self, index: I) -> Result<T> {
+        self.read(index, &self.create_reader())
+    }
+    #[inline]
     fn read(&self, index: I, reader: &Reader) -> Result<T> {
         self.read_(index.to_usize(), reader)
+    }
+    #[inline]
+    fn one_shot_read_(&self, index: usize) -> Result<T> {
+        self.read_(index, &self.create_reader())
     }
     fn read_(&self, index: usize, reader: &Reader) -> Result<T>;
     // fn read_into_(&self, index: usize, reader: &Reader, buffer: &mut [u8]) -> Result<T>;
@@ -94,8 +102,16 @@ where
         Ok(Some(self.read_(index, reader)?))
     }
     #[inline]
+    fn one_shot_get_pushed_or_read(&self, index: I) -> Result<Option<T>> {
+        self.get_pushed_or_read(index, &self.create_reader())
+    }
+    #[inline]
     fn get_pushed_or_read(&'_ self, index: I, reader: &Reader) -> Result<Option<T>> {
         self.get_pushed_or_read_(index.to_usize(), reader)
+    }
+    #[inline]
+    fn one_shot_get_pushed_or_read_(&self, index: usize) -> Result<Option<T>> {
+        self.get_pushed_or_read_(index, &self.create_reader())
     }
     #[inline]
     fn get_pushed_or_read_(&'_ self, index: usize, reader: &Reader) -> Result<Option<T>> {
@@ -166,13 +182,18 @@ where
 
     #[inline]
     fn forced_push_at(&mut self, index: I, value: T, exit: &Exit) -> Result<()> {
+        self.forced_push_at_(index.to_usize(), value, exit)
+    }
+
+    #[inline]
+    fn forced_push_at_(&mut self, index: usize, value: T, exit: &Exit) -> Result<()> {
         match self.len().cmp(&index.to_usize()) {
             Ordering::Less => {
                 return Err(Error::IndexTooHigh);
             }
             ord => {
                 if ord == Ordering::Greater {
-                    self.truncate_if_needed(index)?;
+                    self.truncate_if_needed_(index)?;
                 }
                 self.push(value);
             }
@@ -688,7 +709,7 @@ where
     }
     // MUST BE in sync with AnyVec::index_to_name
     fn vec_region_name_(name: &str) -> String {
-        format!("{}{_TO_}{}", I::to_string(), name)
+        format!("{}{SEPARATOR}{}", I::to_string(), name)
     }
 
     fn holes_region_name(&self) -> String {

@@ -2,11 +2,15 @@ use allocative::Allocative;
 
 use crate::{
     AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BoxedVecIterator,
-    CollectableVec, StoredIndex, StoredRaw, VecIterator, Version,
+    CollectableVec, StoredIndex, StoredRaw, VecIteratorExtended, Version,
 };
 
+mod iterator;
+
+pub use iterator::*;
+
 pub type ComputeFrom1<I, T, S1I, S1T> =
-    for<'a> fn(I, &mut dyn VecIterator<Item = (S1I, S1T)>) -> Option<T>;
+    for<'a> fn(I, &mut dyn VecIteratorExtended<I = S1I, T = S1T, Item = S1T>) -> Option<T>;
 
 #[derive(Clone, Allocative)]
 pub struct LazyVecFrom1<I, T, S1I, S1T>
@@ -51,58 +55,6 @@ where
     }
 }
 
-pub struct LazyVecFrom1Iterator<'a, I, T, S1I, S1T>
-where
-    S1T: Clone,
-{
-    lazy: &'a LazyVecFrom1<I, T, S1I, S1T>,
-    source: BoxedVecIterator<'a, S1I, S1T>,
-    index: usize,
-}
-
-impl<'a, I, T, S1I, S1T> Iterator for LazyVecFrom1Iterator<'a, I, T, S1I, S1T>
-where
-    I: StoredIndex,
-    T: StoredRaw + 'a,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-{
-    type Item = T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.index >= self.len() {
-            return None;
-        }
-        let index = I::from(self.index);
-        let opt = (self.lazy.compute)(index, &mut *self.source).map(|v| (index, v));
-        if opt.is_some() {
-            self.index += 1;
-        }
-        opt
-    }
-}
-
-impl<I, T, S1I, S1T> VecIterator for LazyVecFrom1Iterator<'_, I, T, S1I, S1T>
-where
-    I: StoredIndex,
-    T: StoredRaw,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-{
-    fn skip_optimized(self, n: usize) -> Self {
-        todo!();
-    }
-
-    fn take_optimized(self, n: usize) -> Self {
-        todo!();
-    }
-
-    // #[inline]
-    // fn len(&self) -> usize {
-    //     self.source.len()
-    // }
-}
-
 impl<'a, I, T, S1I, S1T> IntoIterator for &'a LazyVecFrom1<I, T, S1I, S1T>
 where
     I: StoredIndex,
@@ -110,7 +62,7 @@ where
     S1I: StoredIndex,
     S1T: StoredRaw,
 {
-    type Item = (I, T);
+    type Item = T;
     type IntoIter = LazyVecFrom1Iterator<'a, I, T, S1I, S1T>;
 
     fn into_iter(self) -> Self::IntoIter {

@@ -1,6 +1,6 @@
-use crate::i64_to_usize;
+use crate::{AnyIterableVec, i64_to_usize};
 
-use super::{AnyIterableVec, AnyVec, StoredIndex, StoredRaw};
+use super::{AnyVec, StoredIndex, StoredRaw};
 
 pub trait CollectableVec<I, T>: AnyIterableVec<I, T>
 where
@@ -12,10 +12,9 @@ where
         let len = self.len();
         let from = from.unwrap_or_default();
         let to = to.map_or(len, |to| to.min(len));
-        self.iter()
-            .skip_optimized(from)
-            .take_optimized(to - from)
-            .map(|(_, v)| v)
+        let mut iter = self.iter();
+        iter.set_end_(to);
+        iter.skip(from).take(to - from)
     }
 
     fn iter_signed_range(&self, from: Option<i64>, to: Option<i64>) -> impl Iterator<Item = T> {
