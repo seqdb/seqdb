@@ -66,10 +66,12 @@ where
     type IntoIter = LazyVecFrom1Iterator<'a, I, T, S1I, S1T>;
 
     fn into_iter(self) -> Self::IntoIter {
+        let len = self.source.len();
         LazyVecFrom1Iterator {
             lazy: self,
             source: self.source.iter(),
             index: 0,
+            end_index: len,
         }
     }
 }

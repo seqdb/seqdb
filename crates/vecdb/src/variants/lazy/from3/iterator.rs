@@ -12,7 +12,11 @@ where
     pub(crate) source1: BoxedVecIterator<'a, S1I, S1T>,
     pub(crate) source2: BoxedVecIterator<'a, S2I, S2T>,
     pub(crate) source3: BoxedVecIterator<'a, S3I, S3T>,
+    pub(crate) source1_same_index: bool,
+    pub(crate) source2_same_index: bool,
+    pub(crate) source3_same_index: bool,
     pub(crate) index: usize,
+    pub(crate) end_index: usize,
 }
 
 impl<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T> Iterator
@@ -31,19 +35,23 @@ where
 
     #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
-        todo!()
-        // let index = I::from(self.index);
-        // let opt = (self.lazy.compute)(
-        //     index,
-        //     &mut *self.source1,
-        //     &mut *self.source2,
-        //     &mut *self.source3,
-        // )
-        // .map(|v| (index, v));
-        // if opt.is_some() {
-        //     self.index += 1;
-        // }
-        // opt
+        if self.index >= self.end_index {
+            return None;
+        }
+
+        let index = I::from(self.index);
+        let opt = (self.lazy.compute)(
+            index,
+            &mut *self.source1,
+            &mut *self.source2,
+            &mut *self.source3,
+        );
+
+        if opt.is_some() {
+            self.index += 1;
+        }
+
+        opt
     }
 }
 
@@ -60,40 +68,59 @@ where
     S3T: StoredRaw,
 {
     fn set_position_(&mut self, i: usize) {
-        todo!()
+        self.index = i.min(self.end_index);
+        if self.source1_same_index {
+            self.source1.set_position_(i);
+        }
+        if self.source2_same_index {
+            self.source2.set_position_(i);
+        }
+        if self.source3_same_index {
+            self.source3.set_position_(i);
+        }
     }
 
     fn set_end_(&mut self, i: usize) {
-        todo!()
+        self.end_index = i.min(self.end_index);
+        if self.source1_same_index {
+            self.source1.set_end_(i);
+        }
+        if self.source2_same_index {
+            self.source2.set_end_(i);
+        }
+        if self.source3_same_index {
+            self.source3.set_end_(i);
+        }
     }
 
-    fn skip_optimized(self, _: usize) -> Self {
-        todo!();
+    fn skip_optimized(mut self, n: usize) -> Self {
+        self.index = self.index.saturating_add(n).min(self.end_index);
+        if self.source1_same_index {
+            self.source1 = self.source1.skip_optimized(n);
+        }
+        if self.source2_same_index {
+            self.source2 = self.source2.skip_optimized(n);
+        }
+        if self.source3_same_index {
+            self.source3 = self.source3.skip_optimized(n);
+        }
+        self
     }
 
-    fn take_optimized(self, _: usize) -> Self {
-        todo!();
+    fn take_optimized(mut self, n: usize) -> Self {
+        let absolute_end = self.index.saturating_add(n);
+        self.end_index = absolute_end.min(self.end_index);
+        if self.source1_same_index {
+            self.source1 = self.source1.take_optimized(n);
+        }
+        if self.source2_same_index {
+            self.source2 = self.source2.take_optimized(n);
+        }
+        if self.source3_same_index {
+            self.source3 = self.source3.take_optimized(n);
+        }
+        self
     }
-
-    // #[inline]
-    // fn len(&self) -> usize {
-    //     let len1 = if self.source1.index_type_to_string() == I::to_string() {
-    //         self.source1.len()
-    //     } else {
-    //         usize::MAX
-    //     };
-    //     let len2 = if self.source2.index_type_to_string() == I::to_string() {
-    //         self.source2.len()
-    //     } else {
-    //         usize::MAX
-    //     };
-    //     let len3 = if self.source3.index_type_to_string() == I::to_string() {
-    //         self.source3.len()
-    //     } else {
-    //         usize::MAX
-    //     };
-    //     len1.min(len2).min(len3)
-    // }
 }
 
 impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> VecIteratorExtended

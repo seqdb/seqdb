@@ -86,11 +86,29 @@ where
     type IntoIter = LazyVecFrom2Iterator<'a, I, T, S1I, S1T, S2I, S2T>;
 
     fn into_iter(self) -> Self::IntoIter {
+        let source1_same_index = self.source1.index_type_to_string() == I::to_string();
+        let source2_same_index = self.source2.index_type_to_string() == I::to_string();
+
+        let len1 = if source1_same_index {
+            self.source1.len()
+        } else {
+            usize::MAX
+        };
+        let len2 = if source2_same_index {
+            self.source2.len()
+        } else {
+            usize::MAX
+        };
+        let end_index = len1.min(len2);
+
         LazyVecFrom2Iterator {
             lazy: self,
             source1: self.source1.iter(),
             source2: self.source2.iter(),
+            source1_same_index,
+            source2_same_index,
             index: 0,
+            end_index,
         }
     }
 }
