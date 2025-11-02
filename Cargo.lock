@@ -411,15 +411,15 @@ dependencies = [
 
 [[package]]
 name = "fjall"
-version = "3.0.0-pre.3"
+version = "3.0.0-pre.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e8417993056b3b3a5b2d991c0b1d435c0afcdeff36c5210a41137810c989fd4"
+checksum = "dcf4746eb86124d4cd91564bc01c247b8c2c3ddf2d9fb3701ca16c86fdb5b538"
 dependencies = [
  "byteorder-lite",
  "byteview 0.8.0",
  "dashmap",
  "log",
- "lsm-tree 3.0.0-pre.3",
+ "lsm-tree 3.0.0-pre.4",
  "std-semaphore",
  "tempfile",
  "xxhash-rust",
@@ -796,9 +796,9 @@ dependencies = [
 
 [[package]]
 name = "lsm-tree"
-version = "3.0.0-pre.3"
+version = "3.0.0-pre.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d2f74962cb60e9e5eefb5d07432606e06a636e93a741b08a83b6b4f809574b1"
+checksum = "70cb98c7f7806b0ad4e9872735c8674bba8ce1277d0fc688d66e8a272b578dd7"
 dependencies = [
  "byteorder-lite",
  "byteview 0.8.0",
@@ -1748,7 +1748,7 @@ dependencies = [
  "anyhow",
  "byteorder",
  "fjall 2.11.2",
- "fjall 3.0.0-pre.3",
+ "fjall 3.0.0-pre.4",
  "heed",
  "rand 0.9.2",
  "rayon",
