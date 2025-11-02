@@ -4,7 +4,7 @@ A K.I.S.S. index-value storage engine that provides persistent, type-safe vector
 
 ## What is vecdb?
 
-vecdb is a high-level vector storage engine built on [seqdb](../seqdb) that provides persistent vector-like data structures. It supports multiple storage formats and computation strategies for different performance and space requirements.
+vecdb is a high-level vector storage engine built on [rawdb](../rawdb) that provides persistent vector-like data structures. It supports multiple storage formats and computation strategies for different performance and space requirements.
 
 ## Key Features
 

@@ -8,7 +8,7 @@ use std::{
 use allocative::Allocative;
 use log::info;
 use parking_lot::RwLock;
-use seqdb::{Database, Reader, Region};
+use rawdb::{Database, Reader, Region};
 
 use crate::{
     AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, AsInnerSlice, BoxedVecIterator,

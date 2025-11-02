@@ -1,7 +1,7 @@
 use std::iter::FusedIterator;
 
 use parking_lot::RwLockReadGuard;
-use seqdb::Reader;
+use rawdb::Reader;
 
 use crate::{
     AnyStoredVec, BUFFER_SIZE, CompressedVec, GenericStoredVec, Result, StoredCompressed,
@@ -312,7 +312,7 @@ where
 mod tests {
     use super::*;
     use crate::{CompressedVec, Version};
-    use seqdb::Database;
+    use rawdb::Database;
     use tempfile::TempDir;
 
     fn setup() -> (TempDir, Database, CompressedVec<usize, i32>) {
@@ -560,7 +560,9 @@ mod tests {
         }
         vec.flush().unwrap();
 
-        let collected: Vec<i32> = vec.clean_iter().unwrap()
+        let collected: Vec<i32> = vec
+            .clean_iter()
+            .unwrap()
             .skip(1000)
             .take(5000)
             .skip(500)
@@ -596,11 +598,10 @@ mod tests {
         vec.flush().unwrap();
 
         let mut iter = vec.clean_iter().unwrap();
-        iter.set_end_(2500);  // Middle of a page
+        iter.set_end_(2500); // Middle of a page
 
         let collected: Vec<i32> = iter.collect();
         assert_eq!(collected.len(), 2500);
         assert_eq!(collected[2499], 2499);
     }
 }
-

@@ -1,4 +1,4 @@
-use seqdb::Database;
+use rawdb::Database;
 
 use crate::Version;
 

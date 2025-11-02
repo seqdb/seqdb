@@ -1,4 +1,4 @@
-use seqdb::{Database, PAGE_SIZE, Result};
+use rawdb::{Database, Result, PAGE_SIZE};
 use std::sync::Arc;
 use std::thread;
 use tempfile::TempDir;

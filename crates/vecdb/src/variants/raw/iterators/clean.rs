@@ -5,7 +5,7 @@ use std::{
 };
 
 use parking_lot::RwLockReadGuard;
-use seqdb::RegionMetadata;
+use rawdb::RegionMetadata;
 
 use crate::{
     AnyStoredVec, RawVec, Result, StoredIndex, StoredRaw, VecIterator, VecIteratorExtended, likely,
@@ -285,7 +285,7 @@ where
 mod tests {
     use super::*;
     use crate::{GenericStoredVec, RawVec, Version};
-    use seqdb::Database;
+    use rawdb::Database;
     use tempfile::TempDir;
 
     fn setup() -> (TempDir, Database, RawVec<usize, i32>) {

@@ -6,7 +6,7 @@ use std::{
 };
 
 use log::info;
-use seqdb::Reader;
+use rawdb::Reader;
 use zerocopy::FromBytes;
 
 use crate::{AnyStoredVec, Error, Exit, Result, SEPARATOR, Stamp, Version};

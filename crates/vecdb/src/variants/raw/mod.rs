@@ -11,7 +11,7 @@ use std::{
 
 use allocative::Allocative;
 use log::info;
-use seqdb::{Database, Reader, Region};
+use rawdb::{Database, Reader, Region};
 use zerocopy::{FromBytes, IntoBytes};
 
 use crate::{

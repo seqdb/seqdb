@@ -14,7 +14,7 @@ pub enum Error {
     ZeroCopyError,
     SystemTimeError(time::SystemTimeError),
     PCO(pco::errors::PcoError),
-    SeqDB(seqdb::Error),
+    SeqDB(rawdb::Error),
     Sonic(sonic_rs::Error),
 
     Str(&'static str),
@@ -47,8 +47,8 @@ impl From<sonic_rs::Error> for Error {
     }
 }
 
-impl From<seqdb::Error> for Error {
-    fn from(value: seqdb::Error) -> Self {
+impl From<rawdb::Error> for Error {
+    fn from(value: rawdb::Error) -> Self {
         Self::SeqDB(value)
     }
 }

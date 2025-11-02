@@ -20,7 +20,7 @@ ctrlc = { version = "3.5.1", features = ["termination"] }
 log = { workspace = true }
 parking_lot = { workspace = true }
 pco = "0.4.7"
-seqdb = { workspace = true }
+rawdb = { workspace = true }
 serde = "1.0.228"
 serde_derive = "1.0.228"
 sonic-rs = "0.5.5"

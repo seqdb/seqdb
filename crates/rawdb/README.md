@@ -1,10 +1,10 @@
-# seqdb
+# rawdb
 
-A K.I.S.S. (Keep It Simple, Stupid) sequential storage engine that provides storage with dynamic region management.
+A very simple filesystem like storage engine that provides storage with dynamic region management.
 
-## What is seqdb?
+## What is rawdb?
 
-seqdb is a lightweight storage engine designed for applications that need to store and retrieve data in named regions on disk. It provides:
+rawdb is a lightweight storage engine designed for applications that need to store and retrieve data in named regions on disk. It provides:
 
 - **Dynamic region management** with automatic resizing and defragmentation
 - **Sequential writes** optimized for append-heavy workloads
@@ -27,7 +27,7 @@ seqdb is a lightweight storage engine designed for applications that need to sto
 
 ## Storage Model
 
-seqdb organizes data into regions within a single file. Each region has:
+rawdb organizes data into regions within a single file. Each region has:
 - **Start offset**: Position in the file (page-aligned)
 - **Length**: Current data size
 - **Reserved space**: Allocated space (≥ length, page-aligned)

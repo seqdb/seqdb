@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use parking_lot::RwLock;
-use seqdb::Region;
+use rawdb::Region;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 use crate::{Error, Result, Stamp, Version};

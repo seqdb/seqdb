@@ -13,7 +13,7 @@ mod iterator;
 
 pub use computation::*;
 pub use iterator::*;
-use seqdb::Database;
+use rawdb::Database;
 
 #[derive(Clone)]
 pub enum Dependencies<I, T, S1I, S1T, S2I, S2T, S3I, S3T>

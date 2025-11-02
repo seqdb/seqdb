@@ -176,7 +176,7 @@ where
 mod tests {
     use super::*;
     use crate::{AnyStoredVec, CompressedVec, GenericStoredVec, Version};
-    use seqdb::Database;
+    use rawdb::Database;
     use tempfile::TempDir;
 
     fn setup() -> (TempDir, Database, CompressedVec<usize, i32>) {

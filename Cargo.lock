@@ -1193,6 +1193,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rawdb"
+version = "0.2.17"
+dependencies = [
+ "allocative",
+ "libc",
+ "memmap2",
+ "parking_lot 0.12.5",
+ "rayon",
+ "tempfile",
+]
+
+[[package]]
 name = "rayon"
 version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1384,18 +1396,6 @@ name = "self_cell"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "16c2f82143577edb4921b71ede051dac62ca3c16084e918bf7b40c96ae10eb33"
-
-[[package]]
-name = "seqdb"
-version = "0.2.17"
-dependencies = [
- "allocative",
- "libc",
- "memmap2",
- "parking_lot 0.12.5",
- "rayon",
- "tempfile",
-]
 
 [[package]]
 name = "seqdb"
@@ -1713,7 +1713,7 @@ dependencies = [
  "log",
  "parking_lot 0.12.5",
  "pco",
- "seqdb 0.2.17",
+ "rawdb",
  "serde",
  "serde_derive",
  "sonic-rs",
@@ -1733,7 +1733,7 @@ dependencies = [
  "log",
  "parking_lot 0.12.5",
  "pco",
- "seqdb 0.2.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "seqdb",
  "serde",
  "serde_derive",
  "serde_json",

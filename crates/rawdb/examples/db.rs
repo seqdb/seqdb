@@ -1,6 +1,6 @@
 use std::{fs, path::Path, sync::Arc};
 
-use seqdb::{Database, PAGE_SIZE, Result};
+use rawdb::{Database, Result, PAGE_SIZE};
 
 fn main() -> Result<()> {
     let _ = fs::remove_dir_all("vecs");
@@ -18,11 +18,9 @@ fn main() -> Result<()> {
 
         let regions = db.regions();
 
-        assert!(
-            regions
-                .get_region_from_id("region1")
-                .is_some_and(|r| Arc::ptr_eq(r, &region1))
-        );
+        assert!(regions
+            .get_region_from_id("region1")
+            .is_some_and(|r| Arc::ptr_eq(r, &region1)));
 
         let region1_meta = region1.meta().read();
         assert!(region1_meta.start() == 0);
@@ -69,9 +67,7 @@ fn main() -> Result<()> {
         assert!(region1_meta.reserved() == PAGE_SIZE);
         assert!(
             db.mmap()[0..20]
-                == [
-                    1, 2, 2, 3, 10, 11, 12, 13, 14, 15, 16, 17, 18, 0, 0, 0, 0, 0, 0, 0
-                ]
+                == [1, 2, 2, 3, 10, 11, 12, 13, 14, 15, 16, 17, 18, 0, 0, 0, 0, 0, 0, 0]
         );
     }
 
@@ -84,9 +80,7 @@ fn main() -> Result<()> {
         assert!(region1_meta.reserved() == PAGE_SIZE);
         assert!(
             db.mmap()[0..20]
-                == [
-                    1, 2, 2, 3, 10, 11, 12, 13, 14, 15, 16, 17, 18, 0, 0, 0, 0, 0, 1, 0
-                ]
+                == [1, 2, 2, 3, 10, 11, 12, 13, 14, 15, 16, 17, 18, 0, 0, 0, 0, 0, 1, 0]
         );
     }
 
@@ -262,11 +256,9 @@ fn main() -> Result<()> {
         assert!(region1_meta.start() == 0);
         assert!(region1_meta.len() == 0);
         assert!(region1_meta.reserved() == PAGE_SIZE);
-        assert!(
-            index_to_region
-                .get(region2_i)
-                .is_some_and(|opt| opt.is_none())
-        );
+        assert!(index_to_region
+            .get(region2_i)
+            .is_some_and(|opt| opt.is_none()));
 
         let region3_meta = region3.meta().read();
         assert!(region3_meta.start() == PAGE_SIZE * 2);
@@ -304,11 +296,9 @@ fn main() -> Result<()> {
         assert!(region1_meta.start() == 0);
         assert!(region1_meta.len() == 8000);
         assert!(region1_meta.reserved() == 2 * PAGE_SIZE);
-        assert!(
-            index_to_region
-                .get(region2_i)
-                .is_some_and(|opt| opt.is_none())
-        );
+        assert!(index_to_region
+            .get(region2_i)
+            .is_some_and(|opt| opt.is_none()));
 
         let region3_meta = region3.meta().read();
         assert!(region3_meta.start() == PAGE_SIZE * 2);

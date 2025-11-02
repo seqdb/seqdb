@@ -1,6 +1,6 @@
 [package]
-name = "seqdb"
-description = "A K.I.S.S. sequential storage engine"
+name = "rawdb"
+description = "A very simple filesystem like storage engine"
 keywords.workspace = true
 categories.workspace = true
 license.workspace = true

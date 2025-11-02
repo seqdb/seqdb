@@ -1,5 +1,5 @@
 use allocative::Allocative;
-use seqdb::{Database, Region};
+use rawdb::{Database, Region};
 use zerocopy::{FromBytes, IntoBytes};
 
 use crate::Result;

@@ -223,7 +223,7 @@ where
 mod tests {
     use super::*;
     use crate::{GenericStoredVec, RawVec, Version};
-    use seqdb::Database;
+    use rawdb::Database;
     use tempfile::TempDir;
 
     fn setup() -> (TempDir, Database, RawVec<usize, i32>) {
@@ -338,11 +338,11 @@ mod tests {
         }
 
         let mut iter = vec.dirty_iter().unwrap();
-        assert_eq!(iter.nth(45), Some(45));  // In stored
-        assert_eq!(iter.next(), Some(46));    // In stored
-        assert_eq!(iter.nth(2), Some(49));    // In stored
-        assert_eq!(iter.next(), Some(50));    // In pushed
-        assert_eq!(iter.next(), Some(51));    // In pushed
+        assert_eq!(iter.nth(45), Some(45)); // In stored
+        assert_eq!(iter.next(), Some(46)); // In stored
+        assert_eq!(iter.nth(2), Some(49)); // In stored
+        assert_eq!(iter.next(), Some(50)); // In pushed
+        assert_eq!(iter.next(), Some(51)); // In pushed
     }
 
     #[test]
@@ -359,7 +359,7 @@ mod tests {
         }
 
         let mut iter = vec.dirty_iter().unwrap();
-        iter.set_position_(75);  // Into pushed region
+        iter.set_position_(75); // Into pushed region
         assert_eq!(iter.next(), Some(75));
         assert_eq!(iter.next(), Some(76));
     }
@@ -413,7 +413,7 @@ mod tests {
         iter.next();
         assert_eq!(iter.len(), 74);
 
-        iter.nth(49);  // Cross boundary
+        iter.nth(49); // Cross boundary
         assert_eq!(iter.len(), 24);
     }
 

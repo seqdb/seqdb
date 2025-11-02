@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use seqdb::Region;
+use rawdb::Region;
 
 use crate::{AnyVec, Exit, Result, Stamp, variants::Header};
 
