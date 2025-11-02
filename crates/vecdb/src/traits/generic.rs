@@ -92,13 +92,6 @@ where
             return Ok(Some(updated.clone()));
         }
 
-        let prev_updated = self.prev_updated();
-        if !prev_updated.is_empty()
-            && let Some(prev) = prev_updated.get(&index)
-        {
-            return Ok(Some(prev.clone()));
-        }
-
         Ok(Some(self.read_(index, reader)?))
     }
     #[inline]
@@ -406,36 +399,52 @@ where
         let mut len = 8;
 
         let prev_stamp = u64::read_from_bytes(&bytes[..pos + len])?;
-        // dbg!(prev_stamp);
         self.mut_header().update_stamp(Stamp::new(prev_stamp));
         pos += len;
 
         let prev_stored_len = usize::read_from_bytes(&bytes[pos..pos + len])?;
-        // dbg!(prev_stored_len);
-        // *self.mut_stored_len() = prev_stored_len;
-        // *self.mut_prev_stored_len() = prev_stored_len;
-        // self.truncate_if_needed_(prev_stored_len)?;
         pos += len;
 
-        let stored_len = usize::read_from_bytes(&bytes[pos..pos + len])?;
-        // dbg!(stored_len);
-        self.truncate_if_needed_(stored_len)?;
+        let _stored_len = usize::read_from_bytes(&bytes[pos..pos + len])?;
         pos += len;
 
-        let truncated = usize::read_from_bytes(&bytes[pos..pos + len])?;
+        let current_stored_len = self.stored_len();
+
+        // Restore to the length BEFORE the changes that we're undoing
+        if prev_stored_len < current_stored_len {
+            // Shrinking - truncate will handle this
+            self.truncate_if_needed_(prev_stored_len)?;
+        } else if prev_stored_len > current_stored_len {
+            // Expanding - truncate won't handle this, manually set stored_len
+            self.update_stored_len(prev_stored_len);
+        }
+        // If equal, no change needed
+
+        let truncated_count = usize::read_from_bytes(&bytes[pos..pos + len])?;
         pos += len;
 
+        // Clear pushed (will be replaced with prev_pushed from change file)
         self.mut_pushed().clear();
 
-        if truncated > 0 {
-            len = Self::SIZE_OF_T * truncated;
-            let truncated = bytes[pos..pos + len]
+        // DON'T clear updated! The change file only contains indices modified in this stamp.
+        // When doing multiple rollbacks, we need to preserve updates from previous rollbacks.
+        // The update_() calls below will overwrite specific indices as needed.
+
+        // Restore truncated items into the updated map since they're now at indices < stored_len
+        // The disk still has stale data for these indices, so we need to override with correct values
+        if truncated_count > 0 {
+            len = Self::SIZE_OF_T * truncated_count;
+            let truncated_values = bytes[pos..pos + len]
                 .chunks(Self::SIZE_OF_T)
                 .map(|b| T::read_from_bytes(b).map_err(|_| Error::ZeroCopyError))
                 .collect::<Result<Vec<_>>>()?;
-            // dbg!(&truncated);
-            *self.mut_pushed() = truncated;
             pos += len;
+
+            // Add truncated values to updated map at their correct indices
+            let start_index = prev_stored_len - truncated_count;
+            for (i, val) in truncated_values.into_iter().enumerate() {
+                self.mut_updated().insert(start_index + i, val);
+            }
         }
 
         len = 8;
@@ -447,19 +456,17 @@ where
             .map(|s| T::read_from_bytes(s).map_err(|_| Error::ZeroCopyError))
             .collect::<Result<Vec<_>>>()?;
         pos += len;
-        // dbg!(&prev_pushed);
         self.mut_pushed().append(&mut prev_pushed);
 
         len = 8;
         let pushed_len = usize::read_from_bytes(&bytes[pos..pos + len])?;
         pos += len;
         len = Self::SIZE_OF_T * pushed_len;
-        let pushed = bytes[pos..pos + len]
+        let _pushed = bytes[pos..pos + len]
             .chunks(Self::SIZE_OF_T)
             .map(|s| T::read_from_bytes(s).map_err(|_| Error::ZeroCopyError))
             .collect::<Result<Vec<_>>>()?;
         pos += len;
-        // dbg!(&pushed);
 
         len = 8;
         let prev_modified_len = usize::read_from_bytes(&bytes[pos..pos + len])?;
@@ -469,7 +476,7 @@ where
         pos += len;
         len = Self::SIZE_OF_T * prev_modified_len;
         let prev_values = bytes[pos..pos + len].chunks(Self::SIZE_OF_T);
-        let mut prev_updated: BTreeMap<usize, T> = prev_indexes
+        let _prev_updated: BTreeMap<usize, T> = prev_indexes
             .zip(prev_values)
             .map(|(i, v)| {
                 let idx = usize::read_from_bytes(i).map_err(|_| Error::ZeroCopyError)?;
@@ -478,7 +485,6 @@ where
             })
             .collect::<Result<_>>()?;
         pos += len;
-        // dbg!(&prev_updated);
 
         len = 8;
         let modified_len = usize::read_from_bytes(&bytes[pos..pos + len])?;
@@ -488,7 +494,7 @@ where
         pos += len;
         len = Self::SIZE_OF_T * modified_len;
         let values = bytes[pos..pos + len].chunks(Self::SIZE_OF_T);
-        let updated: BTreeMap<usize, T> = indexes
+        let old_values_to_restore: BTreeMap<usize, T> = indexes
             .zip(values)
             .map(|(i, v)| {
                 let idx = usize::read_from_bytes(i).map_err(|_| Error::ZeroCopyError)?;
@@ -496,7 +502,6 @@ where
                 Ok((idx, val))
             })
             .collect::<Result<_>>()?;
-        // dbg!(&updated);
         pos += len;
 
         len = 8;
@@ -507,47 +512,31 @@ where
             .chunks(8)
             .map(|b| usize::read_from_bytes(b).map_err(|_| Error::ZeroCopyError))
             .collect::<Result<BTreeSet<_>>>()?;
-        // dbg!(&prev_holes);
         pos += len;
 
         len = 8;
         let holes_len = usize::read_from_bytes(&bytes[pos..pos + len])?;
         pos += len;
         len = size_of::<usize>() * holes_len;
-        let holes = bytes[pos..pos + len]
+        let _holes = bytes[pos..pos + len]
             .chunks(8)
             .map(|b| usize::read_from_bytes(b).map_err(|_| Error::ZeroCopyError))
             .collect::<Result<BTreeSet<_>>>()?;
-        // dbg!(&holes);
-        // pos += len;
 
-        if !self.holes().is_empty()
-            || !self.prev_holes().is_empty()
-            || !holes.is_empty()
-            || !self.prev_holes().is_empty()
-        {
+        if !self.holes().is_empty() || !self.prev_holes().is_empty() || !prev_holes.is_empty() {
             *self.mut_holes() = prev_holes.clone();
-            *self.mut_prev_holes() = prev_holes.clone();
+            *self.mut_prev_holes() = prev_holes;
         }
 
-        // prev_updated
-        //     .into_iter()
-        //     .try_for_each(|(i, v)| self.update_(i, v))?;
+        // Restore old values to updated map (the "modified" section contains the values we want to restore)
+        old_values_to_restore
+            .into_iter()
+            .try_for_each(|(i, v)| self.update_(i, v))?;
 
-        // *self.mut_updated() = updated;
-        // self.mut_prev_updated().append(&mut prev_updated);
-        // dbg!(prev_updated());
-        // prev_updated
-        //     .into_iter()
-        //     .try_for_each(|(i, v)| self.update_(i, v))?;
-
-        updated.into_iter().try_for_each(|(i, v)| {
-            self.mut_prev_updated().insert(i, v.clone());
-            self.update_(i, v)
-        })?;
-
-        // prev_updated.into_iter().for_each(|(i, v)| {
-        // });
+        // After rollback, prev_* should reflect the rolled-back state (for the next flush)
+        *self.mut_prev_updated() = self.updated().clone();
+        *self.mut_prev_pushed() = self.pushed().to_vec();
+        // prev_holes and prev_stored_len are already set above
 
         Ok(())
     }
@@ -602,12 +591,25 @@ where
             fs::remove_file(path)?;
         }
 
+        // Save current state BEFORE flush clears it (flush uses mem::take on pushed/updated)
+        let holes_before_flush = self.holes().clone();
+
         fs::write(
             path.join(u64::from(stamp).to_string()),
             self.serialize_changes()?,
         )?;
 
-        self.stamped_flush(stamp)
+        self.stamped_flush(stamp)?;
+
+        // Update prev_ fields to reflect the PERSISTED state after flush
+        // After flush: pushed data → stored (on disk), updated → stored (on disk)
+        // So prev_pushed is always empty, prev_updated is ALSO empty (updates are now on disk)
+        *self.mut_prev_stored_len() = self.stored_len(); // Use NEW stored_len after flush
+        *self.mut_prev_pushed() = vec![]; // Always empty after flush - pushed data is now stored
+        *self.mut_prev_updated() = BTreeMap::new(); // Always empty after flush - updated data is now stored
+        *self.mut_prev_holes() = holes_before_flush;
+
+        Ok(())
     }
 
     fn rollback_before(&mut self, stamp: Stamp) -> Result<Stamp> {
@@ -636,12 +638,13 @@ where
                 dbg!((s, self.stamp(), stamp));
                 return Err(Error::Str("File stamp should be the same as vec stamp"));
             }
-            self.rollback_()?;
+            self.rollback()?;
         }
 
+        // Save the restored state to prev_ fields so they're available for the next flush
         *self.mut_prev_stored_len() = self.stored_len();
         *self.mut_prev_pushed() = self.pushed().to_vec();
-        // *self.mut_updated() = self.updated().clone();
+        *self.mut_prev_updated() = self.updated().clone();
         *self.mut_prev_holes() = self.holes().clone();
 
         Ok(self.stamp())
@@ -652,17 +655,6 @@ where
     }
 
     fn rollback(&mut self) -> Result<()> {
-        self.rollback_()?;
-
-        *self.mut_prev_stored_len() = self.stored_len();
-        *self.mut_prev_pushed() = self.pushed().to_vec();
-        // *self.mut_updated() = self.prev_updated().clone();
-        *self.mut_prev_holes() = self.holes().clone();
-
-        Ok(())
-    }
-
-    fn rollback_(&mut self) -> Result<()> {
         let path = self
             .changes_path()
             .join(u64::from(self.stamp()).to_string());

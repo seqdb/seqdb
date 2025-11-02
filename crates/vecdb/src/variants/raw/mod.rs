@@ -294,31 +294,20 @@ where
         let stored_len = self.stored_len();
         let pushed_len = self.pushed_len();
         let real_stored_len = self.real_stored_len();
-        assert!(stored_len <= real_stored_len);
-        let truncated = stored_len != real_stored_len;
+        // After rollback, stored_len can be > real_stored_len (missing items are in updated map)
+        let truncated = stored_len < real_stored_len;
+        let expanded = stored_len > real_stored_len;
         let has_new_data = pushed_len != 0;
-        let has_prev_updated_data = !self.prev_updated.is_empty();
         let has_updated_data = !self.updated.is_empty();
         let has_holes = !self.holes.is_empty();
-        let had_holes = !self.prev_holes.is_empty() || self.has_stored_holes;
+        let had_holes = self.has_stored_holes;
 
-        if !truncated
-            && !has_new_data
-            && !has_prev_updated_data
-            && !has_updated_data
-            && !has_holes
-            && !had_holes
+        if !truncated && !expanded && !has_new_data && !has_updated_data && !has_holes && !had_holes
         {
             return Ok(());
         }
 
         let from = (stored_len * Self::SIZE_OF_T + HEADER_OFFSET as usize) as u64;
-
-        // self.prev_stored_len = stored_len;
-
-        // BE CAREFUL WITH `.clone()` !
-        // Take into account the first pass which hold a ton of data
-        // self.prev_pushed = self.pushed.clone();
 
         if has_new_data {
             self.region
@@ -328,9 +317,8 @@ where
             self.region.truncate(from)?;
         }
 
-        if has_updated_data || has_prev_updated_data {
-            let mut updated = mem::take(&mut self.updated);
-            updated.append(&mut mem::take(&mut self.prev_updated));
+        if has_updated_data {
+            let updated = mem::take(&mut self.updated);
             updated.into_iter().try_for_each(|(i, v)| -> Result<()> {
                 let bytes = v.as_bytes();
                 let at = (i * Self::SIZE_OF_T) as u64 + HEADER_OFFSET;
@@ -359,8 +347,6 @@ where
                 .remove_region_with_id(&self.holes_region_name());
         }
 
-        // self.prev_holes = self.holes.clone();
-
         Ok(())
     }
 
@@ -384,20 +370,16 @@ where
         let truncated = prev_stored_len.checked_sub(stored_len).unwrap_or_default();
         bytes.extend(truncated.as_bytes());
         if truncated > 0 {
-            // dbg!((
-            //     "trunc",
-            //     stored_len,
-            //     prev_stored_len,
-            //     (stored_len..prev_stored_len)
-            //         .map(|i| self.unwrap_read_(i, &reader))
-            //         .collect::<Vec<_>>()
-            // ));
-            bytes.extend(
-                (stored_len..prev_stored_len)
-                    .map(|i| self.unwrap_read_(i, &reader))
-                    .collect::<Vec<_>>()
-                    .as_bytes(),
-            );
+            let truncated_vals = (stored_len..prev_stored_len)
+                .map(|i| {
+                    // Prefer prev_updated, then read from disk
+                    self.prev_updated
+                        .get(&i)
+                        .cloned()
+                        .unwrap_or_else(|| self.unwrap_read_(i, &reader))
+                })
+                .collect::<Vec<_>>();
+            bytes.extend(truncated_vals.as_bytes());
         }
 
         bytes.extend(self.prev_pushed.len().as_bytes());
@@ -418,7 +400,15 @@ where
         let (modified_indexes, modified_values) = self
             .updated
             .keys()
-            .map(|&i| (i, self.unwrap_read_(i, &reader)))
+            .map(|&i| {
+                // Prefer prev_updated values over disk values (for post-rollback state)
+                let val = self
+                    .prev_updated
+                    .get(&i)
+                    .cloned()
+                    .unwrap_or_else(|| self.unwrap_read_(i, &reader));
+                (i, val)
+            })
             .collect::<(Vec<_>, Vec<_>)>();
         bytes.extend(modified_indexes.len().as_bytes());
         bytes.extend(modified_indexes.as_bytes());

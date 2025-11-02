@@ -44,15 +44,12 @@ where
     /// Skip one stored element without reading it (for holes/updates optimization)
     #[inline(always)]
     fn skip_stored_element(&mut self) {
-        if self.index >= self.stored_len {
-            return;
-        }
-
-        self.inner.buffer_pos += Self::SIZE_OF_T;
-
+        // Refill buffer BEFORE advancing position
+        // Otherwise refill_buffer() resets buffer_pos to 0, losing the skip
         if unlikely(self.inner.cant_read_buffer()) && likely(self.inner.can_read_file()) {
             self.inner.refill_buffer();
         }
+        self.inner.buffer_pos += Self::SIZE_OF_T;
     }
 
     #[inline(always)]
@@ -92,7 +89,9 @@ where
         self.index += 1;
 
         if unlikely(self.holes) && self.inner._vec.holes().contains(&index) {
-            self.skip_stored_element();
+            if index < self.stored_len {
+                self.skip_stored_element();
+            }
             return self.next();
         }
 
@@ -103,7 +102,9 @@ where
         if unlikely(self.updated)
             && let Some(updated) = self.inner._vec.updated().get(&index)
         {
-            self.skip_stored_element();
+            if index < self.stored_len {
+                self.skip_stored_element();
+            }
             return Some(updated.clone());
         }
 
@@ -149,8 +150,9 @@ where
             if self.index >= self.vec_len() {
                 self.index = self.vec_len();
                 return None;
+            } else if self.index < self.stored_len {
+                self.skip_stored_element();
             }
-            self.skip_stored_element();
             self.index += 1;
         }
         self.next()
