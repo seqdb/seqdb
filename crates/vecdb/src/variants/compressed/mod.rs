@@ -1,6 +1,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     mem,
+    path::PathBuf,
     sync::Arc,
 };
 
@@ -57,15 +58,16 @@ where
             | Err(Error::WrongLength)
             | Err(Error::DifferentVersion { .. }) => {
                 info!("Resetting {}...", options.name);
+
                 let _ = options
                     .db
-                    .remove_region(Self::vec_region_name_(options.name).into());
+                    .remove_region_with_id(&Self::vec_region_name_(options.name));
                 let _ = options
                     .db
-                    .remove_region(Self::holes_region_name_(options.name).into());
+                    .remove_region_with_id(&Self::holes_region_name_(options.name));
                 let _ = options
                     .db
-                    .remove_region(Self::pages_region_name_(options.name).into());
+                    .remove_region_with_id(&Self::pages_region_name_(options.name));
                 Self::import_with(options)
             }
             _ => res,
@@ -227,18 +229,14 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    fn db(&self) -> &Database {
-        self.inner.db()
+    #[inline]
+    fn db_path(&self) -> PathBuf {
+        self.inner.db_path()
     }
 
     #[inline]
-    fn region(&self) -> &RwLock<Region> {
+    fn region(&self) -> &Region {
         self.inner.region()
-    }
-
-    #[inline]
-    fn region_index(&self) -> usize {
-        self.inner.region_index()
     }
 
     #[inline]
@@ -338,13 +336,11 @@ where
             .flat_map(|(v, _)| v)
             .collect::<Vec<_>>();
 
-        let db = self.db();
-
-        db.truncate_write_all_to_region(self.region_index().into(), truncate_at, &buf)?;
+        self.region().truncate_write_all(truncate_at, &buf)?;
 
         self.update_stored_len(stored_len + pushed_len);
 
-        pages.flush(db)?;
+        pages.flush()?;
 
         Ok(())
     }

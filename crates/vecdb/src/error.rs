@@ -13,7 +13,6 @@ pub enum Error {
     TryLockError(fs::TryLockError),
     ZeroCopyError,
     SystemTimeError(time::SystemTimeError),
-    SerdeJson(serde_json::Error),
     PCO(pco::errors::PcoError),
     SeqDB(seqdb::Error),
     Sonic(sonic_rs::Error),
@@ -78,12 +77,6 @@ impl<A, B> From<zerocopy::error::SizeError<A, B>> for Error {
     }
 }
 
-impl From<serde_json::Error> for Error {
-    fn from(error: serde_json::Error) -> Self {
-        Self::SerdeJson(error)
-    }
-}
-
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -96,7 +89,6 @@ impl fmt::Display for Error {
             ),
             Error::PCO(error) => Display::fmt(&error, f),
             Error::SystemTimeError(error) => Display::fmt(&error, f),
-            Error::SerdeJson(error) => Display::fmt(&error, f),
             Error::ZeroCopyError => write!(f, "ZeroCopy error"),
 
             Error::WrongEndian => write!(f, "Wrong endian"),

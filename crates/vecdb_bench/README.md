@@ -10,14 +10,14 @@ Benchmark comparing vecdb against popular embedded databases: fjall, redb, and l
 
 ### Results
 
-| Metric | vecdb | vecdb_old | fjall3 | fjall2 | redb | lmdb | rocksdb |
+| Metric | vecdb_compressed | vecdb_raw | fjall3 | fjall2 | redb | lmdb | rocksdb |
 |--------|--------|--------|--------|--------|--------|--------|--------|
-| **Open** | 0.17 ms | **0.08 ms** | 1.03 s | 644.84 ms | 5.63 ms | 0.15 ms | 2.15 ms |
-| **Write** | 17.57 ms<br>569.2 Mo/s<br>4.241 GB/s<br>1.757 ns | **15.12 ms<br>661.6 Mo/s<br>4.929 GB/s<br>1.512 ns** | 15.39 s<br>649.9 Ko/s<br>4.958 MB/s<br>1.539 µs | 12.05 s<br>829.6 Ko/s<br>6.330 MB/s<br>1.205 µs | 5.83 s<br>1.716 Mo/s<br>13.09 MB/s<br>582.7 ns | 7.20 s<br>1.388 Mo/s<br>10.59 MB/s<br>720.3 ns | 4.48 s<br>2.230 Mo/s<br>17.01 MB/s<br>448.4 ns |
-| **Linear** | **8.14 ms<br>1228 Mo/s<br>9.151 GB/s<br>0.814 ns** | 37.73 ms<br>265.0 Mo/s<br>1.975 GB/s<br>3.773 ns | 713.72 ms<br>14.01 Mo/s<br>106.9 MB/s<br>71.37 ns | 752.31 ms<br>13.29 Mo/s<br>101.4 MB/s<br>75.23 ns | 390.49 ms<br>25.61 Mo/s<br>195.4 MB/s<br>39.05 ns | 89.30 ms<br>112.0 Mo/s<br>854.4 MB/s<br>8.930 ns | 1.01 s<br>9.934 Mo/s<br>75.79 MB/s<br>100.7 ns |
-| **Random** | 0.05 ms<br>2145 Mo/s<br>15.98 GB/s<br>0.466 ns | **0.04 ms<br>2489 Mo/s<br>18.54 GB/s<br>0.402 ns** | 192.57 ms<br>519.3 Ko/s<br>3.962 MB/s<br>1.926 µs | 440.59 ms<br>227.0 Ko/s<br>1.732 MB/s<br>4.406 µs | 113.38 ms<br>882.0 Ko/s<br>6.729 MB/s<br>1.134 µs | 98.85 ms<br>1.012 Mo/s<br>7.718 MB/s<br>988.5 ns | 618.37 ms<br>161.7 Ko/s<br>1.234 MB/s<br>6.184 µs |
-| **Random Rayon** | **2.18 ms<br>45.95 Mo/s<br>350.5 MB/s<br>21.76 ns** | 5.59 ms<br>17.89 Mo/s<br>136.5 MB/s<br>55.90 ns | 40.82 ms<br>2.449 Mo/s<br>18.69 MB/s<br>408.2 ns | 177.82 ms<br>562.4 Ko/s<br>4.291 MB/s<br>1.778 µs | 16.25 ms<br>6.153 Mo/s<br>46.94 MB/s<br>162.5 ns | 18.54 ms<br>5.395 Mo/s<br>41.16 MB/s<br>185.4 ns | 157.43 ms<br>635.2 Ko/s<br>4.846 MB/s<br>1.574 µs |
-| **Disk Size** | **128.00 MB** | **128.00 MB** | 209.45 MB | 137.11 MB | 514.00 MB | 367.13 MB | 244.54 MB |
+| **Open** | 0.15 ms | **0.07 ms** | 1.02 s | 630.72 ms | 5.39 ms | 0.15 ms | 2.27 ms |
+| **Write** | 11.53 ms<br>867.3 Mo/s<br>6.462 GB/s<br>1.153 ns | **7.70 ms<br>1299 Mo/s<br>9.676 GB/s<br>0.770 ns** | 15.31 s<br>653.1 Ko/s<br>4.983 MB/s<br>1.531 µs | 12.50 s<br>800.2 Ko/s<br>6.105 MB/s<br>1.250 µs | 3.39 s<br>2.951 Mo/s<br>22.51 MB/s<br>338.9 ns | 7.06 s<br>1.417 Mo/s<br>10.81 MB/s<br>705.9 ns | 4.38 s<br>2.282 Mo/s<br>17.41 MB/s<br>438.3 ns |
+| **Linear** | 12.78 ms<br>782.2 Mo/s<br>5.828 GB/s<br>1.278 ns | **6.64 ms<br>1506 Mo/s<br>11.22 GB/s<br>0.664 ns** | 706.95 ms<br>14.15 Mo/s<br>107.9 MB/s<br>70.69 ns | 740.61 ms<br>13.50 Mo/s<br>103.0 MB/s<br>74.06 ns | 293.47 ms<br>34.07 Mo/s<br>260.0 MB/s<br>29.35 ns | 91.73 ms<br>109.0 Mo/s<br>831.7 MB/s<br>9.173 ns | 1.07 s<br>9.316 Mo/s<br>71.08 MB/s<br>107.3 ns |
+| **Random** | 172.55 ms<br>579.5 Ko/s<br>4.421 MB/s<br>1.726 µs | **0.05 ms<br>2202 Mo/s<br>16.40 GB/s<br>0.454 ns** | 190.02 ms<br>526.2 Ko/s<br>4.015 MB/s<br>1.900 µs | 418.94 ms<br>238.7 Ko/s<br>1.821 MB/s<br>4.189 µs | 108.29 ms<br>923.4 Ko/s<br>7.045 MB/s<br>1.083 µs | 96.08 ms<br>1.041 Mo/s<br>7.940 MB/s<br>960.8 ns | 599.77 ms<br>166.7 Ko/s<br>1.272 MB/s<br>5.998 µs |
+| **Random Rayon** | 27.63 ms<br>3.620 Mo/s<br>27.62 MB/s<br>276.3 ns | **2.20 ms<br>45.53 Mo/s<br>347.4 MB/s<br>21.96 ns** | 40.52 ms<br>2.468 Mo/s<br>18.83 MB/s<br>405.2 ns | 143.61 ms<br>696.3 Ko/s<br>5.313 MB/s<br>1.436 µs | 15.47 ms<br>6.464 Mo/s<br>49.31 MB/s<br>154.7 ns | 17.37 ms<br>5.755 Mo/s<br>43.91 MB/s<br>173.7 ns | 153.07 ms<br>653.3 Ko/s<br>4.984 MB/s<br>1.531 µs |
+| **Disk Size** | **392.00 KB** | 128.00 MB | 209.45 MB | 137.11 MB | 514.00 MB | 367.13 MB | 244.94 MB |
 ---
 
 ## Benchmark 2
@@ -28,14 +28,14 @@ Benchmark comparing vecdb against popular embedded databases: fjall, redb, and l
 
 ### Results
 
-| Metric | vecdb_old | vecdb | fjall3 | fjall2 | redb | lmdb |
-|--------|--------|--------|--------|--------|--------|--------|
-| **Open** | 0.22 ms | **0.18 ms** | 242.08 ms | 33.29 ms | 5.90 ms | 0.23 ms |
-| **Write** | 123.55 ms<br>809.4 Mo/s<br>6.030 GB/s<br>1.236 ns | **102.57 ms<br>975.0 Mo/s<br>7.264 GB/s<br>1.026 ns** | 2m 33.15s<br>653.0 Ko/s<br>4.982 MB/s<br>1.531 µs | 2m 7.42s<br>784.8 Ko/s<br>5.988 MB/s<br>1.274 µs | 1m 51.40s<br>897.7 Ko/s<br>6.849 MB/s<br>1.114 µs | 2m 41.13s<br>620.6 Ko/s<br>4.735 MB/s<br>1.611 µs |
-| **Linear** | 386.90 ms<br>258.5 Mo/s<br>1.926 GB/s<br>3.869 ns | **78.89 ms<br>1268 Mo/s<br>9.444 GB/s<br>0.789 ns** | 7.92 s<br>12.62 Mo/s<br>96.31 MB/s<br>79.22 ns | 7.83 s<br>12.77 Mo/s<br>97.41 MB/s<br>78.33 ns | 7.26 s<br>13.78 Mo/s<br>105.1 MB/s<br>72.58 ns | 5.26 s<br>19.01 Mo/s<br>145.0 MB/s<br>52.60 ns |
-| **Random** | 0.44 ms<br>2267 Mo/s<br>16.89 GB/s<br>0.441 ns | **0.42 ms<br>2376 Mo/s<br>17.70 GB/s<br>0.421 ns** | 4.68 s<br>213.8 Ko/s<br>1.631 MB/s<br>4.678 µs | 7.14 s<br>140.0 Ko/s<br>1.068 MB/s<br>7.143 µs | 12.10 s<br>82.63 Ko/s<br>0.630 MB/s<br>12.10 µs | 2.58 s<br>388.2 Ko/s<br>2.961 MB/s<br>2.576 µs |
-| **Random Rayon** | 180.01 ms<br>5.555 Mo/s<br>42.38 MB/s<br>180.0 ns | **175.45 ms<br>5.700 Mo/s<br>43.48 MB/s<br>175.5 ns** | 725.79 ms<br>1.378 Mo/s<br>10.51 MB/s<br>725.8 ns | 1.43 s<br>700.7 Ko/s<br>5.346 MB/s<br>1.427 µs | 446.84 ms<br>2.238 Mo/s<br>17.07 MB/s<br>446.8 ns | 189.20 ms<br>5.285 Mo/s<br>40.32 MB/s<br>189.2 ns |
-| **Disk Size** | **1.00 GB** | **1.00 GB** | 1.78 GB | 1.00 GB | 3.03 GB | 3.58 GB |
+| Metric | vecdb_compressed | vecdb_raw | vecdb_raw_old | fjall3 | fjall2 | redb | lmdb |
+|--------|--------|--------|--------|--------|--------|--------|--------|
+| **Open** | 0.56 ms | 0.15 ms | **0.10 ms** | 243.52 ms | 32.55 ms | 5.64 ms | 0.16 ms |
+| **Write** | **87.82 ms<br>1139 Mo/s<br>8.484 GB/s<br>0.878 ns** | 88.53 ms<br>1130 Mo/s<br>8.416 GB/s<br>0.885 ns | 119.51 ms<br>836.8 Mo/s<br>6.234 GB/s<br>1.195 ns | 2m 33.66s<br>650.8 Ko/s<br>4.965 MB/s<br>1.537 µs | 2m 5.70s<br>795.5 Ko/s<br>6.069 MB/s<br>1.257 µs | 1m 1.47s<br>1.627 Mo/s<br>12.41 MB/s<br>614.7 ns | 2m 38.76s<br>629.9 Ko/s<br>4.806 MB/s<br>1.588 µs |
+| **Linear** | 126.00 ms<br>793.7 Mo/s<br>5.913 GB/s<br>1.260 ns | **72.72 ms<br>1375 Mo/s<br>10.25 GB/s<br>0.727 ns** | 387.86 ms<br>257.8 Mo/s<br>1.921 GB/s<br>3.879 ns | 7.73 s<br>12.94 Mo/s<br>98.72 MB/s<br>77.28 ns | 7.64 s<br>13.09 Mo/s<br>99.89 MB/s<br>76.38 ns | 4.99 s<br>20.04 Mo/s<br>152.9 MB/s<br>49.89 ns | 4.69 s<br>21.32 Mo/s<br>162.7 MB/s<br>46.91 ns |
+| **Random** | 1.74 s<br>575.1 Ko/s<br>4.388 MB/s<br>1.739 µs | 0.42 ms<br>2382 Mo/s<br>17.74 GB/s<br>0.420 ns | **0.41 ms<br>2412 Mo/s<br>17.97 GB/s<br>0.415 ns** | 2.51 s<br>398.0 Ko/s<br>3.037 MB/s<br>2.513 µs | 6.37 s<br>157.0 Ko/s<br>1.198 MB/s<br>6.369 µs | 6.74 s<br>148.5 Ko/s<br>1.133 MB/s<br>6.735 µs | 1.33 s<br>751.8 Ko/s<br>5.736 MB/s<br>1.330 µs |
+| **Random Rayon** | 252.32 ms<br>3.963 Mo/s<br>30.24 MB/s<br>252.3 ns | 130.78 ms<br>7.646 Mo/s<br>58.34 MB/s<br>130.8 ns | **38.08 ms<br>26.26 Mo/s<br>200.3 MB/s<br>38.08 ns** | 453.87 ms<br>2.203 Mo/s<br>16.81 MB/s<br>453.9 ns | 1.31 s<br>763.3 Ko/s<br>5.824 MB/s<br>1.310 µs | 462.10 ms<br>2.164 Mo/s<br>16.51 MB/s<br>462.1 ns | 176.35 ms<br>5.671 Mo/s<br>43.26 MB/s<br>176.3 ns |
+| **Disk Size** | **3.01 MB** | 1.00 GB | 1.00 GB | 1.78 GB | 1.00 GB | 3.03 GB | 3.58 GB |
 
 ## Run
 

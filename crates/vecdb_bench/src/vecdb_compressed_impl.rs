@@ -1,31 +1,32 @@
 use anyhow::Result;
 use rayon::prelude::*;
 use std::path::Path;
-use vecdb_old::{AnyStoredVec, Database, GenericStoredVec, RawVec, Version};
+use vecdb::{AnyStoredVec, CompressedVec, Database, GenericStoredVec, Version};
 
 use crate::database::DatabaseBenchmark;
 
-pub struct VecDbOldBench {
-    vec: RawVec<usize, u64>,
+pub struct VecDbCompressedBench {
+    db: Database,
+    vec: CompressedVec<usize, u64>,
 }
 
-impl DatabaseBenchmark for VecDbOldBench {
+impl DatabaseBenchmark for VecDbCompressedBench {
     fn name() -> &'static str {
-        "vecdb_old"
+        "vecdb_compressed"
     }
 
     fn create(path: &Path) -> Result<Self> {
-        let database = Database::open(path)?;
-        let options = (&database, "bench", Version::TWO).into();
-        let vec: RawVec<usize, u64> = RawVec::forced_import_with(options)?;
-        Ok(Self { vec })
+        let db = Database::open(path)?;
+        let options = (&db, "bench", Version::TWO).into();
+        let vec: CompressedVec<usize, u64> = CompressedVec::forced_import_with(options)?;
+        Ok(Self { db, vec })
     }
 
     fn open(path: &Path) -> Result<Self> {
-        let database = Database::open(path)?;
-        let options = (&database, "bench", Version::TWO).into();
-        let vec: RawVec<usize, u64> = RawVec::forced_import_with(options)?;
-        Ok(Self { vec })
+        let db = Database::open(path)?;
+        let options = (&db, "bench", Version::TWO).into();
+        let vec: CompressedVec<usize, u64> = CompressedVec::forced_import_with(options)?;
+        Ok(Self { db, vec })
     }
 
     fn write_sequential(&mut self, count: u64) -> Result<()> {
@@ -37,9 +38,9 @@ impl DatabaseBenchmark for VecDbOldBench {
 
     fn read_sequential(&self) -> Result<u64> {
         let mut sum = 0u64;
-        let values = self.vec.iter();
-        for (_, value) in values {
-            sum = sum.wrapping_add(value.into_owned());
+
+        for value in self.vec.clean_iter()? {
+            sum = sum.wrapping_add(value);
         }
 
         Ok(sum)
@@ -69,8 +70,8 @@ impl DatabaseBenchmark for VecDbOldBench {
     }
 
     fn flush(&mut self) -> Result<()> {
-        self.vec.db().flush()?;
         self.vec.flush()?;
+        self.db.flush()?;
         Ok(())
     }
 

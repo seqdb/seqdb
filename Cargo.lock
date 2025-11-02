@@ -1394,7 +1394,7 @@ dependencies = [
  "memmap2",
  "parking_lot 0.12.5",
  "rayon",
- "zerocopy",
+ "tempfile",
 ]
 
 [[package]]
@@ -1716,7 +1716,6 @@ dependencies = [
  "seqdb 0.2.17",
  "serde",
  "serde_derive",
- "serde_json",
  "sonic-rs",
  "tempfile",
  "vecdb_derive",

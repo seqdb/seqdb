@@ -12,8 +12,9 @@ pub const NUM_ITERATIONS: usize = 10;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Database {
-    VecDb,
-    VecDbOld,
+    VecDbCompressed,
+    VecDbRaw,
+    VecDbRawOld,
     Fjall2,
     Fjall3,
     Redb,
@@ -24,8 +25,8 @@ pub enum Database {
 impl Database {
     pub fn all() -> Vec<Database> {
         vec![
-            Database::VecDb,
-            Database::VecDbOld,
+            Database::VecDbCompressed,
+            Database::VecDbRaw,
             Database::Fjall3,
             Database::Fjall2,
             Database::Redb,

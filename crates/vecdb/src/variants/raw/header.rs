@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use allocative::Allocative;
-use parking_lot::{RwLock, RwLockReadGuard};
-use seqdb::{Database, Region, RegionReader};
+use parking_lot::RwLock;
+use seqdb::Region;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 use crate::{Error, Result, Stamp, Version};
@@ -19,13 +19,8 @@ pub struct Header {
 }
 
 impl Header {
-    pub fn create_and_write(
-        db: &Database,
-        region_index: usize,
-        vec_version: Version,
-        format: Format,
-    ) -> Result<Self> {
-        let inner = HeaderInner::create_and_write(db, region_index, vec_version, format)?;
+    pub fn create_and_write(region: &Region, vec_version: Version, format: Format) -> Result<Self> {
+        let inner = HeaderInner::create_and_write(region, vec_version, format)?;
         Ok(Self {
             inner: Arc::new(RwLock::new(inner)),
             modified: false,
@@ -33,13 +28,11 @@ impl Header {
     }
 
     pub fn import_and_verify(
-        db: &Database,
-        region: RwLockReadGuard<Region>,
-        region_len: u64,
+        region: &Region,
         vec_version: Version,
         format: Format,
     ) -> Result<Self> {
-        let inner = HeaderInner::import_and_verify(db, region, region_len, vec_version, format)?;
+        let inner = HeaderInner::import_and_verify(region, vec_version, format)?;
         Ok(Self {
             inner: Arc::new(RwLock::new(inner)),
             modified: false,
@@ -77,8 +70,8 @@ impl Header {
         self.inner.read().stamp
     }
 
-    pub fn write(&mut self, db: &Database, region_index: usize) -> Result<()> {
-        self.inner.read().write(db, region_index)?;
+    pub fn write(&mut self, region: &Region) -> Result<()> {
+        self.inner.read().write(region)?;
         self.modified = false;
         Ok(())
     }
@@ -96,12 +89,7 @@ struct HeaderInner {
 }
 
 impl HeaderInner {
-    pub fn create_and_write(
-        db: &Database,
-        region_index: usize,
-        vec_version: Version,
-        format: Format,
-    ) -> Result<Self> {
+    pub fn create_and_write(region: &Region, vec_version: Version, format: Format) -> Result<Self> {
         let header = Self {
             header_version: HEADER_VERSION,
             vec_version,
@@ -110,29 +98,27 @@ impl HeaderInner {
             compressed: ZeroCopyBool::from(format),
             padding: Default::default(),
         };
-        header.write(db, region_index)?;
+        header.write(region)?;
         Ok(header)
     }
 
-    pub fn write(&self, db: &Database, region_index: usize) -> Result<()> {
-        db.write_all_to_region_at(region_index.into(), self.as_bytes(), 0)?;
+    pub fn write(&self, region: &Region) -> Result<()> {
+        region.write_all_at(self.as_bytes(), 0)?;
         Ok(())
     }
 
     pub fn import_and_verify(
-        db: &Database,
-        region: RwLockReadGuard<'_, Region>,
-        region_len: u64,
+        region: &Region,
         vec_version: Version,
         format: Format,
     ) -> Result<Self> {
-        let len = region_len;
+        let len = region.meta().read().len();
 
         if len < HEADER_OFFSET {
             return Err(Error::WrongLength);
         }
 
-        let reader = region.create_reader(db);
+        let reader = region.create_reader();
         let vec = reader.unchecked_read(0, HEADER_OFFSET);
         let header = HeaderInner::read_from_bytes(vec)?;
 

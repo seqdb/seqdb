@@ -1,14 +1,13 @@
-use parking_lot::RwLock;
-use seqdb::{Database, Region};
+use std::path::PathBuf;
+
+use seqdb::Region;
 
 use crate::{AnyVec, Exit, Result, Stamp, variants::Header};
 
 pub trait AnyStoredVec: AnyVec {
-    fn db(&self) -> &Database;
+    fn db_path(&self) -> PathBuf;
 
-    fn region_index(&self) -> usize;
-
-    fn region(&self) -> &RwLock<Region>;
+    fn region(&self) -> &Region;
 
     fn header(&self) -> &Header;
 

@@ -1,7 +1,9 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::PathBuf,
+};
 
 use allocative::Allocative;
-use parking_lot::RwLock;
 use seqdb::{Database, Reader, Region};
 
 use crate::{
@@ -104,23 +106,15 @@ where
     T: StoredCompressed,
 {
     #[inline]
-    fn db(&self) -> &Database {
+    fn db_path(&self) -> PathBuf {
         match self {
-            StoredVec::Raw(v) => v.db(),
-            StoredVec::Compressed(v) => v.db(),
+            StoredVec::Raw(v) => v.db_path(),
+            StoredVec::Compressed(v) => v.db_path(),
         }
     }
 
     #[inline]
-    fn region_index(&self) -> usize {
-        match self {
-            StoredVec::Raw(v) => v.region_index(),
-            StoredVec::Compressed(v) => v.region_index(),
-        }
-    }
-
-    #[inline]
-    fn region(&self) -> &RwLock<Region> {
+    fn region(&self) -> &Region {
         match self {
             StoredVec::Raw(v) => v.region(),
             StoredVec::Compressed(v) => v.region(),

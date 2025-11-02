@@ -5,27 +5,28 @@ use vecdb::{AnyStoredVec, Database, GenericStoredVec, RawVec, Version};
 
 use crate::database::DatabaseBenchmark;
 
-pub struct VecDbBench {
+pub struct VecDbRawBench {
+    db: Database,
     vec: RawVec<usize, u64>,
 }
 
-impl DatabaseBenchmark for VecDbBench {
+impl DatabaseBenchmark for VecDbRawBench {
     fn name() -> &'static str {
-        "vecdb"
+        "vecdb_raw"
     }
 
     fn create(path: &Path) -> Result<Self> {
-        let database = Database::open(path)?;
-        let options = (&database, "bench", Version::TWO).into();
+        let db = Database::open(path)?;
+        let options = (&db, "bench", Version::TWO).into();
         let vec: RawVec<usize, u64> = RawVec::forced_import_with(options)?;
-        Ok(Self { vec })
+        Ok(Self { db, vec })
     }
 
     fn open(path: &Path) -> Result<Self> {
-        let database = Database::open(path)?;
-        let options = (&database, "bench", Version::TWO).into();
+        let db = Database::open(path)?;
+        let options = (&db, "bench", Version::TWO).into();
         let vec: RawVec<usize, u64> = RawVec::forced_import_with(options)?;
-        Ok(Self { vec })
+        Ok(Self { db, vec })
     }
 
     fn write_sequential(&mut self, count: u64) -> Result<()> {
@@ -69,8 +70,8 @@ impl DatabaseBenchmark for VecDbBench {
     }
 
     fn flush(&mut self) -> Result<()> {
-        self.vec.db().flush()?;
         self.vec.flush()?;
+        self.db.flush()?;
         Ok(())
     }
 

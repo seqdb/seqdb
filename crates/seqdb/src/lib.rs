@@ -10,7 +10,7 @@ use std::{
     ops::Deref,
     os::unix::io::AsRawFd,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, Weak},
 };
 
 use allocative::Allocative;
@@ -19,14 +19,12 @@ use memmap2::{MmapMut, MmapOptions};
 use parking_lot::{RwLock, RwLockReadGuard};
 
 pub mod error;
-mod identifier;
 mod layout;
 mod reader;
 mod region;
 mod regions;
 
 pub use error::*;
-pub use identifier::*;
 use layout::*;
 use rayon::prelude::*;
 pub use reader::*;
@@ -38,39 +36,20 @@ pub const PAGE_SIZE_MINUS_1: u64 = PAGE_SIZE - 1;
 const GB: usize = 1024 * 1024 * 1024;
 
 #[derive(Debug, Clone, Allocative)]
-pub struct Database(Arc<DatabaseInner>);
+pub struct Database(#[allocative(skip)] Arc<DatabaseInner>);
 
-impl Database {
-    pub fn open(path: &Path) -> Result<Self> {
-        Ok(Self(Arc::new(DatabaseInner::open(path)?)))
-    }
-}
-
-impl Deref for Database {
-    type Target = DatabaseInner;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[derive(Debug, Allocative)]
+#[derive(Debug)]
 pub struct DatabaseInner {
     path: PathBuf,
     regions: RwLock<Regions>,
     layout: RwLock<Layout>,
-    #[allocative(skip)]
     file: RwLock<File>,
-    #[allocative(skip)]
     mmap: RwLock<MmapMut>,
 }
 
-impl DatabaseInner {
-    fn open(path: &Path) -> Result<Self> {
+impl Database {
+    pub fn open(path: &Path) -> Result<Self> {
         fs::create_dir_all(path)?;
-
-        let regions = Regions::open(path)?;
-
-        let layout = Layout::from(&regions);
 
         let file = OpenOptions::new()
             .read(true)
@@ -80,15 +59,21 @@ impl DatabaseInner {
             .open(Self::data_path_(path))?;
         file.try_lock()?;
 
+        let regions = Regions::open(path)?;
         let mmap = Self::create_mmap(&file)?;
 
-        Ok(Self {
+        let db = Self(Arc::new(DatabaseInner {
             path: path.to_owned(),
             file: RwLock::new(file),
             mmap: RwLock::new(mmap),
             regions: RwLock::new(regions),
-            layout: RwLock::new(layout),
-        })
+            layout: RwLock::new(Layout::default()),
+        }));
+
+        db.regions.write().fill_index_to_region(&db)?;
+        *db.layout.write() = Layout::from(&*db.regions.read());
+
+        Ok(db)
     }
 
     pub fn file_len(&self) -> Result<u64> {
@@ -113,16 +98,18 @@ impl DatabaseInner {
     pub fn set_min_regions(&self, regions: usize) -> Result<()> {
         self.regions
             .write()
-            .set_min_len((regions * SIZE_OF_REGION) as u64)?;
+            .set_min_len((regions * SIZE_OF_REGION_METADATA) as u64)?;
         self.set_min_len(regions as u64 * PAGE_SIZE)
     }
 
-    pub fn create_region_if_needed(&self, id: &str) -> Result<(usize, Arc<RwLock<Region>>)> {
-        let regions = self.regions.read();
-        if let Some(index) = regions.get_region_index_from_id(id) {
-            return Ok((index, regions.get_region_from_index(index).unwrap()));
+    pub fn get_region(&self, id: &str) -> Option<Region> {
+        self.regions.read().get_region_from_id(id).cloned()
+    }
+
+    pub fn create_region_if_needed(&self, id: &str) -> Result<Region> {
+        if let Some(region) = self.get_region(id) {
+            return Ok(region);
         }
-        drop(regions);
 
         let mut regions = self.regions.write();
         let mut layout = self.layout.write();
@@ -132,11 +119,10 @@ impl DatabaseInner {
             start
         } else {
             let start = layout
-                .get_last_region_index()
-                .map(|index| {
-                    let region_opt = regions.get_region_from_index(index);
-                    let region = region_opt.as_ref().unwrap().read();
-                    region.start() + region.reserved()
+                .get_last_region()
+                .map(|(_, region)| {
+                    let region_meta = region.meta.read();
+                    region_meta.start() + region_meta.reserved()
                 })
                 .unwrap_or_default();
 
@@ -147,70 +133,58 @@ impl DatabaseInner {
             start
         };
 
-        let (index, region) = regions.create_region(id.to_owned(), start)?;
+        let region = regions.create_region(self, id.to_owned(), start)?;
 
-        layout.insert_region(start, index);
+        layout.insert_region(start, &region);
 
-        Ok((index, region))
-    }
-
-    pub fn get_region(&self, identifier: Identifier) -> Result<RwLockReadGuard<'static, Region>> {
-        let regions = self.regions.read();
-        let region_opt = regions.get_region(identifier);
-        let region_arc = region_opt.ok_or(Error::Str("Unknown region"))?;
-        let region = region_arc.read();
-        let region: RwLockReadGuard<'static, Region> = unsafe { std::mem::transmute(region) };
         Ok(region)
     }
 
     #[inline]
-    pub fn write_all_to_region(&self, identifier: Identifier, data: &[u8]) -> Result<()> {
-        self.write_all_to_region_at_(identifier, data, None, false)
+    pub fn write_all_to_region(&self, region: &Region, data: &[u8]) -> Result<()> {
+        self.write_all_to_region_at_(region, data, None, false)
     }
 
     #[inline]
-    pub fn write_all_to_region_at(
-        &self,
-        identifier: Identifier,
-        data: &[u8],
-        at: u64,
-    ) -> Result<()> {
-        self.write_all_to_region_at_(identifier, data, Some(at), false)
+    pub fn write_all_to_region_at(&self, region: &Region, data: &[u8], at: u64) -> Result<()> {
+        self.write_all_to_region_at_(region, data, Some(at), false)
     }
 
     #[inline]
     pub fn truncate_write_all_to_region(
         &self,
-        identifier: Identifier,
+        region: &Region,
         at: u64,
         data: &[u8],
     ) -> Result<()> {
-        self.write_all_to_region_at_(identifier, data, Some(at), true)
+        self.write_all_to_region_at_(region, data, Some(at), true)
     }
 
     fn write_all_to_region_at_(
         &self,
-        identifier: Identifier,
+        region: &Region,
         data: &[u8],
         at: Option<u64>,
         truncate: bool,
     ) -> Result<()> {
         let regions = self.regions.read();
-        let Some(region_lock) = regions.get_region(identifier.clone()) else {
-            return Err(Error::Str("Unknown region"));
-        };
 
-        let region_index = regions.identifier_to_index(identifier).unwrap();
-
-        let region = region_lock.read();
-        let start = region.start();
-        let reserved = region.reserved();
-        let len = region.len();
-        drop(region);
+        let region_meta = region.meta.read();
+        let start = region_meta.start();
+        let reserved = region_meta.reserved();
+        let len = region_meta.len();
+        drop(region_meta);
 
         let data_len = data.len() as u64;
+
+        // Validate write position if specified
+        if let Some(at_val) = at
+            && at_val > len
+        {
+            return Err(Error::Str("Write position beyond current region length"));
+        }
+
         let new_len = at.map_or(len + data_len, |at| {
-            assert!(at <= len);
             let new_len = at + data_len;
             if truncate { new_len } else { new_len.max(len) }
         });
@@ -230,14 +204,14 @@ impl DatabaseInner {
                 self.write(write_start, data);
             }
 
-            let mut region = region_lock.write();
+            let mut region_meta = region.meta.write();
 
             if at.is_some() {
                 self.write(write_start, data);
             }
 
-            region.set_len(new_len);
-            regions.write_region(&region, region_index)?;
+            region_meta.set_len(new_len);
+            regions.write_region_(region.index, &region_meta)?;
 
             return Ok(());
         }
@@ -253,20 +227,20 @@ impl DatabaseInner {
         let mut layout = self.layout.write();
 
         // If is last continue writing
-        if layout.is_last_anything(region_index) {
+        if layout.is_last_anything(region) {
             // info!("{region_index} Append to file at {write_start}");
 
             self.set_min_len(start + new_reserved)?;
-            let mut region = region_lock.write();
-            region.set_reserved(new_reserved);
-            drop(region);
+            let mut region_meta = region.meta.write();
+            region_meta.set_reserved(new_reserved);
+            drop(region_meta);
             drop(layout);
 
             self.write(write_start, data);
 
-            let mut region = region_lock.write();
-            region.set_len(new_len);
-            regions.write_region(&region, region_index)?;
+            let mut region_meta = region.meta.write();
+            region_meta.set_len(new_len);
+            regions.write_region_(region.index, &region_meta)?;
 
             return Ok(());
         }
@@ -280,16 +254,16 @@ impl DatabaseInner {
             // info!("Expand {region_index} to hole");
 
             layout.remove_or_compress_hole(hole_start, added_reserve);
-            let mut region = region_lock.write();
-            region.set_reserved(new_reserved);
-            drop(region);
+            let mut region_meta = region.meta.write();
+            region_meta.set_reserved(new_reserved);
+            drop(region_meta);
             drop(layout);
 
             self.write(write_start, data);
 
-            let mut region = region_lock.write();
-            region.set_len(new_len);
-            regions.write_region(&region, region_index)?;
+            let mut region_meta = region.meta.write();
+            region_meta.set_len(new_len);
+            regions.write_region_(region.index, &region_meta)?;
 
             return Ok(());
         }
@@ -308,20 +282,20 @@ impl DatabaseInner {
 
             self.write(hole_start + at.unwrap_or(len), data);
 
-            let mut region = region_lock.write();
             let mut layout = self.layout.write();
-            layout.move_region(hole_start, region_index, &region)?;
-            drop(layout);
+            layout.move_region(hole_start, region)?;
 
-            region.set_start(hole_start);
-            region.set_reserved(new_reserved);
-            region.set_len(new_len);
-            regions.write_region(&region, region_index)?;
+            let mut region_meta = region.meta.write();
+            region_meta.set_start(hole_start);
+            region_meta.set_reserved(new_reserved);
+            region_meta.set_len(new_len);
+
+            regions.write_region_(region.index, &region_meta)?;
 
             return Ok(());
         }
 
-        let new_start = layout.len(&regions);
+        let new_start = layout.len();
         // Write at the end
         // info!(
         //     "Move {region_index} to the end, from {start}..{} to {new_start}..{}",
@@ -339,16 +313,16 @@ impl DatabaseInner {
         );
         self.write(new_start + at.unwrap_or(len), data);
 
-        let mut region = region_lock.write();
         let mut layout = self.layout.write();
-        layout.move_region(new_start, region_index, &region)?;
+        layout.move_region(new_start, region)?;
         assert!(layout.reserved(new_start) == Some(new_reserved));
-        drop(layout);
 
-        region.set_start(new_start);
-        region.set_reserved(new_reserved);
-        region.set_len(new_len);
-        regions.write_region(&region, region_index)?;
+        let mut region_meta = region.meta.write();
+        region_meta.set_start(new_start);
+        region_meta.set_reserved(new_reserved);
+        region_meta.set_len(new_len);
+
+        regions.write_region_(region.index, &region_meta)?;
 
         Ok(())
     }
@@ -373,41 +347,30 @@ impl DatabaseInner {
     ///
     /// Non destructive
     ///
-    pub fn truncate_region(&self, identifier: Identifier, from: u64) -> Result<()> {
-        let Some(region) = self.regions.read().get_region(identifier.clone()) else {
-            return Err(Error::Str("Unknown region"));
-        };
-        let mut region_ = region.write();
-        let len = region_.len();
+    pub fn truncate_region(&self, region: &Region, from: u64) -> Result<()> {
+        let mut region_meta = region.meta.write();
+        let len = region_meta.len();
         if from == len {
             return Ok(());
         } else if from > len {
             return Err(Error::Str("Truncating further than length"));
         }
-        region_.set_len(from);
+        region_meta.set_len(from);
         Ok(())
     }
 
-    pub fn remove_region(&self, identifier: Identifier) -> Result<Option<Arc<RwLock<Region>>>> {
-        let mut regions = self.regions.write();
-
-        let mut layout = self.layout.write();
-
-        let index_opt = regions.identifier_to_index(identifier.clone());
-
-        let Some(region) = regions.remove_region(identifier)? else {
+    pub fn remove_region_with_id(&self, id: &str) -> Result<Option<Region>> {
+        let Some(region) = self.get_region(id) else {
             return Ok(None);
         };
+        self.remove_region(region)
+    }
 
-        let index = index_opt.unwrap();
-
-        let region_ = region.write();
-
-        layout.remove_region(index, &region_)?;
-
-        drop(region_);
-
-        Ok(Some(region))
+    pub fn remove_region(&self, region: Region) -> Result<Option<Region>> {
+        let mut regions = self.regions.write();
+        let mut layout = self.layout.write();
+        layout.remove_region(&region)?;
+        regions.remove_region(region)
     }
 
     pub fn retain_regions(&self, mut ids: HashSet<String>) -> Result<()> {
@@ -417,13 +380,13 @@ impl DatabaseInner {
             .id_to_index()
             .keys()
             .filter(|id| !ids.remove(&**id))
-            .cloned()
-            .collect::<Vec<String>>();
+            .flat_map(|id| self.get_region(id))
+            .collect::<Vec<Region>>();
 
         regions_to_remove
             .into_iter()
-            .try_for_each(|id| -> Result<()> {
-                self.remove_region(id.into())?;
+            .try_for_each(|region| -> Result<()> {
+                self.remove_region(region)?;
                 Ok(())
             })
     }
@@ -507,11 +470,12 @@ impl DatabaseInner {
             .index_to_region()
             .par_iter()
             .flatten()
-            .map(|region_lock| -> Result<usize> {
-                let region = region_lock.read();
-                let rstart = region.start();
-                let len = region.len();
-                let reserved = region.reserved();
+            .map(|region| -> Result<usize> {
+                // let region = region_lock.read();
+                let region_meta = region.meta.read();
+                let rstart = region_meta.start();
+                let len = region_meta.len();
+                let reserved = region_meta.reserved();
                 let ceil_len = Self::ceil_number_to_page_size_multiple(len);
                 assert!(len <= ceil_len);
                 if ceil_len > reserved {
@@ -644,7 +608,7 @@ impl DatabaseInner {
         let fd = file.as_raw_fd();
 
         let mut spacectl = libc::spacectl_range {
-            r_offset: offset as libc::off_t,
+            r_offset: start as libc::off_t,
             r_len: length as libc::off_t,
         };
 
@@ -677,6 +641,18 @@ impl DatabaseInner {
     pub fn path(&self) -> &Path {
         &self.path
     }
+
+    #[inline]
+    pub fn weak_clone(&self) -> WeakDatabase {
+        WeakDatabase(Arc::downgrade(&self.0))
+    }
+}
+
+impl Deref for Database {
+    type Target = Arc<DatabaseInner>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 #[repr(C)]
@@ -685,4 +661,17 @@ struct FPunchhole {
     reserved: u32,
     fp_offset: off_t,
     fp_length: off_t,
+}
+
+#[derive(Debug, Clone)]
+pub struct WeakDatabase(Weak<DatabaseInner>);
+
+impl WeakDatabase {
+    pub fn upgrade(&self) -> Database {
+        Database(
+            self.0
+                .upgrade()
+                .expect("Database was dropped while Region still exists"),
+        )
+    }
 }

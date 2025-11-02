@@ -6,7 +6,7 @@ use std::{
 };
 
 use log::info;
-use seqdb::{Reader, RegionReader};
+use seqdb::Reader;
 use zerocopy::FromBytes;
 
 use crate::{AnyStoredVec, Error, Exit, Result, SEPARATOR, Stamp, Version};
@@ -40,7 +40,7 @@ where
     /// You'll want to drop the reader before mutable ops
     ///
     fn create_static_reader(&self) -> Reader<'static> {
-        unsafe { std::mem::transmute(self.region().read().create_reader(self.db())) }
+        unsafe { std::mem::transmute(self.region().create_reader()) }
     }
 
     #[inline]
@@ -174,7 +174,7 @@ where
             index_usize,
             len,
             self.header(),
-            self.region_index()
+            self.region().index()
         );
 
         Err(Error::IndexTooHigh)
@@ -562,7 +562,7 @@ where
     }
 
     fn changes_path(&self) -> PathBuf {
-        self.db().path().join(self.index_to_name()).join("changes")
+        self.db_path().join(self.index_to_name()).join("changes")
     }
 
     #[inline]

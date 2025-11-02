@@ -1,8 +1,5 @@
-use std::sync::Arc;
-
 use allocative::Allocative;
-use parking_lot::RwLock;
-use seqdb::{Database, Region, RegionReader};
+use seqdb::{Database, Region};
 use zerocopy::{FromBytes, IntoBytes};
 
 use crate::Result;
@@ -11,9 +8,7 @@ use super::Page;
 
 #[derive(Debug, Clone, Allocative)]
 pub struct Pages {
-    _region: Arc<RwLock<Region>>,
-    region_index: usize,
-
+    region: Region,
     vec: Vec<Page>,
     change_at: Option<usize>,
 }
@@ -22,25 +17,23 @@ impl Pages {
     const SIZE_OF_PAGE: usize = size_of::<Page>();
 
     pub fn import(db: &Database, name: &str) -> Result<Self> {
-        let (region_index, _region) = db.create_region_if_needed(name)?;
+        let region = db.create_region_if_needed(name)?;
 
-        let vec = _region
-            .read()
-            .create_reader(db)
+        let vec = region
+            .create_reader()
             .read_all()
             .chunks(Self::SIZE_OF_PAGE)
             .map(|b| Page::read_from_bytes(b).map_err(|e| e.into()))
             .collect::<Result<_>>()?;
 
         Ok(Self {
-            _region,
-            region_index,
+            region,
             vec,
             change_at: None,
         })
     }
 
-    pub fn flush(&mut self, file: &Database) -> Result<()> {
+    pub fn flush(&mut self) -> Result<()> {
         if self.change_at.is_none() {
             return Ok(());
         }
@@ -48,11 +41,8 @@ impl Pages {
         let change_at = self.change_at.take().unwrap();
         let at = (change_at * Self::SIZE_OF_PAGE) as u64;
 
-        file.truncate_write_all_to_region(
-            self.region_index.into(),
-            at,
-            self.vec[change_at..].as_bytes(),
-        )?;
+        self.region
+            .truncate_write_all(at, self.vec[change_at..].as_bytes())?;
 
         Ok(())
     }

@@ -9,7 +9,6 @@ pub type Result<T, E = Error> = result::Result<T, E>;
 pub enum Error {
     IO(io::Error),
     TryLock(fs::TryLockError),
-    ZeroCopy,
 
     Str(&'static str),
     String(String),
@@ -27,18 +26,6 @@ impl From<fs::TryLockError> for Error {
     }
 }
 
-impl<A, B, C> From<zerocopy::error::ConvertError<A, B, C>> for Error {
-    fn from(_: zerocopy::error::ConvertError<A, B, C>) -> Self {
-        Self::ZeroCopy
-    }
-}
-
-impl<A, B> From<zerocopy::error::SizeError<A, B>> for Error {
-    fn from(_: zerocopy::error::SizeError<A, B>) -> Self {
-        Self::ZeroCopy
-    }
-}
-
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -47,7 +34,6 @@ impl fmt::Display for Error {
                 f,
                 "Couldn't lock file. It must be already opened by another process."
             ),
-            Error::ZeroCopy => write!(f, "ZeroCopy error"),
 
             Error::Str(s) => write!(f, "{s}"),
             Error::String(s) => write!(f, "{s}"),

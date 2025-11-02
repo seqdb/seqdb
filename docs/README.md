@@ -1,4 +1,4 @@
-# [seqdb]
+# anydb
 
 A high-performance, embedded database system designed for analytical workloads and columnar data storage.
 

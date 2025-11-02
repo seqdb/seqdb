@@ -2,6 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     marker::PhantomData,
     mem,
+    path::PathBuf,
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -10,8 +11,7 @@ use std::{
 
 use allocative::Allocative;
 use log::info;
-use parking_lot::RwLock;
-use seqdb::{Database, Reader, Region, RegionReader};
+use seqdb::{Database, Reader, Region};
 use zerocopy::{FromBytes, IntoBytes};
 
 use crate::{
@@ -33,9 +33,7 @@ const VERSION: Version = Version::ONE;
 
 #[derive(Debug, Allocative)]
 pub struct RawVec<I, T> {
-    db: Database,
-    region: Arc<RwLock<Region>>,
-    region_index: usize,
+    region: Region,
 
     header: Header,
     name: &'static str,
@@ -76,10 +74,10 @@ where
                 info!("Resetting {}...", options.name);
                 let _ = options
                     .db
-                    .remove_region(Self::vec_region_name_(options.name).into());
+                    .remove_region_with_id(&Self::vec_region_name_(options.name));
                 let _ = options
                     .db
-                    .remove_region(Self::holes_region_name_(options.name).into());
+                    .remove_region_with_id(&Self::holes_region_name_(options.name));
                 Self::import_with(options)
             }
             _ => res,
@@ -104,9 +102,9 @@ where
         }: ImportOptions,
         format: Format,
     ) -> Result<Self> {
-        let (region_index, region) = db.create_region_if_needed(&Self::vec_region_name_(name))?;
+        let region = db.create_region_if_needed(&Self::vec_region_name_(name))?;
 
-        let region_len = region.read().len() as usize;
+        let region_len = region.meta().read().len() as usize;
         if region_len > 0
             && (region_len < HEADER_OFFSET as usize
                 || (format.is_raw()
@@ -117,15 +115,15 @@ where
         }
 
         let header = if region_len == 0 {
-            Header::create_and_write(db, region_index, version, format)?
+            Header::create_and_write(&region, version, format)?
         } else {
-            Header::import_and_verify(db, region.read(), region.read().len(), version, format)?
+            Header::import_and_verify(&region, version, format)?
         };
 
-        let holes = if let Ok(holes) = db.get_region(Self::holes_region_name_(name).into()) {
+        let holes = if let Some(holes) = db.get_region(&Self::holes_region_name_(name)) {
             Some(
                 holes
-                    .create_reader(db)
+                    .create_reader()
                     .read_all()
                     .chunks(size_of::<usize>())
                     .map(|b| -> Result<usize> { usize::read_from_bytes(b).map_err(|e| e.into()) })
@@ -136,9 +134,7 @@ where
         };
 
         let mut this = Self {
-            db: db.clone(),
             region: region.clone(),
-            region_index,
             header,
             name: Box::leak(Box::new(name.to_string())),
             prev_pushed: vec![],
@@ -178,7 +174,7 @@ where
 
     pub fn write_header_if_needed(&mut self) -> Result<()> {
         if self.header.modified() {
-            self.header.write(&self.db, self.region_index)?;
+            self.header.write(&self.region)?;
         }
         Ok(())
     }
@@ -203,9 +199,7 @@ where
 impl<I, T> Clone for RawVec<I, T> {
     fn clone(&self) -> Self {
         Self {
-            db: self.db.clone(),
             region: self.region.clone(),
-            region_index: self.region_index,
             header: self.header.clone(),
             name: self.name,
             prev_pushed: vec![],
@@ -265,6 +259,11 @@ where
     T: StoredRaw,
 {
     #[inline]
+    fn db_path(&self) -> PathBuf {
+        self.region.db().path().to_path_buf()
+    }
+
+    #[inline]
     fn header(&self) -> &Header {
         &self.header
     }
@@ -281,7 +280,7 @@ where
 
     #[inline]
     fn real_stored_len(&self) -> usize {
-        (self.region.read().len() as usize - HEADER_OFFSET as usize) / Self::SIZE_OF_T
+        (self.region.meta().read().len() as usize - HEADER_OFFSET as usize) / Self::SIZE_OF_T
     }
 
     #[inline]
@@ -322,14 +321,11 @@ where
         // self.prev_pushed = self.pushed.clone();
 
         if has_new_data {
-            self.db.truncate_write_all_to_region(
-                self.region_index.into(),
-                from,
-                mem::take(&mut self.pushed).as_bytes(),
-            )?;
+            self.region
+                .truncate_write_all(from, mem::take(&mut self.pushed).as_bytes())?;
             self.update_stored_len(stored_len + pushed_len);
         } else if truncated {
-            self.db.truncate_region(self.region_index.into(), from)?;
+            self.region.truncate(from)?;
         }
 
         if has_updated_data || has_prev_updated_data {
@@ -338,25 +334,29 @@ where
             updated.into_iter().try_for_each(|(i, v)| -> Result<()> {
                 let bytes = v.as_bytes();
                 let at = (i * Self::SIZE_OF_T) as u64 + HEADER_OFFSET;
-                self.db
-                    .write_all_to_region_at(self.region_index.into(), bytes, at)?;
+                self.region.write_all_at(bytes, at)?;
                 Ok(())
             })?;
         }
 
         if has_holes {
             self.has_stored_holes = true;
-            let (holes_index, _) = self.db.create_region_if_needed(&self.holes_region_name())?;
+            let holes = self
+                .region
+                .db()
+                .create_region_if_needed(&self.holes_region_name())?;
             let bytes = self
                 .holes
                 .iter()
                 .flat_map(|i| i.to_ne_bytes())
                 .collect::<Vec<_>>();
-            self.db
-                .truncate_write_all_to_region(holes_index.into(), 0, &bytes)?;
+            holes.truncate_write_all(0, &bytes)?;
         } else if had_holes {
             self.has_stored_holes = false;
-            let _ = self.db.remove_region(self.holes_region_name().into());
+            let _ = self
+                .region
+                .db()
+                .remove_region_with_id(&self.holes_region_name());
         }
 
         // self.prev_holes = self.holes.clone();
@@ -364,15 +364,7 @@ where
         Ok(())
     }
 
-    fn db(&self) -> &Database {
-        &self.db
-    }
-
-    fn region_index(&self) -> usize {
-        self.region_index
-    }
-
-    fn region(&self) -> &RwLock<Region> {
+    fn region(&self) -> &Region {
         &self.region
     }
 

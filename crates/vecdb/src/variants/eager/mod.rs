@@ -1,14 +1,13 @@
-use core::error;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     f32,
     fmt::Debug,
     iter::Sum,
     ops::{Add, Div, Mul, Sub},
+    path::PathBuf,
 };
 
 use allocative::Allocative;
-use parking_lot::RwLock;
 use seqdb::{Database, Reader, Region};
 
 use crate::{
@@ -554,7 +553,7 @@ where
             + CheckedSub<T2>
             + TryInto<T>
             + Default,
-        <T2 as TryInto<T>>::Error: error::Error + 'static,
+        <T2 as TryInto<T>>::Error: core::error::Error + 'static,
         T3: StoredRaw,
     {
         let opt: Option<Box<dyn FnMut(T2) -> bool>> = None;
@@ -578,7 +577,7 @@ where
             + CheckedSub<T2>
             + TryInto<T>
             + Default,
-        <T2 as TryInto<T>>::Error: error::Error + 'static,
+        <T2 as TryInto<T>>::Error: core::error::Error + 'static,
         T3: StoredRaw,
         F: FnMut(T2) -> bool,
     {
@@ -609,7 +608,7 @@ where
             + TryInto<T>
             + Default,
         T3: StoredRaw,
-        <T2 as TryInto<T>>::Error: error::Error + 'static,
+        <T2 as TryInto<T>>::Error: core::error::Error + 'static,
     {
         self.validate_computed_version_or_reset(
             Version::ZERO
@@ -1366,17 +1365,12 @@ where
     T: StoredCompressed,
 {
     #[inline]
-    fn db(&self) -> &Database {
-        self.0.db()
+    fn db_path(&self) -> PathBuf {
+        self.0.db_path()
     }
 
     #[inline]
-    fn region_index(&self) -> usize {
-        self.0.region_index()
-    }
-
-    #[inline]
-    fn region(&self) -> &RwLock<Region> {
+    fn region(&self) -> &Region {
         self.0.region()
     }
 

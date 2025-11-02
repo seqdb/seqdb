@@ -9,8 +9,9 @@ mod lmdb_impl;
 mod redb_impl;
 mod rocksdb_impl;
 mod runner;
-mod vecdb_impl;
-mod vecdb_old_impl;
+mod vecdb_compressed_impl;
+mod vecdb_raw_impl;
+mod vecdb_raw_old_impl;
 
 use database::DatabaseBenchmark;
 use fjall2_impl::*;
@@ -20,8 +21,9 @@ use redb_impl::*;
 use rocksdb_impl::*;
 use runner::*;
 pub use runner::{BenchConfig, Database};
-use vecdb_impl::*;
-use vecdb_old_impl::*;
+use vecdb_compressed_impl::*;
+use vecdb_raw_impl::*;
+use vecdb_raw_old_impl::*;
 
 struct AccumulatedTimes {
     open: Vec<Duration>,
@@ -206,7 +208,9 @@ pub fn run(configs: &[BenchConfig]) -> Result<()> {
         println!("\n=== Running Benchmark {} ===", config_idx + 1);
         println!(
             "Config: {} writes, {}% random reads, {} iterations",
-            config.write_count, config.random_read_percent * 100.0, config.num_iterations
+            config.write_count,
+            config.random_read_percent * 100.0,
+            config.num_iterations
         );
 
         let runner = BenchmarkRunner::new(&base_path, config.clone());
@@ -220,11 +224,15 @@ pub fn run(configs: &[BenchConfig]) -> Result<()> {
 
         for db in &config.databases {
             match db {
-                Database::VecDb => {
-                    db_benchmarks.push(Box::new(DbBenchmark::<VecDbBench>::new(&runner)?));
+                Database::VecDbCompressed => {
+                    db_benchmarks
+                        .push(Box::new(DbBenchmark::<VecDbCompressedBench>::new(&runner)?));
                 }
-                Database::VecDbOld => {
-                    db_benchmarks.push(Box::new(DbBenchmark::<VecDbOldBench>::new(&runner)?));
+                Database::VecDbRaw => {
+                    db_benchmarks.push(Box::new(DbBenchmark::<VecDbRawBench>::new(&runner)?));
+                }
+                Database::VecDbRawOld => {
+                    db_benchmarks.push(Box::new(DbBenchmark::<VecDbRawOldBench>::new(&runner)?));
                 }
                 Database::Fjall3 => {
                     db_benchmarks.push(Box::new(DbBenchmark::<Fjall3Bench>::new(&runner)?));

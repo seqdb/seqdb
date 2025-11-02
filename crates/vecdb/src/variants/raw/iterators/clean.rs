@@ -5,7 +5,7 @@ use std::{
 };
 
 use parking_lot::RwLockReadGuard;
-use seqdb::Region;
+use seqdb::RegionMetadata;
 
 use crate::{
     AnyStoredVec, RawVec, Result, StoredIndex, StoredRaw, VecIterator, VecIteratorExtended, likely,
@@ -22,7 +22,7 @@ pub struct CleanRawVecIterator<'a, I, T> {
     end_offset: u64,
     start_offset: u64,
     pub(crate) _vec: &'a RawVec<I, T>,
-    _lock: RwLockReadGuard<'a, Region>,
+    _lock: RwLockReadGuard<'a, RegionMetadata>,
 }
 
 impl<'a, I, T> CleanRawVecIterator<'a, I, T>
@@ -35,15 +35,14 @@ where
     const _CHECK_T: () = assert!(Self::SIZE_OF_T > 0, "Can't have T with size_of() == 0");
 
     pub fn new(vec: &'a RawVec<I, T>) -> Result<Self> {
-        let region = vec.region.read();
-        let file = vec.db.open_read_only_file()?;
+        let file = vec.region.open_db_read_only_file()?;
 
-        let region_start = region.start();
+        let region_meta = vec.region.meta().read();
+        let region_start = region_meta.start();
         let start_offset = region_start + HEADER_OFFSET;
-
         // Support truncated vecs
         let end_offset = region_start
-            + (region
+            + (region_meta
                 .len()
                 .min(Self::index_to_bytes(vec.stored_len()) + HEADER_OFFSET));
 
@@ -56,7 +55,7 @@ where
             end_offset,
             start_offset,
             _vec: vec,
-            _lock: region,
+            _lock: region_meta,
         };
 
         this.seek(start_offset);
@@ -454,7 +453,9 @@ mod tests {
         vec.flush().unwrap();
 
         // Skip 100, take 200, skip 50 more, take 100 more
-        let collected: Vec<i32> = vec.clean_iter().unwrap()
+        let collected: Vec<i32> = vec
+            .clean_iter()
+            .unwrap()
             .skip(100)
             .take(200)
             .skip(50)
