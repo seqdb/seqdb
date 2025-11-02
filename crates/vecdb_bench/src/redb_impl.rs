@@ -23,7 +23,7 @@ impl DatabaseBenchmark for RedbBench {
 
     fn open(path: &Path) -> Result<Self> {
         let db = Builder::new()
-            .set_cache_size(4 * 1024 * 1024 * 1024)
+            .set_cache_size(1024 * 1024 * 1024)
             .create(path.join("bench.redb"))?;
         Ok(Self { db })
     }

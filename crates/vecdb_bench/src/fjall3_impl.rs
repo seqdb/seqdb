@@ -22,7 +22,7 @@ impl DatabaseBenchmark for Fjall3Bench {
 
     fn open(path: &Path) -> Result<Self> {
         let database = TxDatabase::builder(path)
-            .cache_size(4 * 1024 * 1024 * 1024)
+            .cache_size(1024 * 1024 * 1024)
             .open()?;
         let options = KeyspaceCreateOptions::default();
         let keyspace = database.keyspace("bench", options)?;

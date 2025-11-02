@@ -8,7 +8,6 @@ fn main() {
             databases: vec![
                 Database::VecDbCompressed,
                 Database::VecDbRaw,
-                Database::VecDbRawOld,
                 Database::Fjall3,
                 Database::Fjall2,
                 Database::Redb,
@@ -16,19 +15,15 @@ fn main() {
             ],
             ..Default::default()
         },
-        // BenchConfig {
-        //     write_count: 200_000_000,
-        //     databases: vec![
-        //         Database::VecDbCompressed,
-        //         Database::VecDb,
-        //         Database::VecDbOld,
-        //         Database::Fjall3,
-        //         Database::Fjall2,
-        //         Database::Redb,
-        //         Database::Lmdb,
-        //     ],
-        //     ..Default::default()
-        // },
+        BenchConfig {
+            write_count: 1_000_000_000,
+            databases: vec![
+                Database::VecDbRawOld,
+                Database::VecDbRaw,
+                Database::VecDbCompressed,
+            ],
+            ..Default::default()
+        },
     ];
     run(&configs).unwrap();
 }
