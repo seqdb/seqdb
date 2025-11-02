@@ -13,7 +13,7 @@ use rawdb::{Database, Reader, Region};
 use crate::{
     AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, AsInnerSlice, BoxedVecIterator,
     CollectableVec, Error, Format, FromInnerSlice, GenericStoredVec, HEADER_OFFSET, Header, RawVec,
-    Result, StoredCompressed, StoredIndex, Version, variants::ImportOptions,
+    Result, StoredCompressed, StoredIndex, Version, likely, variants::ImportOptions,
 };
 
 mod iterators;
@@ -78,6 +78,7 @@ where
         Self::import_with((db, name, version).into())
     }
 
+    #[inline]
     pub fn import_with(options: ImportOptions) -> Result<Self> {
         let inner = RawVec::import_(options, Format::Compressed)?;
 
@@ -93,24 +94,12 @@ where
         Ok(this)
     }
 
+    #[inline]
     fn decode_page(&self, page_index: usize, reader: &Reader) -> Result<Vec<T>> {
         Self::decode_page_(self.stored_len(), page_index, reader, &self.pages.read())
     }
 
-    /// Stateless: decompress raw bytes into Vec<T>
-    fn decompress_bytes(compressed_data: &[u8], expected_values: usize) -> Result<Vec<T>> {
-        let vec: Vec<T::NumberType> = pco::standalone::simple_decompress(compressed_data)?;
-        let vec = T::from_inner_slice(vec);
-
-        if vec.len() != expected_values {
-            dbg!((compressed_data.len(), vec.len(), expected_values));
-            dbg!(&vec);
-            unreachable!("Decompressed page has wrong number of values")
-        }
-
-        Ok(vec)
-    }
-
+    #[inline]
     fn decode_page_(
         stored_len: usize,
         page_index: usize,
@@ -131,6 +120,22 @@ where
         Self::decompress_bytes(compressed_data, page.values as usize)
     }
 
+    /// Stateless: decompress raw bytes into Vec<T>
+    #[inline]
+    fn decompress_bytes(compressed_data: &[u8], expected_values: usize) -> Result<Vec<T>> {
+        let vec: Vec<T::NumberType> = pco::standalone::simple_decompress(compressed_data)?;
+        let vec = T::from_inner_slice(vec);
+
+        if likely(vec.len() == expected_values) {
+            return Ok(vec);
+        }
+
+        dbg!((compressed_data.len(), vec.len(), expected_values));
+        dbg!(&vec);
+        unreachable!("Decompressed page has wrong number of values")
+    }
+
+    #[inline]
     fn compress_page(chunk: &[T]) -> Vec<u8> {
         if chunk.len() > Self::PER_PAGE {
             panic!();
