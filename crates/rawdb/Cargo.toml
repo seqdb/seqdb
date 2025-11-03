@@ -1,6 +1,6 @@
 [package]
 name = "rawdb"
-description = "A very simple filesystem like storage engine"
+description = "Single-file, low-level and space efficient storage engine with filesystem-like API"
 keywords.workspace = true
 categories.workspace = true
 license.workspace = true

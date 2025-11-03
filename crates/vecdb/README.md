@@ -1,6 +1,6 @@
 # vecdb
 
-Persistent vectors built on [`rawdb`](../rawdb/README.md).
+High-performance mutable persistent vectors built on [`rawdb`](../rawdb/README.md).
 
 It features:
 
@@ -9,7 +9,7 @@ It features:
 - Rollback via stamped change deltas
 - Sparse deletions with holes
 - Thread-safe with concurrent reads
-- Very high read speeds
+- Blazing fast ([benchmark](../vecdb_bench/README.md))
 - Persistence only on `flush`
 
 It is not:
@@ -80,7 +80,3 @@ Compression via Pcodec works for numeric types only.
 ## Examples
 
 See [examples/](examples/) for usage.
-
-## Benchmarks
-
-See [`vecdb_bench`](../vecdb_bench/README.md) for results.

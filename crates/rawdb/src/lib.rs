@@ -1,8 +1,8 @@
-#![doc = include_str!(concat!("../", env!("CARGO_PKG_README")))]
-#![doc = "\n## Example\n"]
-#![doc = "\n```rust"]
-#![doc = include_str!("../examples/db.rs")]
-#![doc = "```\n"]
+#![doc = include_str!("../README.md")]
+// #![doc = "\n## Example\n"]
+// #![doc = "\n```rust"]
+// #![doc = include_str!("../examples/db.rs")]
+// #![doc = "```\n"]
 
 use std::{
     collections::HashSet,

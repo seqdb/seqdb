@@ -1,6 +1,6 @@
 # rawdb
 
-Single-file low-level space efficient storage engine with filesystem-like API.
+Single-file, low-level and space efficient storage engine with filesystem-like API.
 
 It features:
 
@@ -30,7 +30,8 @@ use rawdb::{Database, Result};
 
 fn main() -> Result<()> {
     // open database
-    let db = Database::open("my_db")?;
+    let temp_dir = tempfile::TempDir::new()?;
+    let db = Database::open(temp_dir.path())?;
 
     // create regions
     let region1 = db.create_region_if_needed("region1")?;
@@ -48,7 +49,8 @@ fn main() -> Result<()> {
 
     // remove region (space becomes reusable hole)
     db.remove_region(region1)?;
-    db.punch_holes()?;
+
+    db.flush()?; // Should be `db.flush_then_punch()?` but doesn't work with `TempDir`
 
     Ok(())
 }
