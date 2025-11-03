@@ -1,6 +1,6 @@
 [package]
 name = "vecdb"
-description = "A K.I.S.S. index-value storage engine"
+description = "A very simple vector database"
 keywords.workspace = true
 categories.workspace = true
 version.workspace = true
