@@ -1,16 +1,86 @@
 # vecdb
 
-A K.I.S.S. index-value storage engine that provides persistent, type-safe vector storage with compression and computation capabilities.
+Persistent vectors built on [`rawdb`](../rawdb/README.md).
 
-## What is vecdb?
+It features:
 
-vecdb is a high-level vector storage engine built on [rawdb](../rawdb) that provides persistent vector-like data structures. It supports multiple storage formats and computation strategies for different performance and space requirements.
+- `Vec` based API: push, update, truncate, delete by index
+- Multiple variants: `raw`, `compressed`, `computed`
+- Rollback via stamped change deltas
+- Sparse deletions with holes
+- Thread-safe with concurrent reads
+- Very high read speeds
+- Persistence only on `flush`
 
-## Key Features
+It is not:
 
-- **Multiple storage variants**: Raw, compressed, lazy, eager, and computed vectors
-- **Advanced compression**: Uses Pcodec for numerical data compression
-- **Type safety**: Generic storage with zero-copy access
-- **Versioning system**: Change tracking and rollback support
-- **Hole management**: Efficient sparse data handling
-- **Thread-safe**: Concurrent read operations
+- A key-value store (consider [`fjall`](https://crates.io/crates/fjall) or [`redb`](https://crates.io/crates/redb))
+- Suited for variable-sized types (`String`, `Vec<T>`, etc.)
+
+## Install
+
+```bash
+cargo add vecdb
+```
+
+## Usage
+
+```rust
+use vecdb::{AnyStoredVec, Database, GenericStoredVec, RawVec, Result, Version};
+
+fn main() -> Result<()> {
+    // create
+    let temp_dir = tempfile::TempDir::new()?;
+    let db = Database::open(temp_dir.path())?;
+    let mut vec: RawVec<usize, u64> = RawVec::import(&db, "vec", Version::ONE)?;
+
+    // push
+    for i in 0..1_000_000 {
+        vec.push(i);
+    }
+
+    // flush
+    vec.flush()?;
+    db.flush()?;
+
+    // read (sequential)
+    let mut sum = 0u64;
+    for value in vec.iter()? {
+        sum = sum.wrapping_add(value);
+    }
+
+    // read (random)
+    let indices: Vec<usize> = vec![500, 1000, 10];
+    let reader = vec.create_reader();
+    for idx in indices {
+        if let Ok(value) = vec.read(idx as usize, &reader) {
+            sum = sum.wrapping_add(value);
+        }
+    }
+
+    Ok(())
+}
+```
+
+## Constraints
+
+Data must be fixed-size types: numbers, fixed arrays, structs with `#[repr(C)]`.
+
+Compression via Pcodec works for numeric types only.
+
+## When to use it
+
+- Need to store `Vec`s on disk
+- Append-only or append-mostly workloads
+- Need very high read speeds
+- Space-efficient storage for numeric data
+- Sparse deletions without reindexing
+- Rollback without full snapshots
+
+## Examples
+
+See [examples/](examples/) for usage.
+
+## Benchmarks
+
+See [`vecdb_bench`](../vecdb_bench/README.md) for results.

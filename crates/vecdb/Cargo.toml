@@ -28,7 +28,7 @@ vecdb_derive = { workspace = true, optional = true }
 zerocopy = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3.23.0"
+tempfile = { workspace = true }
 
 [package.metadata.docs.rs]
 all-features = true

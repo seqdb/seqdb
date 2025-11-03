@@ -16,16 +16,12 @@ impl DatabaseBenchmark for VecDbRawBench {
     }
 
     fn create(path: &Path) -> Result<Self> {
-        let db = Database::open(path)?;
-        let options = (&db, "bench", Version::TWO).into();
-        let vec: RawVec<usize, u64> = RawVec::forced_import_with(options)?;
-        Ok(Self { db, vec })
+        Self::open(path)
     }
 
     fn open(path: &Path) -> Result<Self> {
         let db = Database::open(path)?;
-        let options = (&db, "bench", Version::TWO).into();
-        let vec: RawVec<usize, u64> = RawVec::forced_import_with(options)?;
+        let vec: RawVec<usize, u64> = RawVec::import(&db, "bench", Version::TWO)?;
         Ok(Self { db, vec })
     }
 
@@ -49,13 +45,11 @@ impl DatabaseBenchmark for VecDbRawBench {
     fn read_random(&self, indices: &[u64]) -> Result<u64> {
         let mut sum = 0u64;
         let reader = self.vec.create_reader();
-
         for &idx in indices {
-            if let Ok(value) = self.vec.read_(idx as usize, &reader) {
+            if let Ok(value) = self.vec.read(idx as usize, &reader) {
                 sum = sum.wrapping_add(value);
             }
         }
-
         Ok(sum)
     }
 

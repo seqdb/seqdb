@@ -2,6 +2,12 @@
 
 Single-file database with named regions and automatic space management.
 
+## Install
+
+```bash
+cargo add rawdb
+```
+
 ## What it is
 
 A mmap-backed storage engine that manages multiple named regions in one file. Think filesystem-like abstraction where regions are files, but everything lives in a single physical file with automatic compaction.
@@ -28,3 +34,7 @@ A mmap-backed storage engine that manages multiple named regions in one file. Th
 ## What it's not
 
 Not a general-purpose database. No transactions, no queries, no schemas. Just regions of bytes with automatic layout management.
+
+## Examples
+
+See [examples/](examples/) for usage.

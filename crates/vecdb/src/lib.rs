@@ -1,11 +1,11 @@
 #![doc = include_str!("../README.md")]
-#![doc = "\n## Examples\n"]
-#![doc = "\n### Raw\n\n```rust"]
-#![doc = include_str!("../examples/raw.rs")]
-#![doc = "```\n"]
-#![doc = "\n### Compressed\n\n```rust"]
-#![doc = include_str!("../examples/compressed.rs")]
-#![doc = "```"]
+// #![doc = "\n## Examples\n"]
+// #![doc = "\n### Raw\n\n```rust"]
+// #![doc = include_str!("../examples/raw.rs")]
+// #![doc = "```\n"]
+// #![doc = "\n### Compressed\n\n```rust"]
+// #![doc = include_str!("../examples/compressed.rs")]
+// #![doc = "```"]
 
 pub use rawdb::{Database, Error as SeqDBError, PAGE_SIZE, Reader};
 #[cfg(feature = "derive")]
