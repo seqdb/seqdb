@@ -1,6 +1,21 @@
 # rawdb
 
-Single-file database with named regions and automatic space management.
+Single-file low-level space efficient storage engine with filesystem-like API.
+
+It features:
+
+- Multiple named regions in one file
+- Automatic space reclamation via hole punching
+- Regions grow and move automatically as needed
+- Zero-copy mmap access
+- Thread-safe with concurrent reads and writes
+- Page-aligned allocations (4KB)
+- Persistence only on flush
+- Foundation for higher-level abstractions (e.g., [`vecdb`](../vecdb/README.md))
+
+It is not:
+
+- A general-purpose database (no transactions, queries, or schemas)
 
 ## Install
 
@@ -8,32 +23,36 @@ Single-file database with named regions and automatic space management.
 cargo add rawdb
 ```
 
-## What it is
+## Usage
 
-A mmap-backed storage engine that manages multiple named regions in one file. Think filesystem-like abstraction where regions are files, but everything lives in a single physical file with automatic compaction.
+```rust
+use rawdb::{Database, Result};
 
-## Why use it
+fn main() -> Result<()> {
+    // open database
+    let db = Database::open("my_db")?;
 
-**One file, many regions**: Create unlimited named regions in a single database file. No directory management, no file handle limits.
+    // create regions
+    let region1 = db.create_region_if_needed("region1")?;
+    let region2 = db.create_region_if_needed("region2")?;
 
-**Automatic space reclamation**: Removed regions become holes that are automatically reused. Hole punching reduces disk usage without manual compaction.
+    // write data
+    db.write_all_to_region(&region1, &[0, 1, 2, 3, 4])?;
+    db.write_all_to_region(&region2, &[5, 6, 7, 8, 9])?;
 
-**Zero-copy access**: Direct mmap access. Read without copying into buffers.
+    // read via mmap
+    let data = &db.mmap()[0..5];
 
-**Thread-safe**: Clone the database handle and share across threads. Concurrent reads and writes are safe.
+    // flush to disk
+    db.flush()?;
 
-**Page-aligned**: All allocations are 4KB page-aligned. Regions grow automatically on demand.
+    // remove region (space becomes reusable hole)
+    db.remove_region(region1)?;
+    db.punch_holes()?;
 
-## When to use it
-
-- Multiple logical partitions without filesystem overhead
-- Building higher-level data structures (vectors, arrays, indices)
-- Need mmap performance with simpler management than raw files
-- Append-mostly workloads with occasional region removal
-
-## What it's not
-
-Not a general-purpose database. No transactions, no queries, no schemas. Just regions of bytes with automatic layout management.
+    Ok(())
+}
+```
 
 ## Examples
 
