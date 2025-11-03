@@ -7,7 +7,7 @@ It features:
 - Multiple named regions in one file
 - Automatic space reclamation via hole punching
 - Regions grow and move automatically as needed
-- Zero-copy mmap access
+- Optional zero-copy mmap access
 - Thread-safe with concurrent reads and writes
 - Page-aligned allocations (4KB)
 - Persistence only on flush
