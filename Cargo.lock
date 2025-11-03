@@ -1194,7 +1194,7 @@ dependencies = [
 
 [[package]]
 name = "rawdb"
-version = "0.2.17"
+version = "0.3.0"
 dependencies = [
  "allocative",
  "libc",
@@ -1707,24 +1707,6 @@ checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 [[package]]
 name = "vecdb"
 version = "0.2.17"
-dependencies = [
- "allocative",
- "ctrlc",
- "log",
- "parking_lot 0.12.5",
- "pco",
- "rawdb",
- "serde",
- "serde_derive",
- "sonic-rs",
- "tempfile",
- "vecdb_derive",
- "zerocopy",
-]
-
-[[package]]
-name = "vecdb"
-version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f4bc53cae8d59e2201d5553b351b124feeed236b6bd31645b6dda8f8dcf95e9a"
 dependencies = [
@@ -1742,8 +1724,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "vecdb"
+version = "0.3.0"
+dependencies = [
+ "allocative",
+ "ctrlc",
+ "log",
+ "parking_lot 0.12.5",
+ "pco",
+ "rawdb",
+ "serde",
+ "serde_derive",
+ "sonic-rs",
+ "tempfile",
+ "vecdb_derive",
+ "zerocopy",
+]
+
+[[package]]
 name = "vecdb_bench"
-version = "0.2.17"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -1755,13 +1755,13 @@ dependencies = [
  "redb",
  "rocksdb",
  "vecdb 0.2.17",
- "vecdb 0.2.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "vecdb 0.3.0",
  "walkdir",
 ]
 
 [[package]]
 name = "vecdb_derive"
-version = "0.2.17"
+version = "0.3.0"
 dependencies = [
  "quote",
  "syn 2.0.108",

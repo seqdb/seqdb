@@ -1,24 +1,32 @@
 # vecdb_derive
 
-Procedural macros for [vecdb](../vecdb) that enable custom types to work with compressed storage.
+Derive macros for [`vecdb`](../vecdb/) compression support.
 
-## What is vecdb_derive?
+Automatically implements compression traits for custom wrapper types, enabling them to work with `CompressedVec`.
 
-This crate provides derive macros that automatically implement compression traits for custom wrapper types, allowing them to be used seamlessly with vecdb's compressed storage variants.
+## Install
 
-## Features
+```bash
+cargo add vecdb --features derive
+```
 
-- **Automatic trait implementation**: Generates `StoredCompressed` for wrapper types
-- **Zero-cost abstractions**: Wrappers have the same compression characteristics as inner types
-- **Generic support**: Works with generic types and proper trait bounds
-- **Type safety**: Compile-time guarantees for compression compatibility
+## Usage
 
-## Derive Macros
+```rust
+use vecdb_derive::StoredCompressed;
 
-### `#[derive(StoredCompressed)]`
+#[derive(StoredCompressed)]
+struct Timestamp(u64);
 
-Automatically implements compression traits for single-field tuple structs.
+// Now works with CompressedVec
+let mut vec: CompressedVec<usize, Timestamp> = ...;
+vec.push(Timestamp(12345));
+```
+
+## `#[derive(StoredCompressed)]`
+
+Implements `StoredCompressed` for single-field tuple structs. The wrapper inherits compression characteristics from the inner type.
 
 **Requirements:**
 - Must be a tuple struct with exactly one field
-- The inner type must implement `StoredCompressed`
+- Inner type must implement `StoredCompressed`

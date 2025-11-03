@@ -3,11 +3,11 @@ resolver = "3"
 members = ["crates/*"]
 package.license = "MIT"
 package.edition = "2024"
-package.version = "0.2.17"
+package.version = "0.3.0"
 package.homepage = "https://github.com/anydb-rs/anydb"
 package.repository = "https://github.com/anydb-rs/anydb"
 package.readme = "README.md"
-package.keywords = ["vec", "disk", "data"]
+package.keywords = ["vec", "disk", "database"]
 package.categories = ["database"]
 package.rust-version = "1.89"
 
@@ -16,26 +16,16 @@ lto = "fat"
 codegen-units = 1
 panic = "abort"
 
-[profile.profiling]
-inherits = "release"
-debug = true
-
-[profile.dist]
-inherits = "release"
-
-[profile.clippy]
-inherits = "dev"
-
 [workspace.dependencies]
 allocative = { version = "0.3.4", features = ["parking_lot"] }
 allocative_derive = "0.3.3"
 log = "0.4.28"
 parking_lot = "0.12.5"
-rawdb = { version = "0.2.17", path = "crates/rawdb" }
+rawdb = { version = "0.3.0", path = "crates/rawdb" }
 rayon = "1.11.0"
 tempfile = "3.23.0"
-vecdb = { version = "0.2.17", path = "crates/vecdb" }
-vecdb_derive = { version = "0.2.17", path = "crates/vecdb_derive" }
+vecdb = { version = "0.3.0", path = "crates/vecdb" }
+vecdb_derive = { version = "0.3.0", path = "crates/vecdb_derive" }
 zerocopy = { version = "0.8.27", features = ["zerocopy-derive"] }
 
 [workspace.metadata.release]
