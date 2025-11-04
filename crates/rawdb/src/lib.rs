@@ -13,7 +13,6 @@ use std::{
     sync::{Arc, Weak},
 };
 
-use allocative::Allocative;
 use libc::off_t;
 use memmap2::{MmapMut, MmapOptions};
 use parking_lot::{RwLock, RwLockReadGuard};
@@ -35,8 +34,8 @@ pub const PAGE_SIZE: u64 = 4096;
 pub const PAGE_SIZE_MINUS_1: u64 = PAGE_SIZE - 1;
 const GB: usize = 1024 * 1024 * 1024;
 
-#[derive(Debug, Clone, Allocative)]
-pub struct Database(#[allocative(skip)] Arc<DatabaseInner>);
+#[derive(Debug, Clone)]
+pub struct Database(Arc<DatabaseInner>);
 
 #[derive(Debug)]
 pub struct DatabaseInner {
@@ -170,8 +169,6 @@ impl Database {
         at: Option<u64>,
         truncate: bool,
     ) -> Result<()> {
-        let regions = self.regions.read();
-
         let region_meta = region.meta().read();
         let start = region_meta.start();
         let reserved = region_meta.reserved();
@@ -214,7 +211,6 @@ impl Database {
             }
 
             region_meta.set_len(new_len);
-            regions.write_region_(region.index(), &region_meta)?;
 
             return Ok(());
         }
@@ -243,7 +239,6 @@ impl Database {
 
             let mut region_meta = region.meta().write();
             region_meta.set_len(new_len);
-            regions.write_region_(region.index(), &region_meta)?;
 
             return Ok(());
         }
@@ -266,7 +261,6 @@ impl Database {
 
             let mut region_meta = region.meta().write();
             region_meta.set_len(new_len);
-            regions.write_region_(region.index(), &region_meta)?;
 
             return Ok(());
         }
@@ -292,8 +286,6 @@ impl Database {
             region_meta.set_start(hole_start);
             region_meta.set_reserved(new_reserved);
             region_meta.set_len(new_len);
-
-            regions.write_region_(region.index(), &region_meta)?;
 
             return Ok(());
         }
@@ -325,8 +317,6 @@ impl Database {
         region_meta.set_reserved(new_reserved);
         region_meta.set_len(new_len);
 
-        regions.write_region_(region.index(), &region_meta)?;
-
         Ok(())
     }
 
@@ -351,7 +341,6 @@ impl Database {
     /// Non destructive
     ///
     pub fn truncate_region(&self, region: &Region, from: u64) -> Result<()> {
-        let regions = self.regions.read();
         let mut region_meta = region.meta().write();
         let len = region_meta.len();
         if from == len {
@@ -360,7 +349,6 @@ impl Database {
             return Err(Error::Str("Truncating further than length"));
         }
         region_meta.set_len(from);
-        regions.write_region_(region.index(), &region_meta)?;
         Ok(())
     }
 
@@ -456,16 +444,21 @@ impl Database {
         let mmap = self.mmap.read();
         let regions = self.regions.read();
         mmap.flush()?;
-        regions.flush()
+        regions.flush()?;
+
+        // Now that metadata is durable, pending holes can be reused
+        self.layout.write().promote_pending_holes();
+
+        Ok(())
     }
 
     #[inline]
-    pub fn flush_then_punch(&self) -> Result<()> {
+    pub fn compact(&self) -> Result<()> {
         self.flush()?;
         self.punch_holes()
     }
 
-    pub fn punch_holes(&self) -> Result<()> {
+    fn punch_holes(&self) -> Result<()> {
         let file = self.file.write();
         let mut mmap = self.mmap.write();
         let regions = self.regions.read();

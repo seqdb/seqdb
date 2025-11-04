@@ -5,7 +5,6 @@ use std::{
     sync::Arc,
 };
 
-use allocative::Allocative;
 use std::os::unix::fs::FileExt;
 
 use crate::{Database, Error, RegionMetadata, Result};
@@ -15,11 +14,10 @@ use super::{
     region::{Region, SIZE_OF_REGION_METADATA},
 };
 
-#[derive(Debug, Allocative)]
+#[derive(Debug)]
 pub struct Regions {
     id_to_index: HashMap<String, usize>,
     index_to_region: Vec<Option<Region>>,
-    #[allocative(skip)]
     index_to_region_file: File,
     index_to_region_file_len: u64,
 }
@@ -96,8 +94,6 @@ impl Regions {
 
         self.set_min_len(((index + 1) * SIZE_OF_REGION_METADATA) as u64)?;
 
-        self.write_region(&region)?;
-
         let region_opt = Some(region.clone());
         if index < self.index_to_region.len() {
             self.index_to_region[index] = region_opt
@@ -158,18 +154,25 @@ impl Regions {
         Ok(Some(region))
     }
 
-    pub fn write_region(&self, region: &Region) -> Result<()> {
-        self.write_region_(region.index(), &region.meta().read())
-    }
-
-    pub fn write_region_(&self, index: usize, region_meta: &RegionMetadata) -> Result<()> {
-        let start = (index * SIZE_OF_REGION_METADATA) as u64;
-        let bytes = region_meta.to_bytes();
-        self.index_to_region_file.write_all_at(&bytes, start)?;
-        Ok(())
-    }
-
     pub fn flush(&self) -> Result<()> {
+        // Write all dirty metadata to file
+        for (index, region) in self
+            .index_to_region
+            .iter()
+            .enumerate()
+            .flat_map(|(i, opt)| opt.as_ref().map(|r| (i, r)))
+        {
+            let mut region_meta = region.meta().write();
+            if region_meta.is_clean() {
+                continue;
+            }
+            let start = (index * SIZE_OF_REGION_METADATA) as u64;
+            let bytes = region_meta.to_bytes();
+            self.index_to_region_file.write_all_at(&bytes, start)?;
+            region_meta.clear_dirty();
+        }
+
+        // Sync the metadata file
         self.index_to_region_file.sync_data()?;
         Ok(())
     }

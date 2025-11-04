@@ -1,21 +1,22 @@
 # rawdb
 
-Single-file, low-level and space efficient storage engine with filesystem-like API.
+Non-transactional embedded storage engine with a filesystem-like API.
 
 It features:
 
 - Multiple named regions in one file
 - Automatic space reclamation via hole punching
 - Regions grow and move automatically as needed
-- Optional zero-copy mmap access
+- Zero-copy mmap access
 - Thread-safe with concurrent reads and writes
 - Page-aligned allocations (4KB)
-- Persistence only on flush
+- Crash-consistent with explicit flush
 - Foundation for higher-level abstractions (e.g., [`vecdb`](../vecdb/README.md))
 
 It is not:
 
-- A general-purpose database (no transactions, queries, or schemas)
+- A transactional database (no ACID, transactions, or rollback)
+- A query engine (no SQL, indexes, or schemas)
 
 ## Install
 
@@ -58,20 +59,28 @@ fn main() -> Result<()> {
 
 ## Durability
 
-Operations are durable after calling `flush()`. Before flush, writes are visible in memory but not guaranteed to survive crashes.
+Operations become durable after calling `flush()`. Before flush, writes are visible in memory but not guaranteed to survive crashes.
 
 **Design:**
-- **4KB metadata entries**: Atomic writes per region. IDs embedded in metadata.
-- **Single metadata file**: Rebuilt into HashMap on startup for O(1) lookups.
-- **No WAL**: Simple design. Metadata is always consistent after flush.
+- **4KB metadata entries**: Atomic page-sized writes per region with embedded IDs
+- **Single metadata file**: Rebuilt into HashMap on startup for O(1) lookups
+- **No WAL**: Simple design with proper write ordering for consistency
+- **Dirty tracking**: Metadata changes tracked in-memory, batch-written on flush
 
-**Region writes:**
+**Write ordering:**
+1. Data writes update mmap (in-memory)
+2. Metadata changes tracked with dirty flag (in-memory)
+3. Holes from moves/removes marked as pending (not reusable until flush)
+4. `flush()` syncs mmap first, then writes dirty metadata, then syncs metadata file, then promotes pending holes
+5. Ensures metadata never points to unflushed data and old locations aren't reused prematurely (crash-consistent COW)
+
+**Region operations:**
 - Expand in-place when possible (last region or adjacent hole)
 - Copy-on-write to new location when expansion needed
-- Metadata written immediately but only durable after `flush()`
+- All changes stay in memory until `flush()` makes them durable
 
 **Recovery:**
-On open, reads all metadata entries and rebuilds in-memory structures. Empty IDs indicate deleted regions.
+On open, reads all metadata entries and rebuilds in-memory structures. Deleted regions are identified by zeroed metadata.
 
 ## Examples
 

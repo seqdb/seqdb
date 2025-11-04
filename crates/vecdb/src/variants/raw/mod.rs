@@ -33,6 +33,7 @@ const VERSION: Version = Version::ONE;
 
 #[derive(Debug, Allocative)]
 pub struct RawVec<I, T> {
+    #[allocative(skip)]
     region: Region,
 
     header: Header,

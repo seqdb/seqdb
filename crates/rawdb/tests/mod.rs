@@ -1,4 +1,4 @@
-use rawdb::{Database, Result, PAGE_SIZE};
+use rawdb::{Database, PAGE_SIZE, Result};
 use std::sync::Arc;
 use std::thread;
 use tempfile::TempDir;
@@ -205,6 +205,8 @@ fn test_remove_region() -> Result<()> {
     assert!(regions.get_region_from_id("test").is_none());
     assert!(regions.get_region_from_index(index).is_none());
 
+    db.flush()?; // Make hole available
+
     // Layout should have a hole now
     let layout = db.layout();
     assert_eq!(layout.start_to_region().len(), 0);
@@ -291,6 +293,7 @@ fn test_hole_filling() -> Result<()> {
 
     // Remove middle region to create a hole
     db.remove_region(region2)?;
+    db.flush()?; // Make hole available for reuse
 
     let layout = db.layout();
     assert_eq!(layout.start_to_hole().len(), 1);
@@ -399,6 +402,7 @@ fn test_region_defragmentation() -> Result<()> {
     // Write large data to region1 - should move it to end
     let large_data = vec![1u8; (PAGE_SIZE * 2) as usize];
     db.write_all_to_region(&region1, &large_data)?;
+    db.flush()?; // Make hole available
 
     dbg!(2);
     // region1 should have moved, leaving a hole
@@ -517,7 +521,7 @@ fn test_punch_holes() -> Result<()> {
     db.truncate_region(&region, 100)?;
 
     // Flush and punch holes
-    db.flush_then_punch()?;
+    db.compact()?;
 
     // Should still be able to read the data
     let meta = region.meta().read();
@@ -614,6 +618,7 @@ fn test_complex_region_lifecycle() -> Result<()> {
 
     // Remove middle region
     db.remove_region(r2)?;
+    db.flush()?; // Make hole available
 
     // Verify hole exists
     {
@@ -634,6 +639,7 @@ fn test_complex_region_lifecycle() -> Result<()> {
     // Write large data to trigger region movement (overwrite from start)
     let large = vec![42u8; (PAGE_SIZE * 3) as usize];
     db.write_all_to_region_at(&r4, &large, 0)?;
+    db.flush()?; // Make hole available
 
     // Verify r4 moved and created a hole
     {
@@ -896,6 +902,7 @@ fn test_hole_coalescing() -> Result<()> {
     db.remove_region(regions[1].take().unwrap())?;
     db.remove_region(regions[2].take().unwrap())?;
     db.remove_region(regions[3].take().unwrap())?;
+    db.flush()?; // Make holes available and coalesce
 
     // Check that holes were coalesced
     let layout = db.layout();
@@ -1227,6 +1234,7 @@ fn test_complex_fragmentation_scenario() -> Result<()> {
     // This creates 2 separate holes
     db.remove_region(r1)?;
     db.remove_region(r3)?;
+    db.flush()?; // Make holes available
 
     let layout = db.layout();
     assert_eq!(layout.start_to_hole().len(), 2);

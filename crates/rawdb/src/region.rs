@@ -1,6 +1,5 @@
 use std::{fs::File, mem, ops::Deref, sync::Arc};
 
-use allocative::Allocative;
 use memmap2::MmapMut;
 use parking_lot::{RwLock, RwLockReadGuard};
 
@@ -8,18 +7,17 @@ use crate::{Database, Error, Result, WeakDatabase};
 
 use super::{PAGE_SIZE, Reader};
 
-#[derive(Debug, Clone, Allocative)]
+#[derive(Debug, Clone)]
 pub struct Region(Arc<RegionInner>);
 
-#[derive(Debug, Allocative)]
+#[derive(Debug)]
 pub struct RegionInner {
-    #[allocative(skip)]
     db: WeakDatabase,
     index: usize,
     meta: RwLock<RegionMetadata>,
 }
 
-#[derive(Debug, Clone, Allocative)]
+#[derive(Debug, Clone)]
 pub struct RegionMetadata {
     /// Must be multiple of 4096
     start: u64,
@@ -27,6 +25,8 @@ pub struct RegionMetadata {
     /// Must be multiple of 4096, greater or equal to len
     reserved: u64,
     id: String,
+    /// Dirty flag for tracking changes (not serialized)
+    dirty: bool,
 }
 
 pub const SIZE_OF_REGION_METADATA: usize = PAGE_SIZE as usize; // 4096 bytes for atomic writes
@@ -113,6 +113,7 @@ impl RegionMetadata {
             len,
             reserved,
             start,
+            dirty: true,
         }
     }
 
@@ -124,7 +125,8 @@ impl RegionMetadata {
     #[inline]
     pub fn set_start(&mut self, start: u64) {
         assert!(start.is_multiple_of(PAGE_SIZE));
-        self.start = start
+        self.start = start;
+        self.dirty = true;
     }
 
     #[allow(clippy::len_without_is_empty)]
@@ -136,7 +138,8 @@ impl RegionMetadata {
     #[inline]
     pub fn set_len(&mut self, len: u64) {
         assert!(len <= self.reserved());
-        self.len = len
+        self.len = len;
+        self.dirty = true;
     }
 
     #[inline]
@@ -155,6 +158,22 @@ impl RegionMetadata {
         assert!(reserved.is_multiple_of(PAGE_SIZE));
 
         self.reserved = reserved;
+        self.dirty = true;
+    }
+
+    #[inline]
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    #[inline]
+    pub fn is_clean(&self) -> bool {
+        !self.is_dirty()
+    }
+
+    #[inline]
+    pub fn clear_dirty(&mut self) {
+        self.dirty = false;
     }
 
     #[inline]
@@ -197,7 +216,14 @@ impl RegionMetadata {
             return Err(Error::Str("Zeroed region metadata"));
         }
 
-        Ok(Self::new(id, start, len, reserved))
+        // Loaded from disk, so not dirty
+        Ok(Self {
+            id,
+            start,
+            len,
+            reserved,
+            dirty: false,
+        })
     }
 }
 

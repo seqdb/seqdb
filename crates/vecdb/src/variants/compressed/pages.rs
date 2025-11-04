@@ -8,6 +8,7 @@ use super::Page;
 
 #[derive(Debug, Clone, Allocative)]
 pub struct Pages {
+    #[allocative(skip)]
     region: Region,
     vec: Vec<Page>,
     change_at: Option<usize>,

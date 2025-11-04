@@ -12,7 +12,6 @@ rust-version.workspace = true
 build = "build.rs"
 
 [dependencies]
-allocative = { workspace = true }
 libc = "0.2.177"
 memmap2 = "0.9.9"
 parking_lot = { workspace = true }

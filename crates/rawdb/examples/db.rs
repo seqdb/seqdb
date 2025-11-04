@@ -108,7 +108,7 @@ fn main() -> Result<()> {
     println!("Disk usage - post sync: {}", db.disk_usage());
 
     db.truncate_region(&region1, 10)?;
-    db.punch_holes()?;
+    db.compact()?;
 
     {
         let region1_meta = region1.meta().read();
@@ -127,7 +127,7 @@ fn main() -> Result<()> {
     println!("Disk usage - post sync: {}", db.disk_usage());
 
     db.truncate_region(&region1, 10)?;
-    db.punch_holes()?;
+    db.compact()?;
 
     {
         let region1_meta = region1.meta().read();
@@ -145,7 +145,7 @@ fn main() -> Result<()> {
 
     db.remove_region(region1)?;
 
-    db.flush_then_punch()?;
+    db.compact()?;
 
     println!("Disk usage - post remove: {}", db.disk_usage());
 

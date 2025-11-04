@@ -1,16 +1,16 @@
-use std::collections::BTreeMap;
-
-use allocative::Allocative;
+use std::{collections::BTreeMap, mem};
 
 use crate::{Error, Result};
 
 use super::{Region, Regions};
 
-#[derive(Debug, Default, Allocative)]
+#[derive(Debug, Default)]
 pub struct Layout {
     start_to_region: BTreeMap<u64, Region>,
     start_to_hole: BTreeMap<u64, u64>,
     start_to_reserved: BTreeMap<u64, u64>,
+    /// Holes from region moves that can't be reused until flush
+    pending_holes: BTreeMap<u64, u64>,
 }
 
 impl From<&Regions> for Layout {
@@ -41,6 +41,7 @@ impl From<&Regions> for Layout {
             start_to_region,
             start_to_hole,
             start_to_reserved: BTreeMap::default(),
+            pending_holes: BTreeMap::default(),
         }
     }
 }
@@ -137,17 +138,19 @@ impl Layout {
             ));
         }
 
+        // Coalesce with adjacent holes
         reserved += self
             .start_to_hole
             .remove(&(start + reserved))
             .unwrap_or_default();
 
-        if let Some((&hole_start, gap)) = self.start_to_hole.range_mut(..start).next_back()
+        // Mark as pending hole (can't reuse until flush)
+        if let Some((&hole_start, gap)) = self.pending_holes.range_mut(..start).next_back()
             && hole_start + *gap == start
         {
             *gap += reserved;
         } else {
-            self.start_to_hole.insert(start, reserved);
+            self.pending_holes.insert(start, reserved);
         }
 
         Ok(())
@@ -197,5 +200,20 @@ impl Layout {
 
     pub fn reserved(&mut self, start: u64) -> Option<u64> {
         self.start_to_reserved.remove(&start)
+    }
+
+    /// Promote pending holes to real holes after flush
+    /// Safe to reuse now that metadata changes are durable
+    pub fn promote_pending_holes(&mut self) {
+        for (start, size) in mem::take(&mut self.pending_holes) {
+            // Coalesce with adjacent holes
+            if let Some((&hole_start, gap)) = self.start_to_hole.range_mut(..start).next_back()
+                && hole_start + *gap == start
+            {
+                *gap += size;
+            } else {
+                self.start_to_hole.insert(start, size);
+            }
+        }
     }
 }
