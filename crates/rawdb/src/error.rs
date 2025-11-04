@@ -10,8 +10,42 @@ pub enum Error {
     IO(io::Error),
     TryLock(fs::TryLockError),
 
-    Str(&'static str),
-    String(String),
+    // Region errors
+    RegionNotFound,
+    RegionAlreadyExists,
+    RegionStillReferenced {
+        ref_count: usize,
+    },
+
+    // Write errors
+    WriteOutOfBounds {
+        position: u64,
+        region_len: u64,
+    },
+
+    // Truncate errors
+    TruncateInvalid {
+        from: u64,
+        current_len: u64,
+    },
+
+    // Metadata errors
+    InvalidRegionId,
+    InvalidMetadataSize {
+        expected: usize,
+        actual: usize,
+    },
+    EmptyMetadata,
+
+    // Layout errors
+    RegionIndexMismatch,
+
+    // Hole punching errors
+    HolePunchFailed {
+        start: u64,
+        len: u64,
+        source: io::Error,
+    },
 }
 
 impl From<io::Error> for Error {
@@ -30,13 +64,46 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::IO(error) => Display::fmt(&error, f),
-            Error::TryLock(_) => write!(
+            Error::TryLock(_) => write!(f, "Database is locked by another process"),
+
+            Error::RegionNotFound => write!(f, "Region not found"),
+            Error::RegionAlreadyExists => write!(f, "Region already exists"),
+            Error::RegionStillReferenced { ref_count } => write!(
                 f,
-                "Couldn't lock file. It must be already opened by another process."
+                "Cannot remove region: still held by {} reference(s)",
+                ref_count - 1
             ),
 
-            Error::Str(s) => write!(f, "{s}"),
-            Error::String(s) => write!(f, "{s}"),
+            Error::WriteOutOfBounds {
+                position,
+                region_len,
+            } => write!(
+                f,
+                "Write position {} is beyond region length {}",
+                position, region_len
+            ),
+
+            Error::TruncateInvalid { from, current_len } => write!(
+                f,
+                "Cannot truncate to {} bytes (current length: {})",
+                from, current_len
+            ),
+
+            Error::InvalidRegionId => write!(f, "Invalid region ID"),
+            Error::InvalidMetadataSize { expected, actual } => write!(
+                f,
+                "Invalid metadata size: expected {} bytes, got {}",
+                expected, actual
+            ),
+            Error::EmptyMetadata => write!(f, "Empty region metadata"),
+
+            Error::RegionIndexMismatch => write!(f, "Region index mismatch in layout"),
+
+            Error::HolePunchFailed { start, len, source } => write!(
+                f,
+                "Failed to punch hole at offset {} (length {}): {}",
+                start, len, source
+            ),
         }
     }
 }

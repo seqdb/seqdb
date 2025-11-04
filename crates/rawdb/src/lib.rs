@@ -178,10 +178,15 @@ impl Database {
         let data_len = data.len() as u64;
 
         // Validate write position if specified
+        // Note: checking `at > len` is sufficient since `len <= reserved` is always true
+        // Therefore if `at <= len`, then `at <= reserved` must also be true
         if let Some(at_val) = at
             && at_val > len
         {
-            return Err(Error::Str("Write position beyond current region length"));
+            return Err(Error::WriteOutOfBounds {
+                position: at_val,
+                region_len: len,
+            });
         }
 
         let new_len = at.map_or(len + data_len, |at| {
@@ -189,10 +194,6 @@ impl Database {
             if truncate { new_len } else { new_len.max(len) }
         });
         let write_start = start + at.unwrap_or(len);
-
-        if at.is_some_and(|at| at > reserved) {
-            return Err(Error::Str("Invalid at parameter"));
-        }
 
         // Write to reserved space if possible
         if new_len <= reserved {
@@ -346,7 +347,10 @@ impl Database {
         if from == len {
             return Ok(());
         } else if from > len {
-            return Err(Error::Str("Truncating further than length"));
+            return Err(Error::TruncateInvalid {
+                from,
+                current_len: len,
+            });
         }
         region_meta.set_len(from);
         Ok(())
@@ -576,7 +580,11 @@ impl Database {
 
         if result == -1 {
             let err = std::io::Error::last_os_error();
-            return Err(Error::String(format!("Failed to punch hole: {err}")));
+            return Err(Error::HolePunchFailed {
+                start,
+                len: length,
+                source: err,
+            });
         }
 
         Ok(())
@@ -595,7 +603,11 @@ impl Database {
 
         if result == -1 {
             let err = std::io::Error::last_os_error();
-            return Err(Error::String(format!("Failed to punch hole: {err}")));
+            return Err(Error::HolePunchFailed {
+                start,
+                len: length,
+                source: err,
+            });
         }
 
         Ok(())
@@ -622,7 +634,11 @@ impl Database {
 
         if result == -1 {
             let err = std::io::Error::last_os_error();
-            return Err(Error::String(format!("Failed to punch hole: {err}")));
+            return Err(Error::HolePunchFailed {
+                start,
+                len: length,
+                source: err,
+            });
         }
 
         Ok(())

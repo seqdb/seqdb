@@ -133,9 +133,7 @@ impl Layout {
             .is_none_or(|region_| region.index() != region_.index())
         {
             dbg!((region, removed));
-            return Err(Error::Str(
-                "Something went wrong, indexes of removed region should be the same",
-            ));
+            return Err(Error::RegionIndexMismatch);
         }
 
         // Coalesce with adjacent holes

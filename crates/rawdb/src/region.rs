@@ -199,9 +199,10 @@ impl RegionMetadata {
     /// Deserialize from bytes using little endian encoding
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != SIZE_OF_REGION_METADATA {
-            return Err(Error::String(format!(
-                "Buffer should have {SIZE_OF_REGION_METADATA} bytes"
-            )));
+            return Err(Error::InvalidMetadataSize {
+                expected: SIZE_OF_REGION_METADATA,
+                actual: bytes.len(),
+            });
         }
 
         let start = u64::from_le_bytes(bytes[0..8].try_into().unwrap());
@@ -210,10 +211,10 @@ impl RegionMetadata {
         let id_len = u64::from_le_bytes(bytes[24..32].try_into().unwrap()) as usize;
 
         let id = String::from_utf8(bytes[32..32 + id_len].to_vec())
-            .map_err(|_| Error::Str("Invalid UTF-8 in region id"))?;
+            .map_err(|_| Error::InvalidRegionId)?;
 
         if start == 0 && len == 0 && reserved == 0 && id_len == 0 {
-            return Err(Error::Str("Zeroed region metadata"));
+            return Err(Error::EmptyMetadata);
         }
 
         // Loaded from disk, so not dirty

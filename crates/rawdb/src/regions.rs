@@ -102,7 +102,7 @@ impl Regions {
         }
 
         if self.id_to_index.insert(id, index).is_some() {
-            return Err(Error::Str("Already exists"));
+            return Err(Error::RegionAlreadyExists);
         }
 
         Ok(region)
@@ -137,11 +137,11 @@ impl Regions {
             .and_then(Option::take)
             .is_none()
         {
-            return Err(Error::Str(
-                "Couldn't find region in regions.index_to_region",
-            ));
+            return Err(Error::RegionNotFound);
         } else if Arc::strong_count(&region) > 1 {
-            return Err(Error::Str("Cannot remove a region held multiple times"));
+            return Err(Error::RegionStillReferenced {
+                ref_count: Arc::strong_count(&region),
+            });
         }
 
         self.id_to_index.remove(region.meta().read().id());
