@@ -22,7 +22,7 @@ impl From<&Regions> for Layout {
             .iter()
             .flatten()
             .for_each(|region| {
-                start_to_region.insert(region.meta.read().start(), region.clone());
+                start_to_region.insert(region.meta().read().start(), region.clone());
             });
 
         let mut start_to_hole = BTreeMap::new();
@@ -33,7 +33,7 @@ impl From<&Regions> for Layout {
             if prev_end != start {
                 start_to_hole.insert(prev_end, start - prev_end);
             }
-            let reserved = region.meta.read().reserved();
+            let reserved = region.meta().read().reserved();
             prev_end = start + reserved;
         });
 
@@ -70,7 +70,7 @@ impl Layout {
         if let Some((region_start, region)) = self.get_last_region()
             && region_start > start
         {
-            len = region_start + region.meta.read().reserved();
+            len = region_start + region.meta().read().reserved();
         }
         len
     }
@@ -95,7 +95,7 @@ impl Layout {
 
     pub fn is_last_anything(&self, region: &Region) -> bool {
         if let Some((last_start, last_region)) = self.get_last_region()
-            && last_region.index == region.index
+            && last_region.index() == region.index()
             && self
                 .get_last_hole()
                 .is_none_or(|(hole_start, _)| last_start > hole_start)
@@ -121,7 +121,7 @@ impl Layout {
     }
 
     pub fn remove_region(&mut self, region: &Region) -> Result<()> {
-        let region_meta = region.meta.read();
+        let region_meta = region.meta().read();
         let start = region_meta.start();
         let mut reserved = region_meta.reserved();
 
@@ -129,7 +129,7 @@ impl Layout {
 
         if removed
             .as_ref()
-            .is_none_or(|region_| region.index != region_.index)
+            .is_none_or(|region_| region.index() != region_.index())
         {
             dbg!((region, removed));
             return Err(Error::Str(

@@ -56,6 +56,23 @@ fn main() -> Result<()> {
 }
 ```
 
+## Durability
+
+Operations are durable after calling `flush()`. Before flush, writes are visible in memory but not guaranteed to survive crashes.
+
+**Design:**
+- **4KB metadata entries**: Atomic writes per region. IDs embedded in metadata.
+- **Single metadata file**: Rebuilt into HashMap on startup for O(1) lookups.
+- **No WAL**: Simple design. Metadata is always consistent after flush.
+
+**Region writes:**
+- Expand in-place when possible (last region or adjacent hole)
+- Copy-on-write to new location when expansion needed
+- Metadata written immediately but only durable after `flush()`
+
+**Recovery:**
+On open, reads all metadata entries and rebuilds in-memory structures. Empty IDs indicate deleted regions.
+
 ## Examples
 
 See [examples/](examples/) for usage.

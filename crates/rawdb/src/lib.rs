@@ -124,7 +124,7 @@ impl Database {
             let start = layout
                 .get_last_region()
                 .map(|(_, region)| {
-                    let region_meta = region.meta.read();
+                    let region_meta = region.meta().read();
                     region_meta.start() + region_meta.reserved()
                 })
                 .unwrap_or_default();
@@ -172,7 +172,7 @@ impl Database {
     ) -> Result<()> {
         let regions = self.regions.read();
 
-        let region_meta = region.meta.read();
+        let region_meta = region.meta().read();
         let start = region_meta.start();
         let reserved = region_meta.reserved();
         let len = region_meta.len();
@@ -207,14 +207,14 @@ impl Database {
                 self.write(write_start, data);
             }
 
-            let mut region_meta = region.meta.write();
+            let mut region_meta = region.meta().write();
 
             if at.is_some() {
                 self.write(write_start, data);
             }
 
             region_meta.set_len(new_len);
-            regions.write_region_(region.index, &region_meta)?;
+            regions.write_region_(region.index(), &region_meta)?;
 
             return Ok(());
         }
@@ -234,16 +234,16 @@ impl Database {
             // info!("{region_index} Append to file at {write_start}");
 
             self.set_min_len(start + new_reserved)?;
-            let mut region_meta = region.meta.write();
+            let mut region_meta = region.meta().write();
             region_meta.set_reserved(new_reserved);
             drop(region_meta);
             drop(layout);
 
             self.write(write_start, data);
 
-            let mut region_meta = region.meta.write();
+            let mut region_meta = region.meta().write();
             region_meta.set_len(new_len);
-            regions.write_region_(region.index, &region_meta)?;
+            regions.write_region_(region.index(), &region_meta)?;
 
             return Ok(());
         }
@@ -257,16 +257,16 @@ impl Database {
             // info!("Expand {region_index} to hole");
 
             layout.remove_or_compress_hole(hole_start, added_reserve);
-            let mut region_meta = region.meta.write();
+            let mut region_meta = region.meta().write();
             region_meta.set_reserved(new_reserved);
             drop(region_meta);
             drop(layout);
 
             self.write(write_start, data);
 
-            let mut region_meta = region.meta.write();
+            let mut region_meta = region.meta().write();
             region_meta.set_len(new_len);
-            regions.write_region_(region.index, &region_meta)?;
+            regions.write_region_(region.index(), &region_meta)?;
 
             return Ok(());
         }
@@ -288,12 +288,12 @@ impl Database {
             let mut layout = self.layout.write();
             layout.move_region(hole_start, region)?;
 
-            let mut region_meta = region.meta.write();
+            let mut region_meta = region.meta().write();
             region_meta.set_start(hole_start);
             region_meta.set_reserved(new_reserved);
             region_meta.set_len(new_len);
 
-            regions.write_region_(region.index, &region_meta)?;
+            regions.write_region_(region.index(), &region_meta)?;
 
             return Ok(());
         }
@@ -320,12 +320,12 @@ impl Database {
         layout.move_region(new_start, region)?;
         assert!(layout.reserved(new_start) == Some(new_reserved));
 
-        let mut region_meta = region.meta.write();
+        let mut region_meta = region.meta().write();
         region_meta.set_start(new_start);
         region_meta.set_reserved(new_reserved);
         region_meta.set_len(new_len);
 
-        regions.write_region_(region.index, &region_meta)?;
+        regions.write_region_(region.index(), &region_meta)?;
 
         Ok(())
     }
@@ -352,7 +352,7 @@ impl Database {
     ///
     pub fn truncate_region(&self, region: &Region, from: u64) -> Result<()> {
         let regions = self.regions.read();
-        let mut region_meta = region.meta.write();
+        let mut region_meta = region.meta().write();
         let len = region_meta.len();
         if from == len {
             return Ok(());
@@ -360,7 +360,7 @@ impl Database {
             return Err(Error::Str("Truncating further than length"));
         }
         region_meta.set_len(from);
-        regions.write_region_(region.index, &region_meta)?;
+        regions.write_region_(region.index(), &region_meta)?;
         Ok(())
     }
 
@@ -477,7 +477,7 @@ impl Database {
             .flatten()
             .map(|region| -> Result<usize> {
                 // let region = region_lock.read();
-                let region_meta = region.meta.read();
+                let region_meta = region.meta().read();
                 let rstart = region_meta.start();
                 let len = region_meta.len();
                 let reserved = region_meta.reserved();

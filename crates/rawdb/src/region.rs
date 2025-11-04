@@ -15,8 +15,8 @@ pub struct Region(Arc<RegionInner>);
 pub struct RegionInner {
     #[allocative(skip)]
     db: WeakDatabase,
-    pub(crate) index: usize,
-    pub(crate) meta: RwLock<RegionMetadata>,
+    index: usize,
+    meta: RwLock<RegionMetadata>,
 }
 
 #[derive(Debug, Clone, Allocative)]
@@ -26,27 +26,24 @@ pub struct RegionMetadata {
     len: u64,
     /// Must be multiple of 4096, greater or equal to len
     reserved: u64,
-    padding: u64,
+    id: String,
 }
 
-pub const SIZE_OF_REGION_METADATA: usize = 32; // 4 * u64 = 32 bytes
+pub const SIZE_OF_REGION_METADATA: usize = PAGE_SIZE as usize; // 4096 bytes for atomic writes
 
 impl Region {
-    pub fn new(db: &Database, index: usize, start: u64, len: u64, reserved: u64) -> Self {
-        assert!(start.is_multiple_of(PAGE_SIZE));
-        assert!(reserved >= PAGE_SIZE);
-        assert!(reserved.is_multiple_of(PAGE_SIZE));
-        assert!(len <= reserved);
-
+    pub fn new(
+        db: &Database,
+        id: String,
+        index: usize,
+        start: u64,
+        len: u64,
+        reserved: u64,
+    ) -> Self {
         Self(Arc::new(RegionInner {
             db: db.weak_clone(),
             index,
-            meta: RwLock::new(RegionMetadata {
-                start,
-                len,
-                reserved,
-                padding: 0,
-            }),
+            meta: RwLock::new(RegionMetadata::new(id, start, len, reserved)),
         }))
     }
 
@@ -58,17 +55,17 @@ impl Region {
         }))
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn index(&self) -> usize {
         self.index
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn meta(&self) -> &RwLock<RegionMetadata> {
         &self.meta
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn db(&self) -> Database {
         self.db.upgrade()
     }
@@ -99,6 +96,26 @@ impl Region {
 }
 
 impl RegionMetadata {
+    pub fn new(id: String, start: u64, len: u64, reserved: u64) -> Self {
+        assert!(start.is_multiple_of(PAGE_SIZE));
+        assert!(reserved >= PAGE_SIZE);
+        assert!(reserved.is_multiple_of(PAGE_SIZE));
+        assert!(len <= reserved);
+        assert!(!id.is_empty(), "Region id must not be empty");
+        assert!(id.len() <= 1024, "Region id must be <= 1024 bytes");
+        assert!(
+            !id.chars().any(|c| c.is_control()),
+            "Region id must not contain control characters"
+        );
+
+        Self {
+            id,
+            len,
+            reserved,
+            start,
+        }
+    }
+
     #[inline]
     pub fn start(&self) -> u64 {
         self.start
@@ -127,6 +144,11 @@ impl RegionMetadata {
         self.reserved
     }
 
+    #[inline]
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
     pub fn set_reserved(&mut self, reserved: u64) {
         assert!(self.len() <= reserved);
         assert!(reserved >= PAGE_SIZE);
@@ -146,27 +168,36 @@ impl RegionMetadata {
         bytes[0..8].copy_from_slice(&self.start.to_le_bytes());
         bytes[8..16].copy_from_slice(&self.len.to_le_bytes());
         bytes[16..24].copy_from_slice(&self.reserved.to_le_bytes());
-        bytes[24..32].copy_from_slice(&self.padding.to_le_bytes());
+
+        let id_bytes = self.id.as_bytes();
+        let id_len = id_bytes.len();
+        bytes[24..32].copy_from_slice(&(id_len as u64).to_le_bytes());
+        bytes[32..32 + id_len].copy_from_slice(id_bytes);
+
         bytes
     }
 
     /// Deserialize from bytes using little endian encoding
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        if bytes.len() < SIZE_OF_REGION_METADATA {
-            return Err(Error::Str("Buffer too small for RegionMetadata"));
+        if bytes.len() != SIZE_OF_REGION_METADATA {
+            return Err(Error::String(format!(
+                "Buffer should have {SIZE_OF_REGION_METADATA} bytes"
+            )));
         }
 
         let start = u64::from_le_bytes(bytes[0..8].try_into().unwrap());
         let len = u64::from_le_bytes(bytes[8..16].try_into().unwrap());
         let reserved = u64::from_le_bytes(bytes[16..24].try_into().unwrap());
-        let padding = u64::from_le_bytes(bytes[24..32].try_into().unwrap());
+        let id_len = u64::from_le_bytes(bytes[24..32].try_into().unwrap()) as usize;
 
-        Ok(Self {
-            start,
-            len,
-            reserved,
-            padding,
-        })
+        let id = String::from_utf8(bytes[32..32 + id_len].to_vec())
+            .map_err(|_| Error::Str("Invalid UTF-8 in region id"))?;
+
+        if start == 0 && len == 0 && reserved == 0 && id_len == 0 {
+            return Err(Error::Str("Zeroed region metadata"));
+        }
+
+        Ok(Self::new(id, start, len, reserved))
     }
 }
 
