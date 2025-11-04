@@ -7,6 +7,179 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.3](https://github.com/anydb-rs/anydb/releases/tag/v0.3.3) - 2025-11-04
+
+### Breaking Changes
+#### `rawdb`
+- **API method renamed**: `flush_then_punch()` renamed to `compact()` for clearer semantic meaning - update all call sites ([`src/lib.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.3/crates/rawdb/src/lib.rs#L460))
+- **Removed public method**: `punch_holes()` is now private (internal to `compact()`) - use `compact()` instead
+- **Error type changes**: Replaced generic string errors with specific typed error variants - error handling code may need updates to match on new variants
+
+### Added
+#### `rawdb`
+- **Pending holes mechanism for crash consistency**: Added `pending_holes` field to Layout struct preventing premature space reuse during copy-on-write operations ([`src/layout.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.3/crates/rawdb/src/layout.rs#L12-L13))
+  - Holes from region moves and deletions marked as pending (not immediately reusable)
+  - Only promoted to reusable holes after flush completes and metadata is durable
+  - Prevents old region locations from being overwritten before metadata changes are persisted
+  - Ensures crash-consistent copy-on-write behavior with proper write ordering
+- **Hole promotion mechanism**: Added `promote_pending_holes()` method to safely convert pending holes to reusable holes after flush ([`src/layout.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.3/crates/rawdb/src/layout.rs#L203-L216))
+  - Called automatically after metadata sync completes
+  - Coalesces adjacent holes during promotion for space efficiency
+- **Comprehensive typed error system**: Replaced generic string errors with detailed structured error variants ([`src/error.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.3/crates/rawdb/src/error.rs#L13-L48)):
+  - `RegionNotFound` - region doesn't exist in database
+  - `RegionAlreadyExists` - duplicate region ID on creation
+  - `RegionStillReferenced { ref_count }` - cannot remove region with outstanding references
+  - `WriteOutOfBounds { position, region_len }` - write position exceeds region length
+  - `TruncateInvalid { from, current_len }` - invalid truncation parameters
+  - `InvalidRegionId` - malformed region identifier
+  - `InvalidMetadataSize { expected, actual }` - incorrect metadata buffer size
+  - `EmptyMetadata` - zeroed/deleted region metadata detected
+  - `RegionIndexMismatch` - layout inconsistency in region tracking
+  - `HolePunchFailed { start, len, source }` - hole punching operation failed with context
+- **Enhanced error messages**: Implemented descriptive Display trait providing detailed error context with relevant parameters ([`src/error.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.3/crates/rawdb/src/error.rs#L64-L107))
+
+### Changed
+#### `rawdb`
+- **Deferred metadata writes for atomicity**: Removed all immediate `write_region_()` calls from write operations - metadata changes now tracked in-memory and batch-written during flush for atomic updates ([`src/lib.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.3/crates/rawdb/src/lib.rs))
+  - Write operations no longer write metadata immediately (was: wrote after each operation)
+  - All metadata changes accumulate in-memory with dirty flag
+  - Single atomic batch write during flush() ensures consistency
+- **Enhanced flush semantics with write ordering**: Updated `flush()` to implement proper write ordering for crash consistency ([`src/lib.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.3/crates/rawdb/src/lib.rs#L448-L457))
+  1. Syncs mmap (data) first
+  2. Writes and syncs dirty metadata
+  3. Promotes pending holes to reusable holes
+  - Guarantees metadata never points to unflushed data
+  - Prevents premature reuse of old region locations
+  - Provides crash-consistent copy-on-write operations
+- **Improved write validation**: Enhanced write position validation with better error messages and explanatory comments about the len ≤ reserved invariant ([`src/lib.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.3/crates/rawdb/src/lib.rs#L180-L190))
+- **Improved truncate validation**: Enhanced truncation validation with typed `TruncateInvalid` error providing current length context ([`src/lib.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.3/crates/rawdb/src/lib.rs#L350-L353))
+- **Updated README description**: Changed from "Single-file, low-level and space efficient storage engine" to "Non-transactional embedded storage engine" for clearer positioning ([`README.md`](https://github.com/anydb-rs/anydb/blob/v0.3.3/crates/rawdb/README.md#L3))
+- **Enhanced durability documentation**: Expanded README "Durability" section with comprehensive write ordering explanation ([`README.md`](https://github.com/anydb-rs/anydb/blob/v0.3.3/crates/rawdb/README.md#L59-L84)):
+  - Added detailed 5-step write ordering process
+  - Documented dirty tracking mechanism
+  - Explained pending holes preventing premature reuse
+  - Clarified crash-consistent COW behavior
+  - Updated feature descriptions for accuracy
+- **Region deletion uses pending holes**: Modified `remove_region()` to mark freed space as pending hole instead of immediately reusable hole ([`src/layout.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.3/crates/rawdb/src/layout.rs#L145-L152))
+
+#### `vecdb`
+- **Minor consistency improvements**: Small fixes in compressed pages and raw variant for better consistency
+
+### Removed
+#### `rawdb`
+- **Removed allocative dependency**: Eliminated allocative and allocative_derive dependencies from rawdb, removing memory profiling overhead ([`Cargo.toml`](https://github.com/anydb-rs/anydb/blob/v0.3.3/crates/rawdb/Cargo.toml#L15))
+  - Removed `Allocative` derive from `Layout` struct
+  - Removed `Allocative` derive and skip attribute from `Database` struct
+  - Reduced compilation dependencies and runtime overhead
+- **Removed immediate metadata persistence**: Eliminated all inline metadata writes throughout write operations, replaced with deferred batch writes on flush
+
+### Technical Implementation
+- **Crash consistency through write ordering**: The pending holes mechanism ensures that:
+  - Data is written and synced first via mmap
+  - Metadata pointing to new locations is written and synced second
+  - Old location space (pending holes) only becomes reusable third
+  - Crash at any point leaves database in consistent state
+- **Atomic metadata updates**: Batching metadata writes provides atomic updates - either all changes are persisted or none are, eliminating partial update inconsistencies
+- **Type-safe error handling**: Structured error types with detailed context enable better error recovery and debugging compared to generic string errors
+- **Memory efficiency**: Removed allocative dependency reduces binary size and eliminates runtime memory profiling overhead
+
+### Performance Impact
+- **Reduced write amplification**: Batching metadata writes reduces number of sync operations
+- **Better space utilization**: Pending holes are properly coalesced during promotion
+- **Faster error handling**: Typed errors avoid string allocations and formatting overhead
+- **Smaller binary**: Removed allocative dependency reduces compilation time and binary size
+
+### Migration Notes
+- **Method rename**: Replace all `flush_then_punch()` calls with `compact()`
+- **Remove punch_holes calls**: If calling `punch_holes()` directly, use `compact()` instead
+- **Error handling**: Update error matching to handle new typed error variants instead of string matching
+- **Durability semantics**: No visible behavior change, but operations are now guaranteed crash-consistent with proper write ordering
+
+[View changes](https://github.com/anydb-rs/anydb/compare/v0.3.2...v0.3.3)
+
+## [v0.3.2](https://github.com/anydb-rs/anydb/releases/tag/v0.3.2) - 2025-11-04
+
+### Breaking Changes
+#### `rawdb`
+- **Region constructor signature change**: `Region::new()` now requires `id: String` as second parameter for explicit region identification ([`src/region.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.2/crates/rawdb/src/region.rs))
+- **Metadata format change**: Region metadata entries expanded from 32 bytes to 4KB (PAGE_SIZE) for atomic write guarantees - existing databases must be recreated
+
+### Added
+#### `rawdb`
+- **Atomic metadata writes**: Expanded metadata entry size from 32 bytes to 4KB (PAGE_SIZE) ensuring file system atomic write guarantees for crash consistency ([`src/region.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.2/crates/rawdb/src/region.rs#L32))
+- **Embedded region IDs**: Added `id: String` field to `RegionMetadata` struct, storing region identifiers directly in metadata file and eliminating need for separate id_to_index file
+- **Comprehensive ID validation**: Implemented validation in `RegionMetadata::new()` ensuring IDs are non-empty, <= 1024 bytes, and contain no control characters to prevent data corruption
+- **Enhanced durability guarantees**: Added explicit directory sync operations in database and region initialization to ensure file system metadata persistence ([`src/lib.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.2/crates/rawdb/src/lib.rs#L77), [`src/regions.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.2/crates/rawdb/src/regions.rs#L44))
+- **Comprehensive durability documentation**: Added detailed "Durability" section to README explaining flush requirements, atomic metadata design, single metadata file architecture, region write strategies, and recovery mechanism ([`README.md`](https://github.com/anydb-rs/anydb/blob/v0.3.2/crates/rawdb/README.md#L59-L75))
+
+### Changed
+#### `rawdb`
+- **Upgraded metadata serialization**: Enhanced `to_bytes()` and `from_bytes()` methods to serialize IDs with length prefix and UTF-8 validation, detect zeroed/deleted entries, and require exactly PAGE_SIZE bytes ([`src/region.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.2/crates/rawdb/src/region.rs#L167-L201))
+- **Simplified startup reconstruction**: Refactored `fill_index_to_region()` to scan all metadata slots sequentially, rebuilding both `id_to_index` HashMap and `index_to_region` Vec from single metadata file ([`src/regions.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.2/crates/rawdb/src/regions.rs#L54-L76))
+- **Region deletion marks metadata as deleted**: Modified `remove_region()` to write PAGE_SIZE zeros to metadata file, ensuring deleted regions won't be resurrected on restart ([`src/regions.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.2/crates/rawdb/src/regions.rs#L153-L156))
+
+### Removed
+#### `rawdb`
+- **Eliminated id_to_index file**: Removed separate id_to_index persistence file and all related infrastructure:
+  - Removed `id_to_index_path` field from `Regions` struct
+  - Removed `id_to_index_dirty` atomic flag tracking changes
+  - Removed `serialize()` and `deserialize()` methods for HashMap persistence ([`src/regions.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.2/crates/rawdb/src/regions.rs))
+  - Simplified `flush()` by removing id_to_index file write operation
+  - Now rebuilds id_to_index mapping in memory on startup from metadata file
+- **Code cleanup**: Removed obsolete imports including `std::io::{Cursor, Read}`, `Arc`, and atomic imports, plus commented-out id lookup methods
+
+### Technical Implementation
+- **Atomic write guarantees**: The 4KB metadata size leverages file system guarantees for atomic writes of page-aligned blocks, preventing partial metadata corruption during crashes
+- **Single-file architecture**: Storing IDs in metadata eliminates the separate id_to_index file, reducing failure modes and simplifying recovery to a single sequential metadata scan
+- **Efficient reconstruction**: On startup, reads metadata sequentially and rebuilds both the HashMap (for O(1) ID lookups) and Vec (for O(1) index lookups) data structures in a single pass
+- **Deletion via zeroing**: Writing zeros to deleted region slots provides a clear "tombstone" marker that's detected during deserialization (zeroed entries fail validation)
+- **ID validation layer**: Comprehensive validation at construction time prevents malformed IDs from corrupting the metadata file
+
+### Performance Impact
+- **Faster recovery**: Single metadata file scan on startup (no separate id_to_index file to load and deserialize)
+- **Reduced I/O operations**: Eliminated separate file writes during flush operations
+- **Better crash consistency**: Atomic metadata writes reduce window for corruption
+- **Increased metadata overhead**: Each region metadata entry now uses 4KB instead of 32 bytes (trade-off for atomicity)
+
+### Migration Notes
+- **Database recreation required**: Existing databases using 32-byte metadata format cannot be read by v0.3.2+ and must be recreated
+- **Region creation API**: Update all `Region::new()` calls to provide `id: String` as second parameter
+- **Durability semantics**: Ensure `flush()` is called when durability is required; metadata is visible in memory but not guaranteed durable until flush
+
+[View changes](https://github.com/anydb-rs/anydb/compare/v0.3.1...v0.3.2)
+
+## [v0.3.1](https://github.com/anydb-rs/anydb/releases/tag/v0.3.1) - 2025-11-04
+
+### Changed
+#### `vecdb`
+- **Completed error type naming consistency**: Renamed all `SeqDB` references in error handling to `RawDB`, completing the v0.3.0 crate rename transition ([`src/error.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.1/crates/vecdb/src/error.rs))
+  - Error variant `Error::SeqDB` → `Error::RawDB` for consistent naming across the codebase
+  - Updated `From<rawdb::Error>` trait implementation to construct `Self::RawDB`
+  - Updated `Display` trait implementation to match on `Error::RawDB` for error formatting
+- **Public API naming consistency**: Renamed exported error type from `SeqDBError` to `RawDBError` in public API, ensuring all user-facing types reflect the new rawdb naming ([`src/lib.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.1/crates/vecdb/src/lib.rs#L10))
+
+#### `workspace`
+- **Enhanced documentation structure**: Restructured README.md with improved organization and clarity
+  - Added proper "# anydb" heading establishing the workspace identity
+  - Created "## Crates" section listing all available crates (rawdb, vecdb, vecdb_derive, vecdb_bench)
+  - Added "## Resources" section with direct links to Changelog, License, and TODO documents
+  - Updated all seqdb references to rawdb throughout documentation
+- **Updated copyright notice**: Changed LICENSE.md copyright from "seqdb, vecdb" to "rawdb, vecdb" reflecting the current crate names
+- **Streamlined development roadmap**: Cleaned up TODO.md by removing completed tasks and obsolete sections
+  - Renamed "_SEQDB_" section to "_RAWDB_" for consistency
+  - Removed completed tasks: identifier removal and region index storage optimization
+  - Removed obsolete links and IO reference sections
+
+### Technical Implementation
+- **Consistent error handling**: All error type references now use the `RawDB` naming convention, eliminating any remaining `SeqDB` references from the v0.3.0 transition
+- **Improved documentation discoverability**: The restructured README provides clearer navigation with dedicated sections for crates and resources, making it easier for users to find relevant documentation
+
+### Migration Notes
+- **Error type imports**: If importing error types directly, update `SeqDBError` to `RawDBError` in import statements: `use vecdb::RawDBError;`
+- **Error pattern matching**: If pattern matching on vecdb errors, update `Error::SeqDB(e)` to `Error::RawDB(e)`
+
+[View changes](https://github.com/anydb-rs/anydb/compare/v0.3.0...v0.3.1)
+
 ## [v0.3.0](https://github.com/anydb-rs/anydb/releases/tag/v0.3.0) - 2025-11-03
 
 ### Breaking Changes
