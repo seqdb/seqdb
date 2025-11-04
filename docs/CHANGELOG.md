@@ -7,6 +7,124 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.0](https://github.com/anydb-rs/anydb/releases/tag/v0.3.0) - 2025-11-03
+
+### Breaking Changes
+#### `seqdb` → `rawdb`
+- **Complete crate rename**: Renamed `seqdb` to `rawdb` throughout the entire codebase, reflecting the low-level nature of the storage engine as a foundation for higher-level abstractions
+- **API namespace change**: All imports must change from `use seqdb::*` to `use rawdb::*`
+- **Crate description updated**: Now described as "Single-file, low-level and space efficient storage engine with filesystem-like API"
+
+#### `workspace`
+- **Repository migration**: Moved repository from `seqdb/seqdb` to `anydb-rs/anydb`, reflecting the broader database ecosystem vision
+- **Rust version requirement**: Added explicit rust-toolchain file requiring **Rust 1.91** minimum
+
+#### `rawdb`
+- **Removed mmap-based reader functionality**: Eliminated mmap reader in favor of more reliable direct file I/O patterns for certain operations
+- **Simplified error types**: Removed `Error::ZeroCopy` variants and related zerocopy error conversions, streamlining error handling
+- **Layout API change**: Internal `Layout` struct refactored from `start_to_index` to `start_to_region` for more direct region access
+
+### Added
+#### `vecdb_bench` (NEW CRATE)
+- **Comprehensive benchmarking infrastructure**: Added new `vecdb_bench` crate with full database comparison suite ([`crates/vecdb_bench/`](https://github.com/anydb-rs/anydb/tree/v0.3.0/crates/vecdb_bench))
+- **Multi-database benchmarks**: Implementations for RocksDB, LMDB, redb, fjall2, fjall3, and vecdb (both raw and compressed variants) ([`src/lib.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.0/crates/vecdb_bench/src/lib.rs))
+- **Comprehensive test scenarios**: Sequential writes, sequential reads, random reads, and multi-threaded random read benchmarks ([`src/runner.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.0/crates/vecdb_bench/src/runner.rs))
+
+#### `vecdb`
+- **Branch prediction hints**: Added performance optimization macros `likely()`, `unlikely()`, and `cold()` for better CPU branch prediction ([`src/lib.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.0/crates/vecdb/src/lib.rs#L39-L57))
+- **New integrity test example**: Added comprehensive integrity testing example demonstrating data validation patterns ([`examples/integrity.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.0/crates/vecdb/examples/integrity.rs))
+- **New rollback example**: Added detailed rollback demonstration with 888 lines showing time-travel capabilities ([`examples/rollback.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.0/crates/vecdb/examples/rollback.rs))
+- **Dedicated iterator modules**: Created separate iterator implementations with clean/dirty state handling for compressed, raw, computed, stored, and lazy variants
+- **Extended iterator utilities**: New `ExtendedIterableVec` trait with additional iterator methods ([`src/iterators/extended.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.0/crates/vecdb/src/iterators/extended.rs))
+
+#### `rawdb`
+- **Comprehensive test suite**: Added 1315+ lines of tests covering region management, layout operations, and edge cases ([`tests/mod.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.0/crates/rawdb/tests/mod.rs))
+- **Improved documentation**: Completely rewritten README with clearer API examples and usage patterns
+
+#### `CI/CD`
+- **GitHub Actions workflow**: Added automated build and test pipeline for continuous integration ([`.github/workflows/rust.yml`](https://github.com/anydb-rs/anydb/blob/v0.3.0/.github/workflows/rust.yml))
+
+### Changed
+#### `vecdb`
+- **Major iterator performance improvements**: Complete refactoring of iterator implementation with separate clean and dirty iterators, resulting in dramatically faster iteration speeds
+- **Iterator architecture overhaul**: Split monolithic iterator implementations into dedicated modules per variant:
+  - Compressed: [`iterators/clean.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.0/crates/vecdb/src/variants/compressed/iterators/clean.rs), [`iterators/dirty.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.0/crates/vecdb/src/variants/compressed/iterators/dirty.rs)
+  - Raw: [`iterators/clean.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.0/crates/vecdb/src/variants/raw/iterators/clean.rs), [`iterators/dirty.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.0/crates/vecdb/src/variants/raw/iterators/dirty.rs)
+  - Computed, Stored, and all Lazy variants with dedicated iterator modules
+- **Removed mmap usage for iteration**: Transitioned from memory-mapped I/O to direct reads for better reliability and performance in certain workloads
+- **Module reorganization**: Moved iterable trait from `traits/iterable.rs` to `iterators/iterable.rs` for better logical grouping
+- **Lazy variant restructuring**: Reorganized lazy vector implementations from `lazy1/lazy2/lazy3` to `from1/from2/from3` with dedicated iterator modules
+- **Eager variant file structure**: Split eager variant into modular structure with dedicated directory
+- **Simplified examples**: Commented out embedded documentation examples in lib.rs for cleaner documentation generation
+
+#### `rawdb`
+- **Layout implementation refactored**: Simplified region tracking using direct `BTreeMap<u64, Region>` instead of index-based lookup, improving performance and code clarity
+- **Region module complete rewrite**: Restructured region management with cleaner API and better encapsulation (178 lines)
+- **Regions module complete rewrite**: Rebuilt regions collection management from scratch (253 lines)
+- **Reader implementation simplified**: Streamlined reader implementation to 49 lines with clearer responsibilities
+
+#### `workspace`
+- **Removed build profiles**: Eliminated `profiling`, `dist`, and `clippy` profiles from root Cargo.toml for simpler configuration
+- **Keywords updated**: Changed from `["vec", "disk", "data"]` to `["vec", "disk", "database"]` for better discoverability
+
+### Removed
+#### `vecdb`
+- **Iterator trait module**: Removed `traits/iterator.rs` (103 lines) in favor of dedicated iterator implementations per variant
+
+#### `rawdb`
+- **Identifier module**: Removed unused `identifier.rs` (23 lines) simplifying the codebase
+
+### Technical Implementation
+- **Iterator performance optimization**: The new iterator architecture separates clean (no pending changes) and dirty (with pending changes) code paths, allowing for optimized hot paths without conditional overhead
+- **Branch prediction hints**: The `likely()`, `unlikely()`, and `cold()` macros provide compiler hints for better CPU pipeline utilization in performance-critical code
+- **Direct I/O patterns**: Moved away from mmap for certain operations after performance testing revealed limitations for sequential access patterns
+- **Buffered reading**: Added `BUFFER_SIZE` constant (512 KiB) for optimized read operations
+- **Modular architecture**: The split between clean and dirty iterators enables specialized optimizations for each case while maintaining code clarity
+
+### Performance Impact
+- **Dramatically faster iteration**: Major performance gains in vector iteration
+- **Reduced branching overhead**: Separate clean/dirty iterator paths eliminate conditional checks in hot loops
+- **Optimized memory access patterns**: Direct I/O with proper buffering replaced mmap for better sequential read performance
+- **Better CPU utilization**: Branch prediction hints help modern CPUs optimize execution flow
+
+### Migration Guide
+To migrate from v0.2.x to v0.3.0:
+1. **Update crate name**: Change `seqdb` to `rawdb` in Cargo.toml
+2. **Update imports**: Replace `use seqdb::*` with `use rawdb::*`
+3. **Update repository URL**: Change from `seqdb/seqdb` to `anydb-rs/anydb` in documentation/links
+4. **Verify Rust version**: Ensure Rust 1.91 or later is installed
+5. **Test thoroughly**: Major internal changes may surface edge cases in application code
+
+[View changes](https://github.com/anydb-rs/anydb/compare/v0.2.17...v0.3.0)
+
+## [v0.2.17](https://github.com/seqdb/seqdb/releases/tag/v0.2.17) - 2025-10-10
+
+### Changed
+#### `workspace`
+- **Streamlined zerocopy dependency architecture**: Consolidated zerocopy integration by enabling the `zerocopy-derive` feature directly in the zerocopy dependency ([`Cargo.toml`](https://github.com/seqdb/seqdb/blob/v0.2.17/Cargo.toml#L38)), eliminating the need for a separate zerocopy-derive crate and simplifying the dependency graph
+
+#### `seqdb`
+- **Improved code clarity in region management**: Renamed `ids_to_remove` variable to `regions_to_remove` in [`retain_regions()` method](https://github.com/seqdb/seqdb/blob/v0.2.17/crates/seqdb/src/lib.rs#L419) for better semantic meaning and clearer intent
+- **Modernized zerocopy imports**: Updated import statement in [`region.rs`](https://github.com/seqdb/seqdb/blob/v0.2.17/crates/seqdb/src/region.rs#L4) to use consolidated `zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout}` pattern instead of zerocopy_derive module
+
+#### `vecdb`
+- **Modernized zerocopy integration**: Updated import statements across multiple files to use consolidated zerocopy import pattern:
+  - [`stamp.rs`](https://github.com/seqdb/seqdb/blob/v0.2.17/crates/vecdb/src/stamp.rs#L2): Changed to `zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout}`
+  - [`variants/compressed/page.rs`](https://github.com/seqdb/seqdb/blob/v0.2.17/crates/vecdb/src/variants/compressed/page.rs#L2): Updated zerocopy imports
+  - [`variants/raw/header.rs`](https://github.com/seqdb/seqdb/blob/v0.2.17/crates/vecdb/src/variants/raw/header.rs#L6): Consolidated zerocopy trait imports
+  - [`version.rs`](https://github.com/seqdb/seqdb/blob/v0.2.17/crates/vecdb/src/version.rs#L10): Updated to use unified zerocopy import
+
+### Technical Implementation
+- **Zerocopy consolidation benefits**: The new architecture leverages zerocopy's built-in derive feature instead of maintaining a separate derive crate dependency, reducing build complexity by eliminating one dependency from the compilation graph
+- **Dependency management optimization**: Centralized zerocopy configuration in workspace Cargo.toml with `features = ["zerocopy-derive"]`, allowing all crates to inherit the streamlined setup without individual zerocopy-derive entries
+- **Code organization improvement**: Variable renaming in `retain_regions()` makes the code's intent more explicit—these are region identifiers being removed, not arbitrary IDs
+
+### Performance Impact
+- **Reduced compilation overhead**: Consolidated zerocopy dependency reduces the number of crates to compile and simplifies dependency resolution during builds
+- **Cleaner dependency tree**: One fewer crate in the dependency graph improves build cache efficiency and reduces potential version conflicts
+
+[View changes](https://github.com/seqdb/seqdb/compare/v0.2.16...v0.2.17)
+
 ## [v0.2.16](https://github.com/seqdb/seqdb/releases/tag/v0.2.16) - 2025-09-20
 
 ### Added
