@@ -1,26 +1,12 @@
 # TODO
 
 - __CRATES__
-  - _SEQDB_
-    - remove `identifier` enum
-      - and store the index of region in the region
+  - _RAWDB_
     - improve durability
     - move example to tests
   - _VECDB_
     - fix **rollback**
     - make serde an optional feature
     - move example to tests
-    - try `mmap.advise(x)` and see how it impacts things (especially in threads using the mmap in conflicting ways)
     - add support for other compression algos such as lz4 and zstd
 - __DOCS__
-  - benchmark using fjall bench
-- __LINKS__
-  - https://www.marginalia.nu/log/a_123_index_io/
-- __IO__
-  - https://news.ycombinator.com/item?id=45132710
-  - https://www.marginalia.nu/log/a_123_index_io/
-  - https://blog.canoozie.net/async-i-o-on-linux-and-durability/
-  - https://news.ycombinator.com/item?id=41992975
-  - https://blog.canoozie.net/async-i-o-on-linux-and-durability/
-  - https://docs.rs/async-io/latest/async_io/
-  - https://docs.rs/io-uring/latest/io_uring/

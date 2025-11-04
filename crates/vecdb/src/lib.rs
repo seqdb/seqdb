@@ -7,7 +7,7 @@
 // #![doc = include_str!("../examples/compressed.rs")]
 // #![doc = "```"]
 
-pub use rawdb::{Database, Error as SeqDBError, PAGE_SIZE, Reader};
+pub use rawdb::{Database, Error as RawDBError, PAGE_SIZE, Reader};
 #[cfg(feature = "derive")]
 pub use vecdb_derive::StoredCompressed;
 

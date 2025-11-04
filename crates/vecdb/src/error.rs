@@ -14,7 +14,7 @@ pub enum Error {
     ZeroCopyError,
     SystemTimeError(time::SystemTimeError),
     PCO(pco::errors::PcoError),
-    SeqDB(rawdb::Error),
+    RawDB(rawdb::Error),
     Sonic(sonic_rs::Error),
 
     Str(&'static str),
@@ -49,7 +49,7 @@ impl From<sonic_rs::Error> for Error {
 
 impl From<rawdb::Error> for Error {
     fn from(value: rawdb::Error) -> Self {
-        Self::SeqDB(value)
+        Self::RawDB(value)
     }
 }
 
@@ -82,7 +82,7 @@ impl fmt::Display for Error {
         match self {
             Error::IO(error) => Display::fmt(&error, f),
             Error::Sonic(error) => Display::fmt(&error, f),
-            Error::SeqDB(error) => Display::fmt(&error, f),
+            Error::RawDB(error) => Display::fmt(&error, f),
             Error::TryLockError(_) => write!(
                 f,
                 "Couldn't lock file. It must be already opened by another process."
