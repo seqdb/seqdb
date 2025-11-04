@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fs::{self, File, OpenOptions},
-    io::{Cursor, Read},
+    io::{Cursor, Read, Write},
     path::{Path, PathBuf},
     sync::{
         Arc,
@@ -21,7 +21,6 @@ use super::{
 
 #[derive(Debug, Allocative)]
 pub struct Regions {
-    // db: Database,
     id_to_index: HashMap<String, usize>,
     id_to_index_path: PathBuf,
     index_to_region: Vec<Option<Region>>,
@@ -53,8 +52,10 @@ impl Regions {
 
         let index_to_region_file_len = index_to_region_file.metadata()?.len();
 
+        // Ensure directory entries are durable
+        File::open(path)?.sync_data()?;
+
         Ok(Self {
-            // db: db.clone(),
             id_to_index,
             id_to_index_path,
             index_to_region: vec![],
@@ -134,14 +135,7 @@ impl Regions {
         self.id_to_index
             .get(id)
             .and_then(|&index| self.get_region_from_index(index))
-        // self.get_region_index_from_id(id)
-        //     .and_then(|index| self.get_region_from_index(index))
     }
-
-    // #[inline]
-    // pub fn get_region_index_from_id(&self, id: &str) -> Option<usize> {
-    //     self.id_to_index.get(id).copied()
-    // }
 
     fn find_id_from_index(&self, index: usize) -> Option<&String> {
         Some(self.id_to_index.iter().find(|(_, v)| **v == index)?.0)
@@ -200,7 +194,16 @@ impl Regions {
         self.index_to_region_file.sync_data()?;
 
         if self.id_to_index_dirty.swap(false, Ordering::Acquire) {
-            fs::write(&self.id_to_index_path, Self::serialize(&self.id_to_index))?;
+            let tmp = self.id_to_index_path.with_extension("tmp");
+
+            let mut file = File::create(&tmp)?;
+            file.write_all(&Self::serialize(&self.id_to_index))?;
+            file.sync_data()?;
+            drop(file); // Close before rename
+
+            fs::rename(&tmp, &self.id_to_index_path)?;
+
+            File::open(self.id_to_index_path.parent().unwrap())?.sync_data()?; // Sync dir
         }
 
         Ok(())

@@ -73,6 +73,9 @@ impl Database {
         db.regions.write().fill_index_to_region(&db)?;
         *db.layout.write() = Layout::from(&*db.regions.read());
 
+        // Ensure directory entries are durable
+        File::open(path)?.sync_data()?;
+
         Ok(db)
     }
 
@@ -348,6 +351,7 @@ impl Database {
     /// Non destructive
     ///
     pub fn truncate_region(&self, region: &Region, from: u64) -> Result<()> {
+        let regions = self.regions.read();
         let mut region_meta = region.meta.write();
         let len = region_meta.len();
         if from == len {
@@ -356,6 +360,7 @@ impl Database {
             return Err(Error::Str("Truncating further than length"));
         }
         region_meta.set_len(from);
+        regions.write_region_(region.index, &region_meta)?;
         Ok(())
     }
 
