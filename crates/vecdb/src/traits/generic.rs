@@ -68,8 +68,16 @@ where
     // fn create_buffer() -> Vec<u8>;
 
     #[inline]
+    fn one_shot_get_any_or_read(&self, index: I) -> Result<Option<T>> {
+        self.get_any_or_read(index, &self.create_reader())
+    }
+    #[inline]
     fn get_any_or_read(&'_ self, index: I, reader: &Reader) -> Result<Option<T>> {
         self.get_any_or_read_(index.to_usize(), reader)
+    }
+    #[inline]
+    fn one_shot_get_any_or_read_(&self, index: usize) -> Result<Option<T>> {
+        self.get_any_or_read_(index, &self.create_reader())
     }
     #[inline]
     fn get_any_or_read_(&'_ self, index: usize, reader: &Reader) -> Result<Option<T>> {
