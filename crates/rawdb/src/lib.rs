@@ -58,6 +58,11 @@ impl Database {
             .open(Self::data_path_(path))?;
         file.try_lock()?;
 
+        let file_len = file.metadata()?.len();
+        if file_len == 0 {
+            file.set_len(PAGE_SIZE)?;
+        }
+
         let regions = Regions::open(path)?;
         let mmap = Self::create_mmap(&file)?;
 
