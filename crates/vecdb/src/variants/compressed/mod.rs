@@ -208,7 +208,7 @@ where
 
     #[inline]
     fn len(&self) -> usize {
-        self.len_()
+        self.dirty_len()
     }
 
     #[inline]
@@ -436,7 +436,7 @@ where
 
     fn reset(&mut self) -> Result<()> {
         self.pages.write().reset();
-        self.reset_()
+        self.clear()
     }
 }
 

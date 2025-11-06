@@ -51,7 +51,7 @@ where
 
     // With usize index (internal)
     #[inline]
-    fn read_unwrap_at(&self, index: usize, reader: &Reader) -> T {
+    fn read_at_unwrap(&self, index: usize, reader: &Reader) -> T {
         self.read_at(index, reader).unwrap()
     }
 
@@ -152,7 +152,7 @@ where
     }
 
     #[inline]
-    fn len_(&self) -> usize {
+    fn dirty_len(&self) -> usize {
         self.stored_len() + self.pushed_len()
     }
 
@@ -198,19 +198,19 @@ where
     }
 
     #[inline]
-    fn forced_push_at(&mut self, index: I, value: T, exit: &Exit) -> Result<()> {
-        self.forced_push_at_(index.to_usize(), value, exit)
+    fn forced_push(&mut self, index: I, value: T, exit: &Exit) -> Result<()> {
+        self.forced_push_at(index.to_usize(), value, exit)
     }
 
     #[inline]
-    fn forced_push_at_(&mut self, index: usize, value: T, exit: &Exit) -> Result<()> {
+    fn forced_push_at(&mut self, index: usize, value: T, exit: &Exit) -> Result<()> {
         match self.len().cmp(&index.to_usize()) {
             Ordering::Less => {
                 return Err(Error::IndexTooHigh);
             }
             ord => {
                 if ord == Ordering::Greater {
-                    self.truncate_if_needed_(index)?;
+                    self.truncate_if_needed_at(index)?;
                 }
                 self.push(value);
             }
@@ -246,7 +246,7 @@ where
         self.holes()
             .first()
             .cloned()
-            .unwrap_or_else(|| self.len_())
+            .unwrap_or_else(|| self.dirty_len())
             .into()
     }
 
@@ -269,7 +269,7 @@ where
     fn prev_holes(&self) -> &BTreeSet<usize>;
     fn mut_prev_holes(&mut self) -> &mut BTreeSet<usize>;
 
-    fn take(&mut self, index: I, reader: &Reader) -> Result<Option<T>> {
+    fn take_with(&mut self, index: I, reader: &Reader) -> Result<Option<T>> {
         let opt = self.get_or_read_with(index, reader)?;
         if opt.is_some() {
             self.unchecked_delete(index);
@@ -302,11 +302,11 @@ where
 
     #[inline]
     fn update(&mut self, index: I, value: T) -> Result<()> {
-        self.update_(index.to_usize(), value)
+        self.update_at(index.to_usize(), value)
     }
 
     #[inline]
-    fn update_(&mut self, index: usize, value: T) -> Result<()> {
+    fn update_at(&mut self, index: usize, value: T) -> Result<()> {
         let stored_len = self.stored_len();
 
         if index >= stored_len {
@@ -331,8 +331,8 @@ where
     fn reset(&mut self) -> Result<()>;
 
     #[inline]
-    fn reset_(&mut self) -> Result<()> {
-        self.truncate_if_needed_(0)
+    fn clear(&mut self) -> Result<()> {
+        self.truncate_if_needed_at(0)
     }
 
     fn validate_computed_version_or_reset(&mut self, version: Version) -> Result<()> {
@@ -361,11 +361,11 @@ where
 
     #[inline]
     fn has(&self, index: I) -> bool {
-        self.has_(index.to_usize())
+        self.has_at(index.to_usize())
     }
     #[inline]
-    fn has_(&self, index: usize) -> bool {
-        index < self.len_()
+    fn has_at(&self, index: usize) -> bool {
+        index < self.dirty_len()
     }
 
     fn prev_stored_len(&self) -> usize;
@@ -374,9 +374,9 @@ where
     fn update_stored_len(&self, val: usize);
 
     fn truncate_if_needed(&mut self, index: I) -> Result<()> {
-        self.truncate_if_needed_(index.to_usize())
+        self.truncate_if_needed_at(index.to_usize())
     }
-    fn truncate_if_needed_(&mut self, index: usize) -> Result<()> {
+    fn truncate_if_needed_at(&mut self, index: usize) -> Result<()> {
         let stored_len = self.stored_len();
         let pushed_len = self.pushed_len();
         let len = stored_len + pushed_len;
@@ -437,7 +437,7 @@ where
         // Restore to the length BEFORE the changes that we're undoing
         if prev_stored_len < current_stored_len {
             // Shrinking - truncate will handle this
-            self.truncate_if_needed_(prev_stored_len)?;
+            self.truncate_if_needed_at(prev_stored_len)?;
         } else if prev_stored_len > current_stored_len {
             // Expanding - truncate won't handle this, manually set stored_len
             self.update_stored_len(prev_stored_len);
@@ -555,7 +555,7 @@ where
         // Restore old values to updated map (the "modified" section contains the values we want to restore)
         old_values_to_restore
             .into_iter()
-            .try_for_each(|(i, v)| self.update_(i, v))?;
+            .try_for_each(|(i, v)| self.update_at(i, v))?;
 
         // After rollback, prev_* should reflect the rolled-back state (for the next flush)
         *self.mut_prev_updated() = self.updated().clone();

@@ -149,7 +149,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         drop(iter);
 
         let reader = vec.create_static_reader();
-        assert_eq!(vec.take(10, &reader)?, Some(10));
+        assert_eq!(vec.take_with(10, &reader)?, Some(10));
         assert_eq!(vec.holes(), &BTreeSet::from([10]));
         assert_eq!(vec.get_or_read_with(10, &reader)?, None);
         drop(reader);
@@ -207,7 +207,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec.truncate_if_needed(10)?;
 
         let reader = vec.create_static_reader();
-        vec.take(5, &reader)?;
+        vec.take_with(5, &reader)?;
         vec.update(3, 5)?;
         vec.push(21);
         drop(reader);
@@ -238,7 +238,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(vec.collect(), vec![10, 1, 2, 5, 4, 6, 7, 8, 9, 21]);
 
         let reader = vec.create_static_reader();
-        vec.take(0, &reader)?;
+        vec.take_with(0, &reader)?;
         vec.update(1, 5)?;
         vec.push(5);
         vec.push(6);
@@ -397,7 +397,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec.truncate_if_needed(10)?;
 
         let reader = vec.create_static_reader();
-        vec.take(5, &reader)?;
+        vec.take_with(5, &reader)?;
         vec.update(3, 5)?;
         vec.push(21);
         drop(reader);
@@ -428,7 +428,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(vec.collect(), vec![10, 1, 2, 5, 4, 6, 7, 8, 9, 21]);
 
         let reader = vec.create_static_reader();
-        vec.take(0, &reader)?;
+        vec.take_with(0, &reader)?;
         vec.update(1, 5)?;
         vec.push(5);
         vec.push(6);
@@ -494,13 +494,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         vec.truncate_if_needed(10)?;
         let reader = vec.create_static_reader();
-        vec.take(5, &reader)?;
+        vec.take_with(5, &reader)?;
         vec.update(3, 5)?;
         vec.push(21);
         drop(reader);
 
         let reader = vec.create_static_reader();
-        vec.take(0, &reader)?;
+        vec.take_with(0, &reader)?;
         vec.update(1, 5)?;
         vec.push(5);
         vec.push(6);
@@ -565,7 +565,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         vec.truncate_if_needed(10)?;
         let reader = vec.create_static_reader();
-        vec.take(5, &reader)?;
+        vec.take_with(5, &reader)?;
         vec.update(3, 5)?;
         vec.push(21);
         drop(reader);
@@ -598,7 +598,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ));
 
         let reader = vec.create_static_reader();
-        vec.take(0, &reader)?;
+        vec.take_with(0, &reader)?;
         vec.update(1, 5)?;
         vec.push(5);
         vec.push(6);
@@ -675,13 +675,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         vec.truncate_if_needed(10)?;
         let reader = vec.create_static_reader();
-        vec.take(5, &reader)?;
+        vec.take_with(5, &reader)?;
         vec.update(3, 5)?;
         vec.push(21);
         drop(reader);
 
         let reader = vec.create_static_reader();
-        vec.take(0, &reader)?;
+        vec.take_with(0, &reader)?;
         vec.update(1, 5)?;
         vec.push(5);
         vec.push(6);

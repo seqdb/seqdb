@@ -142,7 +142,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Operation 3: Create a hole and add value
     let reader = vec.create_static_reader();
-    vec.take(5, &reader)?;
+    vec.take_with(5, &reader)?;
     drop(reader);
     vec.push(30);
     vec.stamped_flush_with_changes(Stamp::new(5))?;
@@ -278,7 +278,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Redo Operation 3: Create hole and add value
     let reader = vec.create_static_reader();
-    vec.take(5, &reader)?;
+    vec.take_with(5, &reader)?;
     drop(reader);
     vec.push(30);
     vec.stamped_flush_with_changes(Stamp::new(5))?;

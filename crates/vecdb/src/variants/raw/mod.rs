@@ -235,7 +235,7 @@ where
 
     #[inline]
     fn len(&self) -> usize {
-        self.len_()
+        self.dirty_len()
     }
 
     #[inline]
@@ -377,7 +377,7 @@ where
                     self.prev_updated
                         .get(&i)
                         .cloned()
-                        .unwrap_or_else(|| self.read_unwrap_at(i, &reader))
+                        .unwrap_or_else(|| self.read_at_unwrap(i, &reader))
                 })
                 .collect::<Vec<_>>();
             bytes.extend(truncated_vals.as_bytes());
@@ -407,7 +407,7 @@ where
                     .prev_updated
                     .get(&i)
                     .cloned()
-                    .unwrap_or_else(|| self.read_unwrap_at(i, &reader));
+                    .unwrap_or_else(|| self.read_at_unwrap(i, &reader));
                 (i, val)
             })
             .collect::<(Vec<_>, Vec<_>)>();
@@ -501,7 +501,7 @@ where
     }
 
     fn reset(&mut self) -> Result<()> {
-        self.reset_()
+        self.clear()
     }
 }
 

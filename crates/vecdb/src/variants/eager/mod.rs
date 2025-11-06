@@ -79,7 +79,7 @@ where
 
         (from..to).try_for_each(|i| {
             let (i, v) = t(I::from(i));
-            self.forced_push_at(i, v, exit)
+            self.forced_push(i, v, exit)
         })?;
 
         self.safe_flush(exit)
@@ -138,7 +138,7 @@ where
 
         other.iter().enumerate().skip(skip).try_for_each(|(a, b)| {
             let (i, v) = t((A::from(a), b, self));
-            self.forced_push_at(i, v, exit)
+            self.forced_push(i, v, exit)
         })?;
 
         self.safe_flush(exit)
@@ -172,7 +172,7 @@ where
             .skip(skip)
             .try_for_each(|(a, b)| {
                 let (i, v) = t((A::from(a), b, iter2.next().unwrap(), self));
-                self.forced_push_at(i, v, exit)
+                self.forced_push(i, v, exit)
             })?;
 
         self.safe_flush(exit)
@@ -219,7 +219,7 @@ where
                     iter3.next().unwrap(),
                     self,
                 ));
-                self.forced_push_at(i, v, exit)
+                self.forced_push(i, v, exit)
             })?;
 
         self.safe_flush(exit)
@@ -478,7 +478,7 @@ where
                     return Ok(());
                 }
                 if self.get_pushed_or_read(i)?.is_none_or(|old_v| old_v > v) {
-                    self.forced_push_at(i, v, exit)?;
+                    self.forced_push(i, v, exit)?;
                 }
                 prev_i.replace(i);
                 Ok(())
@@ -622,7 +622,7 @@ where
                 } else {
                     range.count()
                 };
-                self.forced_push_at_(i, T::from(T2::from(count)), exit)
+                self.forced_push_at(i, T::from(T2::from(count)), exit)
             })?;
 
         self.safe_flush(exit)
@@ -654,7 +654,7 @@ where
             .enumerate()
             .skip(skip)
             .try_for_each(|(i, other)| {
-                self.forced_push_at_(
+                self.forced_push_at(
                     i,
                     T::from(other_to_self_iter.get_unwrap(other).to_usize() == i),
                     exit,
@@ -705,7 +705,7 @@ where
 
                 let v = prev.iter().max().cloned().unwrap();
 
-                self.forced_push_at_(i, T::from(v), exit)
+                self.forced_push_at(i, T::from(v), exit)
             })?;
 
         self.safe_flush(exit)
@@ -752,7 +752,7 @@ where
 
                 let v = prev.iter().min().cloned().unwrap();
 
-                self.forced_push_at_(i, T::from(v), exit)
+                self.forced_push_at(i, T::from(v), exit)
             })?;
 
         self.safe_flush(exit)
@@ -805,7 +805,7 @@ where
                 };
 
                 prev.replace(sum);
-                self.forced_push_at_(i, sum, exit)
+                self.forced_push_at(i, sum, exit)
             })?;
 
         self.safe_flush(exit)
@@ -847,7 +847,7 @@ where
                 range.into_iter().for_each(|i| {
                     sum = sum + source_iter.get_unwrap_at(i);
                 });
-                self.forced_push_at_(i, sum, exit)
+                self.forced_push_at(i, sum, exit)
             })?;
 
         self.safe_flush(exit)
@@ -884,7 +884,7 @@ where
                 others_iter.iter_mut().for_each(|iter| {
                     sum = sum + iter.get_unwrap_at(i);
                 });
-                self.forced_push_at_(i, sum, exit)
+                self.forced_push_at(i, sum, exit)
             })?;
 
         self.safe_flush(exit)
@@ -924,7 +924,7 @@ where
                     .map(|iter| iter.get_unwrap_at(i))
                     .min()
                     .map_or(min, |min2| min.min(min2));
-                self.forced_push_at_(i, min, exit)
+                self.forced_push_at(i, min, exit)
             })?;
 
         self.safe_flush(exit)
@@ -964,7 +964,7 @@ where
                     .map(|iter| iter.get_unwrap_at(i))
                     .max()
                     .map_or(max, |max2| max.max(max2));
-                self.forced_push_at_(i, max, exit)
+                self.forced_push_at(i, max, exit)
             })?;
 
         self.safe_flush(exit)
@@ -1041,9 +1041,9 @@ where
                     });
 
                     prev.replace(sma);
-                    self.forced_push_at_(i, sma, exit)
+                    self.forced_push_at(i, sma, exit)
                 } else {
-                    self.forced_push_at_(i, T::from(f32::NAN), exit)
+                    self.forced_push_at(i, T::from(f32::NAN), exit)
                 }
             })?;
 
@@ -1124,9 +1124,9 @@ where
                     };
 
                     prev.replace(ema);
-                    self.forced_push_at_(index, ema, exit)
+                    self.forced_push_at(index, ema, exit)
                 } else {
-                    self.forced_push_at_(index, T::from(f32::NAN), exit)
+                    self.forced_push_at(index, T::from(f32::NAN), exit)
                 }
             })?;
 
@@ -1159,7 +1159,7 @@ where
                 .map(|prev_i| f32::from(source_iter.get_unwrap_at(prev_i)))
                 .unwrap_or(f32::NAN);
 
-            self.forced_push_at_(i, T::from(previous_value), exit)
+            self.forced_push_at(i, T::from(previous_value), exit)
         })?;
 
         self.safe_flush(exit)
@@ -1193,7 +1193,7 @@ where
                     .map(|prev_i| source_iter.get_unwrap_at(prev_i))
                     .unwrap_or_default();
 
-                self.forced_push_at_(i, current.checked_sub(prev).unwrap(), exit)
+                self.forced_push_at(i, current.checked_sub(prev).unwrap(), exit)
             })?;
 
         self.safe_flush(exit)
@@ -1233,7 +1233,7 @@ where
 
                 let percentage_change = ((last_value / previous_value) - 1.0) * 100.0;
 
-                self.forced_push_at_(i, T::from(percentage_change), exit)
+                self.forced_push_at(i, T::from(percentage_change), exit)
             })?;
 
         self.safe_flush(exit)
@@ -1272,7 +1272,7 @@ where
                 let cagr = (((f32::from(percentage) / 100.0 + 1.0).powf(1.0 / years as f32)) - 1.0)
                     * 100.0;
 
-                self.forced_push_at_(i, T::from(cagr), exit)
+                self.forced_push_at(i, T::from(cagr), exit)
             })?;
 
         self.safe_flush(exit)

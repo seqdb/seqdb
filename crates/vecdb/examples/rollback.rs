@@ -171,8 +171,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Block 3: Delete some items (create holes)
         let reader = vec.create_static_reader();
-        vec.take(1, &reader)?;
-        vec.take(4, &reader)?;
+        vec.take_with(1, &reader)?;
+        vec.take_with(4, &reader)?;
         drop(reader);
         vec.push(120);
         vec.stamped_flush_with_changes(Stamp::new(3))?;
@@ -185,7 +185,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Block 4: Mix of updates, holes, and pushes
         vec.update(0, 999)?; // Update first
         let reader = vec.create_static_reader();
-        vec.take(5, &reader)?; // Delete index 5 (removes value 50)
+        vec.take_with(5, &reader)?; // Delete index 5 (removes value 50)
         drop(reader);
         vec.push(130);
         vec.push(140);
@@ -212,7 +212,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec.update(0, 2000)?;
         vec.update(3, 2050)?;
         let reader = vec.create_static_reader();
-        vec.take(8, &reader)?; // Delete index 8 (value 80)
+        vec.take_with(8, &reader)?; // Delete index 8 (value 80)
         drop(reader);
         vec.push(160);
         vec.stamped_flush_with_changes(Stamp::new(6))?;
@@ -254,7 +254,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec.update(0, 5000)?; // Different update
         vec.update(2, 5035)?;
         let reader = vec.create_static_reader();
-        vec.take(10, &reader)?; // Delete storage index 10 (value 100)
+        vec.take_with(10, &reader)?; // Delete storage index 10 (value 100)
         drop(reader);
         vec.push(5150);
         vec.stamped_flush_with_changes(Stamp::new(5))?;
@@ -295,8 +295,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec.update(2, 7020)?; // Update index 2, not 1 (which is a hole)
         vec.update(3, 7035)?;
         let reader = vec.create_static_reader();
-        vec.take(6, &reader)?; // Delete index 6 (value 60)
-        vec.take(9, &reader)?; // Delete index 9 (value 90)
+        vec.take_with(6, &reader)?; // Delete index 6 (value 60)
+        vec.take_with(9, &reader)?; // Delete index 9 (value 90)
         drop(reader);
         vec.push(7150);
         vec.stamped_flush_with_changes(Stamp::new(5))?;
@@ -390,8 +390,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Stamp 2: delete some items (creating holes)
         let reader = vec.create_static_reader();
-        vec.take(1, &reader)?;
-        vec.take(3, &reader)?;
+        vec.take_with(1, &reader)?;
+        vec.take_with(3, &reader)?;
         drop(reader);
         vec.stamped_flush_with_changes(Stamp::new(2))?;
         println!("Stamp 2: {:?}", vec.collect());
@@ -455,7 +455,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Stamp 2: delete + update
         // [0, None, 99, 3, 4]
         let reader = vec.create_static_reader();
-        vec.take(1, &reader)?;
+        vec.take_with(1, &reader)?;
         vec.update(2, 99)?;
         drop(reader);
         vec.stamped_flush_with_changes(Stamp::new(2))?;
@@ -538,9 +538,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // - Update indices 2, 6, 8
         // - Push new values 100, 101
         let reader = vec.create_static_reader();
-        vec.take(1, &reader)?;
-        vec.take(3, &reader)?;
-        vec.take(5, &reader)?;
+        vec.take_with(1, &reader)?;
+        vec.take_with(3, &reader)?;
+        vec.take_with(5, &reader)?;
         drop(reader);
         vec.update(2, 222)?;
         vec.update(6, 666)?;
@@ -610,7 +610,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec.stamped_flush_with_changes(Stamp::new(5))?; // [10, 1, 2]
 
         let reader = vec.create_static_reader();
-        vec.take(1, &reader)?;
+        vec.take_with(1, &reader)?;
         drop(reader);
         vec.stamped_flush_with_changes(Stamp::new(6))?; // [10, 2]
 
@@ -708,7 +708,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Stamp 2: Delete every other element
         let reader = vec.create_static_reader();
         for i in (0..10).step_by(2) {
-            vec.take(i, &reader)?;
+            vec.take_with(i, &reader)?;
         }
         drop(reader);
         vec.stamped_flush_with_changes(Stamp::new(2))?;
@@ -870,9 +870,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Stamp 2: Delete some items, then extend
         let reader = vec.create_static_reader();
-        vec.take(2, &reader)?;
-        vec.take(5, &reader)?;
-        vec.take(7, &reader)?;
+        vec.take_with(2, &reader)?;
+        vec.take_with(5, &reader)?;
+        vec.take_with(7, &reader)?;
         drop(reader);
         vec.push(100);
         vec.push(101);
