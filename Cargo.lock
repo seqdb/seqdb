@@ -1242,7 +1242,7 @@ dependencies = [
 
 [[package]]
 name = "rawdb"
-version = "0.3.6"
+version = "0.3.7"
 dependencies = [
  "libc",
  "memmap2",
@@ -1789,7 +1789,7 @@ dependencies = [
 
 [[package]]
 name = "vecdb"
-version = "0.3.6"
+version = "0.3.7"
 dependencies = [
  "allocative",
  "ctrlc",
@@ -1809,7 +1809,7 @@ dependencies = [
 
 [[package]]
 name = "vecdb_bench"
-version = "0.3.6"
+version = "0.3.7"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -1821,13 +1821,13 @@ dependencies = [
  "redb",
  "rocksdb",
  "vecdb 0.2.17",
- "vecdb 0.3.6",
+ "vecdb 0.3.7",
  "walkdir",
 ]
 
 [[package]]
 name = "vecdb_derive"
-version = "0.3.6"
+version = "0.3.7"
 dependencies = [
  "quote",
  "syn 2.0.108",
