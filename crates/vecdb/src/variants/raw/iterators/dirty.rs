@@ -96,7 +96,11 @@ where
         }
 
         if index >= self.stored_len {
-            return self.inner._vec.get_pushed(index, self.stored_len).cloned();
+            return self
+                .inner
+                ._vec
+                .get_pushed_at(index, self.stored_len)
+                .cloned();
         }
 
         if unlikely(self.updated)

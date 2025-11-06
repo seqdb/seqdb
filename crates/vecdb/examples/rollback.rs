@@ -158,13 +158,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(vec.collect(), vec![0, 10, 20, 30, 40, 50, 60, 70, 80, 90]);
 
         // Block 2: Update some existing + push new
-        vec.update(0, 5)?;  // Change first element
+        vec.update(0, 5)?; // Change first element
         vec.update(3, 35)?; // Change middle element
         vec.push(100);
         vec.push(110);
         vec.stamped_flush_with_changes(Stamp::new(2))?;
         println!("Block 2: {:?}", vec.collect());
-        assert_eq!(vec.collect(), vec![5, 10, 20, 35, 40, 50, 60, 70, 80, 90, 100, 110]);
+        assert_eq!(
+            vec.collect(),
+            vec![5, 10, 20, 35, 40, 50, 60, 70, 80, 90, 100, 110]
+        );
 
         // Block 3: Delete some items (create holes)
         let reader = vec.create_static_reader();
@@ -174,7 +177,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec.push(120);
         vec.stamped_flush_with_changes(Stamp::new(3))?;
         println!("Block 3: {:?}", vec.collect());
-        assert_eq!(vec.collect(), vec![5, 20, 35, 50, 60, 70, 80, 90, 100, 110, 120]);
+        assert_eq!(
+            vec.collect(),
+            vec![5, 20, 35, 50, 60, 70, 80, 90, 100, 110, 120]
+        );
 
         // Block 4: Mix of updates, holes, and pushes
         vec.update(0, 999)?; // Update first
@@ -185,7 +191,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec.push(140);
         vec.stamped_flush_with_changes(Stamp::new(4))?;
         println!("Block 4: {:?}", vec.collect());
-        assert_eq!(vec.collect(), vec![999, 20, 35, 60, 70, 80, 90, 100, 110, 120, 130, 140]); // 50 is gone
+        assert_eq!(
+            vec.collect(),
+            vec![999, 20, 35, 60, 70, 80, 90, 100, 110, 120, 130, 140]
+        ); // 50 is gone
 
         // Block 5: Update same indices multiple times
         vec.update(0, 1000)?;
@@ -194,7 +203,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec.stamped_flush_with_changes(Stamp::new(5))?;
         println!("Block 5: {:?}", vec.collect());
         // Holes at 1,4,5. Values: 0→1000, 2→1035, 3→35, 6→60, 7→70, 8→80, 9→90, 10→100, 11→110, 12→120, 13→130, 14→140, 15→150
-        assert_eq!(vec.collect(), vec![1000, 1035, 35, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150]);
+        assert_eq!(
+            vec.collect(),
+            vec![1000, 1035, 35, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150]
+        );
 
         // Block 6: More complex operations
         vec.update(0, 2000)?;
@@ -206,7 +218,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec.stamped_flush_with_changes(Stamp::new(6))?;
         println!("Block 6: {:?}", vec.collect());
         // Holes at 1,4,5,8. Values: 0→2000, 2→1035, 3→2050, 6→60, 7→70, 9→90, 10→100, 11→110, 12→120, 13→130, 14→140, 15→150, 16→160
-        assert_eq!(vec.collect(), vec![2000, 1035, 2050, 60, 70, 90, 100, 110, 120, 130, 140, 150, 160]);
+        assert_eq!(
+            vec.collect(),
+            vec![
+                2000, 1035, 2050, 60, 70, 90, 100, 110, 120, 130, 140, 150, 160
+            ]
+        );
 
         // Block 7: Continue the main chain
         vec.update(0, 3000)?;
@@ -215,18 +232,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec.stamped_flush_with_changes(Stamp::new(7))?;
         println!("Block 7 (main chain): {:?}", vec.collect());
         // Holes at 1,4,5,8. Values: 0→3000, 2→1035, 3→2050, 6→60, 7→70, 9→90, 10→100, 11→110, 12→120, 13→130, 14→140, 15→150, 16→160, 17→170, 18→180
-        assert_eq!(vec.collect(), vec![3000, 1035, 2050, 60, 70, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180]);
+        assert_eq!(
+            vec.collect(),
+            vec![
+                3000, 1035, 2050, 60, 70, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180
+            ]
+        );
 
         // === REORG: Rollback to block 4 and create alternative chain ===
         println!("\n--- REORG: Rolling back to block 4 ---");
         vec.rollback_before(Stamp::new(5))?;
         println!("After rollback to 4: {:?}", vec.collect());
         // Should match Block 4 state: holes at 1,4,5
-        assert_eq!(vec.collect(), vec![999, 20, 35, 60, 70, 80, 90, 100, 110, 120, 130, 140]);
+        assert_eq!(
+            vec.collect(),
+            vec![999, 20, 35, 60, 70, 80, 90, 100, 110, 120, 130, 140]
+        );
         assert_eq!(vec.stamp(), Stamp::new(4));
 
         // Fork A - Block 5: Different operations than original
-        vec.update(0, 5000)?;  // Different update
+        vec.update(0, 5000)?; // Different update
         vec.update(2, 5035)?;
         let reader = vec.create_static_reader();
         vec.take(10, &reader)?; // Delete storage index 10 (value 100)
@@ -235,7 +260,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec.stamped_flush_with_changes(Stamp::new(5))?;
         println!("Fork A Block 5: {:?}", vec.collect());
         // Holes at 1,4,5,10. Values: 0→5000, 2→5035, 3→35, 6→60, 7→70, 8→80, 9→90, 11→110, 12→120, 13→130, 14→140, 15→5150
-        assert_eq!(vec.collect(), vec![5000, 5035, 35, 60, 70, 80, 90, 110, 120, 130, 140, 5150]);
+        assert_eq!(
+            vec.collect(),
+            vec![5000, 5035, 35, 60, 70, 80, 90, 110, 120, 130, 140, 5150]
+        );
 
         // Fork A - Block 6: Continue with more changes
         vec.update(0, 6000)?;
@@ -245,13 +273,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec.stamped_flush_with_changes(Stamp::new(6))?;
         println!("Fork A Block 6: {:?}", vec.collect());
         // Holes at 1,4,5,10. Values: 0→6000, 2→6020, 3→35, 6→60, 7→70, 8→80, 9→90, 11→110, 12→120, 13→130, 14→140, 15→5150, 16→6160, 17→6170
-        assert_eq!(vec.collect(), vec![6000, 6020, 35, 60, 70, 80, 90, 110, 120, 130, 140, 5150, 6160, 6170]);
+        assert_eq!(
+            vec.collect(),
+            vec![
+                6000, 6020, 35, 60, 70, 80, 90, 110, 120, 130, 140, 5150, 6160, 6170
+            ]
+        );
 
         // === ANOTHER REORG: Rollback to block 4 again ===
         println!("\n--- ANOTHER REORG: Rolling back to block 4 again ---");
         vec.rollback_before(Stamp::new(5))?;
         println!("After second rollback to 4: {:?}", vec.collect());
-        assert_eq!(vec.collect(), vec![999, 20, 35, 60, 70, 80, 90, 100, 110, 120, 130, 140]);
+        assert_eq!(
+            vec.collect(),
+            vec![999, 20, 35, 60, 70, 80, 90, 100, 110, 120, 130, 140]
+        );
         assert_eq!(vec.stamp(), Stamp::new(4));
 
         // Fork B - Block 5: Yet another alternative
@@ -266,7 +302,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec.stamped_flush_with_changes(Stamp::new(5))?;
         println!("Fork B Block 5: {:?}", vec.collect());
         // Holes at 1,4,5,6,9. Values: 0→7000, 2→7020, 3→7035, 7→70, 8→80, 10→100, 11→110, 12→120, 13→130, 14→140, 15→7150
-        assert_eq!(vec.collect(), vec![7000, 7020, 7035, 70, 80, 100, 110, 120, 130, 140, 7150]);
+        assert_eq!(
+            vec.collect(),
+            vec![7000, 7020, 7035, 70, 80, 100, 110, 120, 130, 140, 7150]
+        );
 
         // Fork B - Block 6
         vec.update(0, 8000)?;
@@ -274,13 +313,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec.stamped_flush_with_changes(Stamp::new(6))?;
         println!("Fork B Block 6: {:?}", vec.collect());
         // Holes at 1,4,5,6,9. Values: 0→8000, 2→7020, 3→7035, 7→70, 8→80, 10→100, 11→110, 12→120, 13→130, 14→140, 15→7150, 16→8160
-        assert_eq!(vec.collect(), vec![8000, 7020, 7035, 70, 80, 100, 110, 120, 130, 140, 7150, 8160]);
+        assert_eq!(
+            vec.collect(),
+            vec![
+                8000, 7020, 7035, 70, 80, 100, 110, 120, 130, 140, 7150, 8160
+            ]
+        );
 
         // === Rollback to block 3 (deeper reorg) ===
         println!("\n--- DEEPER REORG: Rolling back to block 3 ---");
         vec.rollback_before(Stamp::new(4))?;
         println!("After rollback to 3: {:?}", vec.collect());
-        assert_eq!(vec.collect(), vec![5, 20, 35, 50, 60, 70, 80, 90, 100, 110, 120]);
+        assert_eq!(
+            vec.collect(),
+            vec![5, 20, 35, 50, 60, 70, 80, 90, 100, 110, 120]
+        );
         assert_eq!(vec.stamp(), Stamp::new(3));
 
         // Fork C - Build new chain from block 3
@@ -289,7 +336,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec.push(9999);
         vec.stamped_flush_with_changes(Stamp::new(4))?;
         println!("Fork C Block 4: {:?}", vec.collect());
-        assert_eq!(vec.collect(), vec![9000, 20, 35, 50, 60, 70, 80, 90, 9120, 110, 120, 9999]);
+        assert_eq!(
+            vec.collect(),
+            vec![9000, 20, 35, 50, 60, 70, 80, 90, 9120, 110, 120, 9999]
+        );
 
         println!("✓ TEST 5 PASSED (COMPLEX BLOCKCHAIN REORG)\n");
     }
@@ -786,8 +836,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         vec.stamped_flush_with_changes(Stamp::new(2))?;
         println!("Stamp 2: {} elements (half updated)", vec.len());
         let reader = vec.create_static_reader();
-        assert_eq!(vec.read(0, &reader)?, 10000);
-        assert_eq!(vec.read(1, &reader)?, 1);
+        assert_eq!(vec.read_at(0, &reader)?, 10000);
+        assert_eq!(vec.read_at(1, &reader)?, 1);
         drop(reader);
 
         // Rollback
@@ -796,9 +846,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let reader = vec.create_static_reader();
         assert_eq!(vec.len(), 1000);
         // After rollback, state is dirty - use get_any_or_read() to check updated map
-        assert_eq!(vec.get_any_or_read(0, &reader)?, Some(0));
-        assert_eq!(vec.get_any_or_read(1, &reader)?, Some(1));
-        assert_eq!(vec.get_any_or_read(999, &reader)?, Some(999));
+        assert_eq!(vec.get_or_read_with(0, &reader)?, Some(0));
+        assert_eq!(vec.get_or_read_with(1, &reader)?, Some(1));
+        assert_eq!(vec.get_or_read_with(999, &reader)?, Some(999));
         drop(reader);
 
         println!("✓ TEST 18 PASSED (LARGE-SCALE)\n");

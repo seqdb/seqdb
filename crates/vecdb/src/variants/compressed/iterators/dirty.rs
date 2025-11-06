@@ -71,7 +71,7 @@ where
 
         self.inner
             ._vec
-            .get_pushed(index, self.inner.stored_len)
+            .get_pushed_at(index, self.inner.stored_len)
             .copied()
     }
 
@@ -120,7 +120,7 @@ where
             // Last element is in pushed data
             self.inner
                 ._vec
-                .get_pushed(last_index, self.inner.stored_len)
+                .get_pushed_at(last_index, self.inner.stored_len)
                 .copied()
         }
     }

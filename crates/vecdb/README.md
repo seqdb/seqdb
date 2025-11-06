@@ -52,8 +52,8 @@ fn main() -> Result<()> {
     // read (random)
     let indices: Vec<usize> = vec![500, 1000, 10];
     let reader = vec.create_reader();
-    for idx in indices {
-        if let Ok(value) = vec.read(idx as usize, &reader) {
+    for i in indices {
+        if let Ok(value) = vec.read_at(i, &reader) {
             sum = sum.wrapping_add(value);
         }
     }

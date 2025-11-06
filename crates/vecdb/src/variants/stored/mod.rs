@@ -182,10 +182,10 @@ where
     T: StoredCompressed,
 {
     #[inline]
-    fn read_(&self, index: usize, reader: &Reader) -> Result<T> {
+    fn read_at(&self, index: usize, reader: &Reader) -> Result<T> {
         match self {
-            StoredVec::Raw(v) => v.read_(index, reader),
-            StoredVec::Compressed(v) => v.read_(index, reader),
+            StoredVec::Raw(v) => v.read_at(index, reader),
+            StoredVec::Compressed(v) => v.read_at(index, reader),
         }
     }
 

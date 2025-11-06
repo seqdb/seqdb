@@ -179,11 +179,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let after_undo_data = vec.collect_holed()?;
     let after_undo_stamp = vec.stamp();
     println!("In-memory state after rollback:");
-    println!("  Stamp: {:?} (expected: {:?})", after_undo_stamp, checkpoint1_stamp);
+    println!(
+        "  Stamp: {:?} (expected: {:?})",
+        after_undo_stamp, checkpoint1_stamp
+    );
     println!("  Data: {:?}", after_undo_data);
 
-    assert_eq!(after_undo_stamp, checkpoint1_stamp, "Stamp mismatch after undo!");
-    assert_eq!(after_undo_data, checkpoint1_data, "In-memory data mismatch after undo!");
+    assert_eq!(
+        after_undo_stamp, checkpoint1_stamp,
+        "Stamp mismatch after undo!"
+    );
+    assert_eq!(
+        after_undo_data, checkpoint1_data,
+        "In-memory data mismatch after undo!"
+    );
     println!("✓ PASS: In-memory data matches checkpoint1 after undo");
 
     // Flush and close
@@ -193,7 +202,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✓ Flushed to disk");
     println!("  File hash: {}", after_flush_hash);
     if after_flush_hash != checkpoint1_hash {
-        println!("  Note: Hash differs from checkpoint1 ({}) due to region allocation bug", checkpoint1_hash);
+        println!(
+            "  Note: Hash differs from checkpoint1 ({}) due to region allocation bug",
+            checkpoint1_hash
+        );
     }
 
     // Drop the vec to close files
@@ -213,27 +225,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let reader = vec.create_static_reader();
     let mut data_via_gets = Vec::new();
     for i in 0..vec.len() {
-        let value = vec.get_any_or_read(i, &reader)?;
+        let value = vec.get_or_read_with(i, &reader)?;
         data_via_gets.push(value);
     }
     drop(reader);
 
     println!("Data read via gets: {:?}", data_via_gets);
-    assert_eq!(data_via_gets, checkpoint1_data, "Data mismatch reading via gets after reopen!");
+    assert_eq!(
+        data_via_gets, checkpoint1_data,
+        "Data mismatch reading via gets after reopen!"
+    );
     println!("✓ PASS: Data correct when reading via gets");
 
     // Verify using iterator
     println!("\n--- Verification 3: After reopen (using iterator) ---");
     let data_via_iter = vec.collect_holed()?;
     println!("Data read via iterator: {:?}", data_via_iter);
-    assert_eq!(data_via_iter, checkpoint1_data, "Data mismatch reading via iterator after reopen!");
+    assert_eq!(
+        data_via_iter, checkpoint1_data,
+        "Data mismatch reading via iterator after reopen!"
+    );
     println!("✓ PASS: Data correct when reading via iterator");
 
     // Also test the clean iterator (non-holed)
     let data_via_clean_iter: Vec<u32> = vec.collect();
     let expected_clean: Vec<u32> = checkpoint1_data.iter().filter_map(|x| *x).collect();
     println!("Data via clean iterator: {:?}", data_via_clean_iter);
-    assert_eq!(data_via_clean_iter, expected_clean, "Data mismatch via clean iterator!");
+    assert_eq!(
+        data_via_clean_iter, expected_clean,
+        "Data mismatch via clean iterator!"
+    );
     println!("✓ PASS: Data correct when reading via clean iterator");
 
     println!("\n✓ ALL VERIFICATION PASSED: Rollback + flush + reopen preserved data correctly!");
@@ -270,11 +291,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let after_redo_data = vec.collect_holed()?;
     let after_redo_stamp = vec.stamp();
     println!("In-memory state after redo:");
-    println!("  Stamp: {:?} (expected: {:?})", after_redo_stamp, checkpoint2_stamp);
+    println!(
+        "  Stamp: {:?} (expected: {:?})",
+        after_redo_stamp, checkpoint2_stamp
+    );
     println!("  Data: {:?}", after_redo_data);
 
-    assert_eq!(after_redo_stamp, checkpoint2_stamp, "Stamp mismatch after redo!");
-    assert_eq!(after_redo_data, checkpoint2_data, "In-memory data mismatch after redo!");
+    assert_eq!(
+        after_redo_stamp, checkpoint2_stamp,
+        "Stamp mismatch after redo!"
+    );
+    assert_eq!(
+        after_redo_data, checkpoint2_data,
+        "In-memory data mismatch after redo!"
+    );
     println!("✓ PASS: In-memory data matches checkpoint2 after redo");
 
     // Flush and close
@@ -286,7 +316,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if after_redo_flush_hash == checkpoint2_hash {
         println!("  ✓ Hash matches checkpoint2 (operations were deterministic)");
     } else {
-        println!("  Note: Hash differs from checkpoint2 ({})", checkpoint2_hash);
+        println!(
+            "  Note: Hash differs from checkpoint2 ({})",
+            checkpoint2_hash
+        );
     }
 
     // Drop and reopen
@@ -305,27 +338,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let reader = vec.create_static_reader();
     let mut data_via_gets = Vec::new();
     for i in 0..vec.len() {
-        let value = vec.get_any_or_read(i, &reader)?;
+        let value = vec.get_or_read_with(i, &reader)?;
         data_via_gets.push(value);
     }
     drop(reader);
 
     println!("Data read via gets: {:?}", data_via_gets);
-    assert_eq!(data_via_gets, checkpoint2_data, "Data mismatch reading via gets after reopen!");
+    assert_eq!(
+        data_via_gets, checkpoint2_data,
+        "Data mismatch reading via gets after reopen!"
+    );
     println!("✓ PASS: Data correct when reading via gets");
 
     // Verify using iterator
     println!("\n--- Verification 6: After reopen (using iterator) ---");
     let data_via_iter = vec.collect_holed()?;
     println!("Data read via iterator: {:?}", data_via_iter);
-    assert_eq!(data_via_iter, checkpoint2_data, "Data mismatch reading via iterator after reopen!");
+    assert_eq!(
+        data_via_iter, checkpoint2_data,
+        "Data mismatch reading via iterator after reopen!"
+    );
     println!("✓ PASS: Data correct when reading via iterator");
 
     // Also test the clean iterator (non-holed)
     let data_via_clean_iter: Vec<u32> = vec.collect();
     let expected_clean: Vec<u32> = checkpoint2_data.iter().filter_map(|x| *x).collect();
     println!("Data via clean iterator: {:?}", data_via_clean_iter);
-    assert_eq!(data_via_clean_iter, expected_clean, "Data mismatch via clean iterator!");
+    assert_eq!(
+        data_via_clean_iter, expected_clean,
+        "Data mismatch via clean iterator!"
+    );
     println!("✓ PASS: Data correct when reading via clean iterator");
 
     println!("\n✓ ALL VERIFICATION PASSED: Redo + flush + reopen preserved data correctly!");

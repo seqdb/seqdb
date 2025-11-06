@@ -46,7 +46,7 @@ impl DatabaseBenchmark for VecDbRawBench {
         let mut sum = 0u64;
         let reader = self.vec.create_reader();
         for &idx in indices {
-            if let Ok(value) = self.vec.read(idx as usize, &reader) {
+            if let Ok(value) = self.vec.read_at(idx as usize, &reader) {
                 sum = sum.wrapping_add(value);
             }
         }
@@ -57,7 +57,7 @@ impl DatabaseBenchmark for VecDbRawBench {
         let reader = self.vec.create_reader();
         let sum = indices
             .par_iter()
-            .map(|&idx| self.vec.read_(idx as usize, &reader).unwrap_or_default())
+            .map(|&idx| self.vec.read_at(idx as usize, &reader).unwrap_or_default())
             .reduce(|| 0, |a, b| a.wrapping_add(b));
 
         Ok(sum)

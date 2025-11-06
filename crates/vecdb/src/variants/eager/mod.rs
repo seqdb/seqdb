@@ -58,16 +58,6 @@ where
     }
 
     #[inline]
-    pub fn get_any_or_read(&self, index: I, reader: &Reader) -> Result<Option<T>> {
-        self.0.get_any_or_read(index, reader)
-    }
-
-    #[inline]
-    pub fn get_pushed_or_read(&self, index: I, reader: &Reader) -> Result<Option<T>> {
-        self.0.get_pushed_or_read(index, reader)
-    }
-
-    #[inline]
     pub fn inner_version(&self) -> Version {
         self.0.header().vec_version()
     }
@@ -487,10 +477,7 @@ where
                 if prev_i.is_some_and(|prev_i| prev_i == i) {
                     return Ok(());
                 }
-                if self
-                    .one_shot_get_pushed_or_read(i)?
-                    .is_none_or(|old_v| old_v > v)
-                {
+                if self.get_pushed_or_read(i)?.is_none_or(|old_v| old_v > v) {
                     self.forced_push_at(i, v, exit)?;
                 }
                 prev_i.replace(i);
@@ -1415,8 +1402,8 @@ where
     T: StoredCompressed,
 {
     #[inline]
-    fn read_(&self, index: usize, reader: &Reader) -> Result<T> {
-        self.0.read_(index, reader)
+    fn read_at(&self, index: usize, reader: &Reader) -> Result<T> {
+        self.0.read_at(index, reader)
     }
 
     #[inline]

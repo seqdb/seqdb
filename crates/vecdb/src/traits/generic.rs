@@ -43,96 +43,116 @@ where
         unsafe { std::mem::transmute(self.region().create_reader()) }
     }
 
+    /// Reads value at index using provided reader. Panics if read fails.
     #[inline]
-    fn unwrap_read(&self, index: I, reader: &Reader) -> T {
-        self.read(index, reader).unwrap()
+    fn read_unchecked(&self, index: I, reader: &Reader) -> T {
+        self.read_with(index, reader).unwrap()
     }
-    #[inline]
-    fn unwrap_read_(&self, index: usize, reader: &Reader) -> T {
-        self.read_(index, reader).unwrap()
-    }
-    #[inline]
-    fn one_shot_read(&self, index: I) -> Result<T> {
-        self.read(index, &self.create_reader())
-    }
-    #[inline]
-    fn read(&self, index: I, reader: &Reader) -> Result<T> {
-        self.read_(index.to_usize(), reader)
-    }
-    #[inline]
-    fn one_shot_read_(&self, index: usize) -> Result<T> {
-        self.read_(index, &self.create_reader())
-    }
-    fn read_(&self, index: usize, reader: &Reader) -> Result<T>;
-    // fn read_into_(&self, index: usize, reader: &Reader, buffer: &mut [u8]) -> Result<T>;
-    // fn create_buffer() -> Vec<u8>;
 
+    // With usize index (internal)
     #[inline]
-    fn one_shot_get_any_or_read(&self, index: I) -> Result<Option<T>> {
-        self.get_any_or_read(index, &self.create_reader())
+    fn read_unchecked_at(&self, index: usize, reader: &Reader) -> T {
+        self.read_at(index, reader).unwrap()
     }
-    #[inline]
-    fn get_any_or_read(&'_ self, index: I, reader: &Reader) -> Result<Option<T>> {
-        self.get_any_or_read_(index.to_usize(), reader)
-    }
-    #[inline]
-    fn one_shot_get_any_or_read_(&self, index: usize) -> Result<Option<T>> {
-        self.get_any_or_read_(index, &self.create_reader())
-    }
-    #[inline]
-    fn get_any_or_read_(&'_ self, index: usize, reader: &Reader) -> Result<Option<T>> {
-        let stored_len = self.stored_len();
 
-        // We can have holes in pushed
+    /// Reads value at index using provided reader.
+    #[inline]
+    fn read_with(&self, index: I, reader: &Reader) -> Result<T> {
+        self.read_at(index.to_usize(), reader)
+    }
+
+    /// Reads value at index, creating a temporary reader.
+    /// For multiple reads, prefer `read_with` with a reused reader.
+    #[inline]
+    fn read(&self, index: I) -> Result<T> {
+        self.read_with(index, &self.create_reader())
+    }
+
+    /// Internal implementation for reading at usize index.
+    fn read_at(&self, index: usize, reader: &Reader) -> Result<T>;
+
+    /// Gets value from any layer (updated, pushed, or storage). Panics on error.
+    #[inline]
+    fn get_or_read_unchecked(&self, index: I) -> T {
+        self.get_or_read(index).unwrap().unwrap()
+    }
+
+    /// Gets value from any layer, creating a temporary reader if needed.
+    /// Returns None if index is in holes or beyond available data.
+    #[inline]
+    fn get_or_read(&self, index: I) -> Result<Option<T>> {
+        self.get_or_read_with(index, &self.create_reader())
+    }
+
+    /// Gets value from any layer using provided reader.
+    #[inline]
+    fn get_or_read_with(&self, index: I, reader: &Reader) -> Result<Option<T>> {
+        self.get_or_read_at(index.to_usize(), reader)
+    }
+
+    /// Internal implementation checking all layers.
+    #[inline]
+    fn get_or_read_at(&self, index: usize, reader: &Reader) -> Result<Option<T>> {
+        // Check holes first
         let holes = self.holes();
         if !holes.is_empty() && holes.contains(&index) {
             return Ok(None);
         }
 
+        let stored_len = self.stored_len();
+
+        // Check pushed (beyond stored length)
         if index >= stored_len {
-            return Ok(self.get_pushed(index, stored_len).cloned());
+            return Ok(self.get_pushed_at(index, stored_len).cloned());
         }
 
+        // Check updated layer
         let updated = self.updated();
         if !updated.is_empty()
-            && let Some(updated) = updated.get(&index)
+            && let Some(updated_value) = updated.get(&index)
         {
-            return Ok(Some(updated.clone()));
+            return Ok(Some(updated_value.clone()));
         }
 
-        Ok(Some(self.read_(index, reader)?))
+        // Fall back to reading from storage
+        Ok(Some(self.read_at(index, reader)?))
     }
+
+    // ============================================================================
+    // Pushed-only operations (skips updated layer)
+    // ============================================================================
+
+    /// Gets value from pushed layer or storage, creating a temporary reader.
+    /// Does not check the updated layer.
     #[inline]
-    fn one_shot_get_pushed_or_read(&self, index: I) -> Result<Option<T>> {
-        self.get_pushed_or_read(index, &self.create_reader())
+    fn get_pushed_or_read(&self, index: I) -> Result<Option<T>> {
+        self.get_pushed_or_read_with(index, &self.create_reader())
     }
+
+    /// Gets value from pushed layer or storage using provided reader.
     #[inline]
-    fn get_pushed_or_read(&'_ self, index: I, reader: &Reader) -> Result<Option<T>> {
-        self.get_pushed_or_read_(index.to_usize(), reader)
+    fn get_pushed_or_read_with(&self, index: I, reader: &Reader) -> Result<Option<T>> {
+        self.get_pushed_or_read_at(index.to_usize(), reader)
     }
+
+    /// Internal implementation checking only pushed and storage.
     #[inline]
-    fn one_shot_get_pushed_or_read_(&self, index: usize) -> Result<Option<T>> {
-        self.get_pushed_or_read_(index, &self.create_reader())
-    }
-    #[inline]
-    fn get_pushed_or_read_(&'_ self, index: usize, reader: &Reader) -> Result<Option<T>> {
+    fn get_pushed_or_read_at(&self, index: usize, reader: &Reader) -> Result<Option<T>> {
         let stored_len = self.stored_len();
 
         if index >= stored_len {
-            return Ok(self.get_pushed(index, stored_len).cloned());
+            return Ok(self.get_pushed_at(index, stored_len).cloned());
         }
 
-        Ok(Some(self.read_(index, reader)?))
+        Ok(Some(self.read_at(index, reader)?))
     }
 
+    /// Gets value from pushed layer only.
     #[inline(always)]
-    fn get_pushed(&'_ self, index: usize, stored_len: usize) -> Option<&'_ T> {
+    fn get_pushed_at(&self, index: usize, stored_len: usize) -> Option<&T> {
         let pushed = self.pushed();
-        let j = index - stored_len;
-        if j >= pushed.len() {
-            return None;
-        }
-        pushed.get(j)
+        let offset = index.checked_sub(stored_len)?;
+        pushed.get(offset)
     }
 
     #[inline]
@@ -254,7 +274,7 @@ where
     fn mut_prev_holes(&mut self) -> &mut BTreeSet<usize>;
 
     fn take(&mut self, index: I, reader: &Reader) -> Result<Option<T>> {
-        let opt = self.get_any_or_read(index, reader)?;
+        let opt = self.get_or_read_with(index, reader)?;
         if opt.is_some() {
             self.unchecked_delete(index);
         }
@@ -700,7 +720,7 @@ where
         let reader = self.create_reader();
 
         (from..to)
-            .map(|i| self.get_any_or_read_(i, &reader))
+            .map(|i| self.get_or_read_at(i, &reader))
             .collect::<Result<Vec<_>>>()
     }
 

@@ -361,7 +361,7 @@ where
     T: StoredCompressed,
 {
     #[inline]
-    fn read_(&self, index: usize, reader: &Reader) -> Result<T> {
+    fn read_at(&self, index: usize, reader: &Reader) -> Result<T> {
         let page_index = Self::index_to_page_index(index);
         let decoded_index = index % Self::PER_PAGE;
         Ok(unsafe {

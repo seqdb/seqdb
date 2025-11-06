@@ -377,7 +377,7 @@ where
                     self.prev_updated
                         .get(&i)
                         .cloned()
-                        .unwrap_or_else(|| self.unwrap_read_(i, &reader))
+                        .unwrap_or_else(|| self.read_unchecked_at(i, &reader))
                 })
                 .collect::<Vec<_>>();
             bytes.extend(truncated_vals.as_bytes());
@@ -407,7 +407,7 @@ where
                     .prev_updated
                     .get(&i)
                     .cloned()
-                    .unwrap_or_else(|| self.unwrap_read_(i, &reader));
+                    .unwrap_or_else(|| self.read_unchecked_at(i, &reader));
                 (i, val)
             })
             .collect::<(Vec<_>, Vec<_>)>();
@@ -433,7 +433,7 @@ where
     T: StoredRaw,
 {
     #[inline(always)]
-    fn read_(&self, index: usize, reader: &Reader) -> Result<T> {
+    fn read_at(&self, index: usize, reader: &Reader) -> Result<T> {
         T::read_from_prefix(reader.prefixed((index * Self::SIZE_OF_T) as u64 + HEADER_OFFSET))
             .map(|(v, _)| v)
             .map_err(Error::from)
