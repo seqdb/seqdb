@@ -2,11 +2,13 @@ mod boxed;
 mod extended;
 mod iterable;
 
+use std::iter::FusedIterator;
+
 pub use boxed::*;
 pub use extended::*;
 pub use iterable::*;
 
-pub trait VecIterator: Iterator {
+pub trait VecIterator: ExactSizeIterator + FusedIterator {
     fn set_position_to(&mut self, i: usize);
 
     #[inline]
