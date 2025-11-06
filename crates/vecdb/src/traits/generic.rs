@@ -45,13 +45,13 @@ where
 
     /// Reads value at index using provided reader. Panics if read fails.
     #[inline]
-    fn read_unchecked(&self, index: I, reader: &Reader) -> T {
+    fn read_unwrap(&self, index: I, reader: &Reader) -> T {
         self.read_with(index, reader).unwrap()
     }
 
     // With usize index (internal)
     #[inline]
-    fn read_unchecked_at(&self, index: usize, reader: &Reader) -> T {
+    fn read_unwrap_at(&self, index: usize, reader: &Reader) -> T {
         self.read_at(index, reader).unwrap()
     }
 
@@ -73,7 +73,7 @@ where
 
     /// Gets value from any layer (updated, pushed, or storage). Panics on error.
     #[inline]
-    fn get_or_read_unchecked(&self, index: I) -> T {
+    fn get_or_read_unwrap(&self, index: I) -> T {
         self.get_or_read(index).unwrap().unwrap()
     }
 
@@ -117,10 +117,6 @@ where
         // Fall back to reading from storage
         Ok(Some(self.read_at(index, reader)?))
     }
-
-    // ============================================================================
-    // Pushed-only operations (skips updated layer)
-    // ============================================================================
 
     /// Gets value from pushed layer or storage, creating a temporary reader.
     /// Does not check the updated layer.

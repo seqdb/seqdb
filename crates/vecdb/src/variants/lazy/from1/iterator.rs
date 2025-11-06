@@ -105,14 +105,14 @@ where
     S1I: StoredIndex,
     S1T: StoredRaw,
 {
-    fn set_position_(&mut self, i: usize) {
+    fn set_position_to(&mut self, i: usize) {
         self.index = i.min(self.end_index);
-        self.source.set_position_(i);
+        self.source.set_position_to(i);
     }
 
-    fn set_end_(&mut self, i: usize) {
+    fn set_end_to(&mut self, i: usize) {
         self.end_index = i.min(self.end_index);
-        self.source.set_end_(i);
+        self.source.set_end_to(i);
     }
 }
 

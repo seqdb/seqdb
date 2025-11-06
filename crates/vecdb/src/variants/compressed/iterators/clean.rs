@@ -256,7 +256,7 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    fn set_position_(&mut self, i: usize) {
+    fn set_position_to(&mut self, i: usize) {
         let new_index = i.min(self.stored_len).min(self.end_index);
 
         // Check if new position is within the currently decoded page
@@ -276,7 +276,7 @@ where
         self.index = new_index;
     }
 
-    fn set_end_(&mut self, i: usize) {
+    fn set_end_to(&mut self, i: usize) {
         self.set_absolute_end(i);
     }
 }
@@ -432,13 +432,13 @@ mod tests {
         vec.flush().unwrap();
 
         let mut iter = vec.clean_iter().unwrap();
-        iter.set_position_(2500);
+        iter.set_position_to(2500);
         assert_eq!(iter.next(), Some(2500));
         assert_eq!(iter.next(), Some(2501));
     }
 
     #[test]
-    fn test_compressed_clean_iter_set_position_same_page() {
+    fn test_compressed_clean_iter_set_position_tosame_page() {
         let (_temp, _db, mut vec) = setup();
 
         for i in 0..1000 {
@@ -448,7 +448,7 @@ mod tests {
 
         let mut iter = vec.clean_iter().unwrap();
         iter.next(); // Decode first page
-        iter.set_position_(50); // Should reuse same page
+        iter.set_position_to(50); // Should reuse same page
         assert_eq!(iter.next(), Some(50));
     }
 
@@ -522,13 +522,13 @@ mod tests {
         let mut iter = vec.clean_iter().unwrap();
 
         // Jump to different pages
-        iter.set_position_(1000);
+        iter.set_position_to(1000);
         assert_eq!(iter.next(), Some(1000));
 
-        iter.set_position_(5000);
+        iter.set_position_to(5000);
         assert_eq!(iter.next(), Some(5000));
 
-        iter.set_position_(100);
+        iter.set_position_to(100);
         assert_eq!(iter.next(), Some(100));
     }
 
@@ -598,7 +598,7 @@ mod tests {
         vec.flush().unwrap();
 
         let mut iter = vec.clean_iter().unwrap();
-        iter.set_end_(2500); // Middle of a page
+        iter.set_end_to(2500); // Middle of a page
 
         let collected: Vec<i32> = iter.collect();
         assert_eq!(collected.len(), 2500);

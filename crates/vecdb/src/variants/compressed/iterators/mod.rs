@@ -83,17 +83,17 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    fn set_position_(&mut self, i: usize) {
+    fn set_position_to(&mut self, i: usize) {
         match self {
-            Self::Clean(iter) => iter.set_position_(i),
-            Self::Dirty(iter) => iter.set_position_(i),
+            Self::Clean(iter) => iter.set_position_to(i),
+            Self::Dirty(iter) => iter.set_position_to(i),
         };
     }
 
-    fn set_end_(&mut self, i: usize) {
+    fn set_end_to(&mut self, i: usize) {
         match self {
-            Self::Clean(iter) => iter.set_end_(i),
-            Self::Dirty(iter) => iter.set_end_(i),
+            Self::Clean(iter) => iter.set_end_to(i),
+            Self::Dirty(iter) => iter.set_end_to(i),
         };
     }
 }

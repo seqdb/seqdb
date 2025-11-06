@@ -6,22 +6,22 @@ pub trait VecIteratorExtended: VecIterator<Item = Self::T> {
 
     #[inline]
     fn set_position(&mut self, i: Self::I) {
-        self.set_position_(i.to_usize());
+        self.set_position_to(i.to_usize());
     }
 
     #[inline]
     fn set_end(&mut self, i: Self::I) {
-        self.set_end_(i.to_usize());
+        self.set_end_to(i.to_usize());
     }
 
     #[inline]
     fn get(&mut self, i: Self::I) -> Option<Self::Item> {
-        self.get_(i.to_usize())
+        self.get_at(i.to_usize())
     }
 
     #[inline]
-    fn unsafe_get(&mut self, i: Self::I) -> Self::Item {
-        unsafe { self.get(i).unwrap_unchecked() }
+    fn get_unwrap(&mut self, i: Self::I) -> Self::Item {
+        self.get(i).unwrap()
     }
 
     fn index_type_to_string(&self) -> &'static str {

@@ -48,7 +48,7 @@ where
 
         // Cap inner iterator if new end is within stored range
         if absolute_end <= self.inner.stored_len {
-            self.inner.set_end_(absolute_end);
+            self.inner.set_end_to(absolute_end);
         }
     }
 }
@@ -131,16 +131,16 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    fn set_position_(&mut self, i: usize) {
+    fn set_position_to(&mut self, i: usize) {
         self.index = i.min(self.vec_len());
 
         // Update inner iterator position if within stored range
         if i < self.inner.stored_len {
-            self.inner.set_position_(i);
+            self.inner.set_position_to(i);
         }
     }
 
-    fn set_end_(&mut self, i: usize) {
+    fn set_end_to(&mut self, i: usize) {
         self.set_absolute_end(i);
     }
 }
@@ -302,7 +302,7 @@ mod tests {
     }
 
     #[test]
-    fn test_compressed_dirty_iter_set_position_to_pushed() {
+    fn test_compressed_dirty_iter_set_position_toto_pushed() {
         let (_temp, _db, mut vec) = setup();
 
         for i in 0..5000 {
@@ -315,7 +315,7 @@ mod tests {
         }
 
         let mut iter = vec.dirty_iter().unwrap();
-        iter.set_position_(7500); // Into pushed region
+        iter.set_position_to(7500); // Into pushed region
         assert_eq!(iter.next(), Some(7500));
         assert_eq!(iter.next(), Some(7501));
     }

@@ -13,7 +13,7 @@ where
         let from = from.unwrap_or_default();
         let to = to.map_or(len, |to| to.min(len));
         let mut iter = self.iter();
-        iter.set_end_(to);
+        iter.set_end_to(to);
         iter.skip(from).take(to - from)
     }
 

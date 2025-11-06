@@ -229,7 +229,7 @@ where
     I: StoredIndex,
     T: StoredRaw,
 {
-    fn set_position_(&mut self, i: usize) {
+    fn set_position_to(&mut self, i: usize) {
         let target_offset = self.start_offset + Self::index_to_bytes(i);
 
         // Check if target is within current buffer
@@ -248,7 +248,7 @@ where
         self.seek(target_offset);
     }
 
-    fn set_end_(&mut self, i: usize) {
+    fn set_end_to(&mut self, i: usize) {
         let byte_offset = self.start_offset + Self::index_to_bytes(i);
         self.end_offset = self.end_offset.min(byte_offset);
     }
@@ -367,7 +367,7 @@ mod tests {
         vec.flush().unwrap();
 
         let mut iter = vec.clean_iter().unwrap();
-        iter.set_position_(50);
+        iter.set_position_to(50);
         assert_eq!(iter.next(), Some(50));
         assert_eq!(iter.next(), Some(51));
     }
@@ -382,7 +382,7 @@ mod tests {
         vec.flush().unwrap();
 
         let mut iter = vec.clean_iter().unwrap();
-        iter.set_end_(50);
+        iter.set_end_to(50);
         let collected: Vec<i32> = iter.collect();
 
         assert_eq!(collected.len(), 50);
@@ -478,13 +478,13 @@ mod tests {
 
         let mut iter = vec.clean_iter().unwrap();
 
-        iter.set_position_(100);
+        iter.set_position_to(100);
         assert_eq!(iter.next(), Some(100));
 
-        iter.set_position_(500);
+        iter.set_position_to(500);
         assert_eq!(iter.next(), Some(500));
 
-        iter.set_position_(50);
+        iter.set_position_to(50);
         assert_eq!(iter.next(), Some(50));
     }
 

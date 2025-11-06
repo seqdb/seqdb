@@ -118,21 +118,21 @@ where
     S3I: StoredIndex,
     S3T: StoredRaw,
 {
-    fn set_position_(&mut self, i: usize) {
+    fn set_position_to(&mut self, i: usize) {
         match self {
-            Self::Eager(iter) => iter.set_position_(i),
-            Self::LazyFrom1(iter) => iter.set_position_(i),
-            Self::LazyFrom2(iter) => iter.set_position_(i),
-            Self::LazyFrom3(iter) => iter.set_position_(i),
+            Self::Eager(iter) => iter.set_position_to(i),
+            Self::LazyFrom1(iter) => iter.set_position_to(i),
+            Self::LazyFrom2(iter) => iter.set_position_to(i),
+            Self::LazyFrom3(iter) => iter.set_position_to(i),
         }
     }
 
-    fn set_end_(&mut self, i: usize) {
+    fn set_end_to(&mut self, i: usize) {
         match self {
-            Self::Eager(iter) => iter.set_end_(i),
-            Self::LazyFrom1(iter) => iter.set_end_(i),
-            Self::LazyFrom2(iter) => iter.set_end_(i),
-            Self::LazyFrom3(iter) => iter.set_end_(i),
+            Self::Eager(iter) => iter.set_end_to(i),
+            Self::LazyFrom1(iter) => iter.set_end_to(i),
+            Self::LazyFrom2(iter) => iter.set_end_to(i),
+            Self::LazyFrom3(iter) => iter.set_end_to(i),
         };
     }
 }

@@ -137,23 +137,23 @@ where
     S2I: StoredIndex,
     S2T: StoredRaw,
 {
-    fn set_position_(&mut self, i: usize) {
+    fn set_position_to(&mut self, i: usize) {
         self.index = i.min(self.end_index);
         if self.source1_same_index {
-            self.source1.set_position_(i);
+            self.source1.set_position_to(i);
         }
         if self.source2_same_index {
-            self.source2.set_position_(i);
+            self.source2.set_position_to(i);
         }
     }
 
-    fn set_end_(&mut self, i: usize) {
+    fn set_end_to(&mut self, i: usize) {
         self.end_index = i.min(self.end_index);
         if self.source1_same_index {
-            self.source1.set_end_(i);
+            self.source1.set_end_to(i);
         }
         if self.source2_same_index {
-            self.source2.set_end_(i);
+            self.source2.set_end_to(i);
         }
     }
 }
