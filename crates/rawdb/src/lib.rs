@@ -61,6 +61,7 @@ impl Database {
         let file_len = file.metadata()?.len();
         if file_len == 0 {
             file.set_len(PAGE_SIZE)?;
+            file.sync_all()?;
         }
 
         let regions = Regions::open(path)?;
