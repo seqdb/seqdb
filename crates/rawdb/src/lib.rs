@@ -48,6 +48,10 @@ pub struct DatabaseInner {
 
 impl Database {
     pub fn open(path: &Path) -> Result<Self> {
+        Self::open_with_min_len(path, 0)
+    }
+
+    pub fn open_with_min_len(path: &Path, min_len: u64) -> Result<Self> {
         fs::create_dir_all(path)?;
 
         let file = OpenOptions::new()
@@ -59,8 +63,8 @@ impl Database {
         file.try_lock()?;
 
         let file_len = file.metadata()?.len();
-        if file_len == 0 {
-            file.set_len(PAGE_SIZE)?;
+        if file_len < min_len {
+            file.set_len(min_len)?;
             file.sync_all()?;
         }
 
@@ -92,15 +96,15 @@ impl Database {
         let len = Self::ceil_number_to_page_size_multiple(len);
 
         let file_len = self.file_len()?;
-        if file_len < len {
-            let mut mmap = self.mmap.write();
-            let file = self.file.write();
-            file.set_len(len)?;
-            *mmap = Self::create_mmap(&file)?;
-            Ok(())
-        } else {
-            Ok(())
+        if file_len >= len {
+            return Ok(());
         }
+
+        let mut mmap = self.mmap.write();
+        let file = self.file.write();
+        file.set_len(len)?;
+        *mmap = Self::create_mmap(&file)?;
+        Ok(())
     }
 
     pub fn set_min_regions(&self, regions: usize) -> Result<()> {
