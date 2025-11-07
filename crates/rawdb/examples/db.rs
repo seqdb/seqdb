@@ -144,7 +144,6 @@ fn main() -> Result<()> {
     println!("Disk usage - post trunc: {}", db.disk_usage());
 
     db.remove_region(region1)?;
-
     db.compact()?;
 
     println!("Disk usage - post remove: {}", db.disk_usage());
@@ -210,6 +209,7 @@ fn main() -> Result<()> {
     }
 
     db.remove_region(region2)?;
+    db.compact()?;
 
     {
         let regions = db.regions();
@@ -250,6 +250,7 @@ fn main() -> Result<()> {
     assert!(region2_i == 1);
 
     db.remove_region(region2)?;
+    db.compact()?;
 
     {
         let regions = db.regions();
@@ -374,6 +375,7 @@ fn main() -> Result<()> {
     }
 
     db.remove_region(region3)?;
+    db.compact()?;
 
     {
         let regions = db.regions();
@@ -409,6 +411,7 @@ fn main() -> Result<()> {
     }
 
     db.write_all_to_region(&region1, &[1; 8000])?;
+    db.compact()?;
 
     {
         let regions = db.regions();
