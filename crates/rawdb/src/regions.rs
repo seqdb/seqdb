@@ -18,8 +18,8 @@ use super::{
 pub struct Regions {
     id_to_index: HashMap<String, usize>,
     index_to_region: Vec<Option<Region>>,
-    index_to_region_file: File,
-    index_to_region_file_len: u64,
+    file: File,
+    file_len: u64,
 }
 
 impl Regions {
@@ -28,15 +28,15 @@ impl Regions {
 
         fs::create_dir_all(&path)?;
 
-        let index_to_region_file = OpenOptions::new()
+        let file = OpenOptions::new()
             .read(true)
             .create(true)
             .write(true)
             .truncate(false)
             .open(path.join("index_to_region"))?;
-        index_to_region_file.try_lock()?;
+        file.try_lock()?;
 
-        let index_to_region_file_len = index_to_region_file.metadata()?.len();
+        let file_len = file.metadata()?.len();
 
         // Ensure directory entries are durable
         File::open(&path)?.sync_data()?;
@@ -44,13 +44,13 @@ impl Regions {
         Ok(Self {
             id_to_index: HashMap::new(),
             index_to_region: vec![],
-            index_to_region_file,
-            index_to_region_file_len,
+            file,
+            file_len,
         })
     }
 
     pub fn fill_index_to_region(&mut self, db: &Database) -> Result<()> {
-        let num_slots = (self.index_to_region_file_len / SIZE_OF_REGION_METADATA as u64) as usize;
+        let num_slots = (self.file_len / SIZE_OF_REGION_METADATA as u64) as usize;
 
         self.index_to_region
             .resize_with(num_slots, Default::default);
@@ -59,8 +59,7 @@ impl Regions {
             let start = (index * SIZE_OF_REGION_METADATA) as u64;
             let mut buffer = vec![0; SIZE_OF_REGION_METADATA];
 
-            self.index_to_region_file
-                .read_exact_at(&mut buffer, start)?;
+            self.file.read_exact_at(&mut buffer, start)?;
 
             let Ok(meta) = RegionMetadata::from_bytes(&buffer) else {
                 continue;
@@ -74,9 +73,9 @@ impl Regions {
     }
 
     pub fn set_min_len(&mut self, len: u64) -> Result<()> {
-        if self.index_to_region_file_len < len {
-            self.index_to_region_file.set_len(len)?;
-            self.index_to_region_file_len = len;
+        if self.file_len < len {
+            self.file.set_len(len)?;
+            self.file_len = len;
         }
         Ok(())
     }
@@ -149,7 +148,7 @@ impl Regions {
         // Clear metadata from file by writing zeros
         let start = (region.index() * SIZE_OF_REGION_METADATA) as u64;
         let empty = [0u8; SIZE_OF_REGION_METADATA];
-        self.index_to_region_file.write_all_at(&empty, start)?;
+        self.file.write_all_at(&empty, start)?;
 
         Ok(Some(region))
     }
@@ -168,12 +167,12 @@ impl Regions {
             }
             let start = (index * SIZE_OF_REGION_METADATA) as u64;
             let bytes = region_meta.to_bytes();
-            self.index_to_region_file.write_all_at(&bytes, start)?;
+            self.file.write_all_at(&bytes, start)?;
             region_meta.clear_dirty();
         }
 
         // Sync the metadata file
-        self.index_to_region_file.sync_data()?;
+        self.file.sync_data()?;
         Ok(())
     }
 }
