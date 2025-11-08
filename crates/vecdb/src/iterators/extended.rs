@@ -29,6 +29,15 @@ pub trait VecIteratorExtended: VecIterator<Item = Self::T> {
         self.get(i).unwrap()
     }
 
+    /// Gets the item at the given typed index, returns default if not found.
+    #[inline]
+    fn get_or_default(&mut self, i: Self::I) -> Self::Item
+    where
+        Self::Item: Default,
+    {
+        self.get(i).unwrap_or_default()
+    }
+
     fn index_type_to_string(&self) -> &'static str {
         Self::I::to_string()
     }

@@ -26,6 +26,15 @@ pub trait VecIterator: ExactSizeIterator + FusedIterator {
         self.get_at(i).unwrap()
     }
 
+    /// Gets the item at the given usize index, returns default if not found.
+    #[inline]
+    fn get_at_or_default(&mut self, i: usize) -> Self::Item
+    where
+        Self::Item: Default,
+    {
+        self.get_at(i).unwrap_or_default()
+    }
+
     /// Sets the exclusive end boundary to the given usize index.
     fn set_end_to(&mut self, i: usize);
 }
