@@ -4,9 +4,12 @@ use serde_derive::{Deserialize, Serialize};
 
 use crate::{Error, Result};
 
+/// Storage format selection for stored vectors.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Format {
+    /// Pcodec compressed storage (best for numerical data with sequential access).
     Compressed,
+    /// Raw uncompressed storage (best for random access or non-compressible data).
     #[default]
     Raw,
 }

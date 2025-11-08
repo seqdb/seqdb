@@ -4,6 +4,7 @@ use rawdb::Region;
 
 use crate::{AnyVec, Exit, Result, Stamp, variants::Header};
 
+/// Trait for stored vectors that persist data to disk (as opposed to lazy computed vectors).
 pub trait AnyStoredVec: AnyVec {
     fn db_path(&self) -> PathBuf;
 
@@ -13,10 +14,12 @@ pub trait AnyStoredVec: AnyVec {
 
     fn mut_header(&mut self) -> &mut Header;
 
+    /// Number of stamped change files to keep for rollback support.
     fn saved_stamped_changes(&self) -> u16;
 
     fn flush(&mut self) -> Result<()>;
 
+    /// Flushes while holding the exit lock to ensure consistency during shutdown.
     #[inline]
     fn safe_flush(&mut self, exit: &Exit) -> Result<()> {
         // info!("safe flush {}", self.name());
@@ -24,7 +27,9 @@ pub trait AnyStoredVec: AnyVec {
         self.flush()
     }
 
+    /// The actual length stored on disk.
     fn real_stored_len(&self) -> usize;
+    /// The effective stored length (may differ from real_stored_len during truncation).
     fn stored_len(&self) -> usize;
 
     fn update_stamp(&mut self, stamp: Stamp) {

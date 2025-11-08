@@ -2,11 +2,16 @@ use rawdb::Database;
 
 use crate::Version;
 
+/// Options for importing or creating stored vectors.
 #[derive(Debug, Clone, Copy)]
 pub struct ImportOptions<'a> {
+    /// Database to store the vector in.
     pub db: &'a Database,
+    /// Name of the vector.
     pub name: &'a str,
+    /// Version for tracking data schema compatibility.
     pub version: Version,
+    /// Number of stamped change files to keep for rollback support (0 to disable).
     pub saved_stamped_changes: u16,
 }
 

@@ -30,6 +30,11 @@ pub const MAX_UNCOMPRESSED_PAGE_SIZE: usize = 16 * 1024; // 16 KiB
 
 const VERSION: Version = Version::TWO;
 
+/// Compressed storage vector using Pcodec for lossless numerical compression.
+///
+/// Values are compressed in pages for better space efficiency. Best for sequential
+/// access patterns of numerical data. Random access is possible but less efficient
+/// than RawVec - prefer the latter for random access workloads.
 #[derive(Debug, Allocative)]
 pub struct CompressedVec<I, T> {
     inner: RawVec<I, T>,
@@ -61,10 +66,10 @@ where
 
                 let _ = options
                     .db
-                    .remove_region_with_id(&Self::vec_region_name_(options.name));
+                    .remove_region_with_id(&Self::vec_region_name_with(options.name));
                 let _ = options
                     .db
-                    .remove_region_with_id(&Self::holes_region_name_(options.name));
+                    .remove_region_with_id(&Self::holes_region_name_with(options.name));
                 let _ = options
                     .db
                     .remove_region_with_id(&Self::pages_region_name_(options.name));
@@ -173,7 +178,7 @@ where
         Self::pages_region_name_(self.name())
     }
     fn pages_region_name_(name: &str) -> String {
-        format!("{}_pages", Self::vec_region_name_(name))
+        format!("{}_pages", Self::vec_region_name_with(name))
     }
 
     #[inline]
@@ -208,7 +213,7 @@ where
 
     #[inline]
     fn len(&self) -> usize {
-        self.dirty_len()
+        self.len_()
     }
 
     #[inline]

@@ -3,6 +3,11 @@ use parking_lot::RwLockReadGuard;
 
 use crate::RegionMetadata;
 
+/// Zero-copy reader for accessing region data from memory-mapped storage.
+///
+/// Holds locks on the memory map and region metadata during its lifetime,
+/// preventing concurrent modifications. Should be dropped as soon as reading
+/// is complete to avoid blocking writes.
 #[derive(Debug)]
 pub struct Reader<'a> {
     mmap: RwLockReadGuard<'a, MmapMut>,

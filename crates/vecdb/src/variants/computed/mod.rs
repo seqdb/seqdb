@@ -43,6 +43,11 @@ pub type ComputedVecFrom2<I, T, S1I, S1T, S2I, S2T> =
 pub type ComputedVecFrom3<I, T, S1I, S1T, S2I, S2T, S3I, S3T> =
     ComputedVec<I, T, S1I, S1T, S2I, S2T, S3I, S3T>;
 
+/// Enum wrapper for computed vectors, supporting both eager and lazy computation strategies.
+///
+/// Allows runtime selection between:
+/// - Eager: Values are computed once, stored on disk, and incrementally updated
+/// - Lazy: Values are recomputed on-the-fly during each access
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone)]
 pub enum ComputedVec<I, T, S1I, S1T, S2I, S2T, S3I, S3T>

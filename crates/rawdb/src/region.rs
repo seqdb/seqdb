@@ -7,6 +7,10 @@ use crate::{Database, Error, Result, WeakDatabase};
 
 use super::{PAGE_SIZE, Reader};
 
+/// Named region within a database providing isolated storage space.
+///
+/// Regions grow dynamically as data is written and can be moved within the
+/// database file to optimize space usage. Each region has a unique ID for lookup.
 #[derive(Debug, Clone)]
 pub struct Region(Arc<RegionInner>);
 
@@ -17,15 +21,18 @@ pub struct RegionInner {
     meta: RwLock<RegionMetadata>,
 }
 
+/// Metadata tracking a region's location, size, and identity.
 #[derive(Debug, Clone)]
 pub struct RegionMetadata {
-    /// Must be multiple of 4096
+    /// Starting offset in the database file (must be multiple of 4096).
     start: u64,
+    /// Current length of data in the region.
     len: u64,
-    /// Must be multiple of 4096, greater or equal to len
+    /// Reserved space for the region (must be multiple of 4096, >= len).
     reserved: u64,
+    /// Unique identifier for the region.
     id: String,
-    /// Dirty flag for tracking changes (not serialized)
+    /// Dirty flag for tracking changes (not serialized).
     dirty: bool,
 }
 

@@ -17,6 +17,11 @@ use crate::{
     variants::{Header, ImportOptions},
 };
 
+/// Stored vector with eager computation methods for deriving values from other vectors.
+///
+/// Wraps a StoredVec and provides various computation methods (transform, arithmetic operations,
+/// moving averages, etc.) to eagerly compute and persist derived data. Results are stored on disk
+/// and incrementally updated when source data changes.
 #[derive(Debug, Clone, Allocative)]
 pub struct EagerVec<I, T>(StoredVec<I, T>);
 
@@ -477,7 +482,10 @@ where
                 if prev_i.is_some_and(|prev_i| prev_i == i) {
                     return Ok(());
                 }
-                if self.get_pushed_or_read(i)?.is_none_or(|old_v| old_v > v) {
+                if self
+                    .get_pushed_or_read_once(i)?
+                    .is_none_or(|old_v| old_v > v)
+                {
                     self.forced_push(i, v, exit)?;
                 }
                 prev_i.replace(i);

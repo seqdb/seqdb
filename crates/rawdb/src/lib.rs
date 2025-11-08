@@ -34,6 +34,10 @@ pub const PAGE_SIZE: u64 = 4096;
 pub const PAGE_SIZE_MINUS_1: u64 = PAGE_SIZE - 1;
 const GB: usize = 1024 * 1024 * 1024;
 
+/// Memory-mapped database with dynamic space allocation and hole punching.
+///
+/// Provides efficient storage through memory mapping with automatic region management,
+/// space reclamation via hole punching, and dynamic file growth as needed.
 #[derive(Debug, Clone)]
 pub struct Database(Arc<DatabaseInner>);
 
@@ -47,10 +51,12 @@ pub struct DatabaseInner {
 }
 
 impl Database {
+    /// Opens or creates a database at the specified path.
     pub fn open(path: &Path) -> Result<Self> {
         Self::open_with_min_len(path, 0)
     }
 
+    /// Opens or creates a database with a minimum initial file size.
     pub fn open_with_min_len(path: &Path, min_len: u64) -> Result<Self> {
         fs::create_dir_all(path)?;
 
@@ -103,6 +109,7 @@ impl Database {
         let mut mmap = self.mmap.write();
         let file = self.file.write();
         file.set_len(len)?;
+        file.sync_all()?;
         *mmap = Self::create_mmap(&file)?;
         Ok(())
     }
@@ -114,10 +121,12 @@ impl Database {
         self.set_min_len(regions as u64 * PAGE_SIZE)
     }
 
+    /// Gets an existing region by ID.
     pub fn get_region(&self, id: &str) -> Option<Region> {
         self.regions.read().get_region_from_id(id).cloned()
     }
 
+    /// Creates a region with the given ID, or returns it if it already exists.
     pub fn create_region_if_needed(&self, id: &str) -> Result<Region> {
         if let Some(region) = self.get_region(id) {
             return Ok(region);
@@ -454,6 +463,7 @@ impl Database {
             .to_string()
     }
 
+    /// Flushes all pending changes to disk.
     pub fn flush(&self) -> Result<()> {
         let mmap = self.mmap.read();
         let regions = self.regions.read();
@@ -466,6 +476,7 @@ impl Database {
         Ok(())
     }
 
+    /// Flushes changes and reclaims unused space via hole punching.
     #[inline]
     pub fn compact(&self) -> Result<()> {
         self.flush()?;
@@ -687,6 +698,10 @@ struct FPunchhole {
     fp_length: off_t,
 }
 
+/// Weak reference to a Database that doesn't prevent it from being dropped.
+///
+/// Used internally by regions to avoid circular references while maintaining
+/// access to the parent database.
 #[derive(Debug, Clone)]
 pub struct WeakDatabase(Weak<DatabaseInner>);
 

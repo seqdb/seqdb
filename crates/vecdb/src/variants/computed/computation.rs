@@ -1,8 +1,11 @@
 use serde_derive::{Deserialize, Serialize};
 
+/// Computation strategy for derived vectors.
 #[derive(Default, Debug, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize)]
 pub enum Computation {
+    /// Values computed once, stored on disk, and incrementally updated.
     Eager,
+    /// Values recomputed on-the-fly during each access.
     #[default]
     Lazy,
 }

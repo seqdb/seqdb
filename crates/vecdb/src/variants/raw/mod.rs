@@ -31,6 +31,11 @@ pub use options::*;
 
 const VERSION: Version = Version::ONE;
 
+/// Raw storage vector that stores values as-is without compression.
+///
+/// This is the most basic storage format, writing values directly to disk
+/// with minimal overhead. Ideal for random access patterns and data that
+/// doesn't compress well.
 #[derive(Debug, Allocative)]
 pub struct RawVec<I, T> {
     #[allocative(skip)]
@@ -75,10 +80,10 @@ where
                 info!("Resetting {}...", options.name);
                 let _ = options
                     .db
-                    .remove_region_with_id(&Self::vec_region_name_(options.name));
+                    .remove_region_with_id(&Self::vec_region_name_with(options.name));
                 let _ = options
                     .db
-                    .remove_region_with_id(&Self::holes_region_name_(options.name));
+                    .remove_region_with_id(&Self::holes_region_name_with(options.name));
                 Self::import_with(options)
             }
             _ => res,
@@ -103,7 +108,7 @@ where
         }: ImportOptions,
         format: Format,
     ) -> Result<Self> {
-        let region = db.create_region_if_needed(&Self::vec_region_name_(name))?;
+        let region = db.create_region_if_needed(&Self::vec_region_name_with(name))?;
 
         let region_len = region.meta().read().len() as usize;
         if region_len > 0
@@ -121,7 +126,7 @@ where
             Header::import_and_verify(&region, version, format)?
         };
 
-        let holes = if let Some(holes) = db.get_region(&Self::holes_region_name_(name)) {
+        let holes = if let Some(holes) = db.get_region(&Self::holes_region_name_with(name)) {
             Some(
                 holes
                     .create_reader()
@@ -235,7 +240,7 @@ where
 
     #[inline]
     fn len(&self) -> usize {
-        self.dirty_len()
+        self.len_()
     }
 
     #[inline]

@@ -12,6 +12,10 @@ pub use iterator::*;
 pub type ComputeFrom1<I, T, S1I, S1T> =
     for<'a> fn(I, &mut dyn VecIteratorExtended<I = S1I, T = S1T, Item = S1T>) -> Option<T>;
 
+/// Lazily computed vector deriving values from one source vector.
+///
+/// Values are computed on-the-fly during iteration using a provided function.
+/// Nothing is stored on disk - all values are recomputed each time they're accessed.
 #[derive(Clone, Allocative)]
 pub struct LazyVecFrom1<I, T, S1I, S1T>
 where

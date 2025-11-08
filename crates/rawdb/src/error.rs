@@ -5,6 +5,7 @@ use std::{
 
 pub type Result<T, E = Error> = result::Result<T, E>;
 
+/// Error types for rawdb operations.
 #[derive(Debug)]
 pub enum Error {
     IO(io::Error),

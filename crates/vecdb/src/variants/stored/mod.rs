@@ -20,6 +20,10 @@ mod iterator;
 pub use format::*;
 pub use iterator::*;
 
+/// Enum wrapper for stored vectors, supporting both raw and compressed formats.
+///
+/// This allows runtime selection between RawVec and CompressedVec storage formats
+/// based on the data characteristics and access patterns.
 #[derive(Debug, Clone, Allocative)]
 pub enum StoredVec<I, T> {
     Raw(RawVec<I, T>),

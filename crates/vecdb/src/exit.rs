@@ -3,6 +3,10 @@ use std::{process::exit, sync::Arc};
 use log::info;
 use parking_lot::{RwLock, RwLockReadGuard};
 
+/// Graceful shutdown coordinator for ensuring data consistency during program exit.
+///
+/// Uses a read-write lock to coordinate between operations and shutdown signals (e.g., Ctrl-C).
+/// Operations hold read locks during critical sections, preventing shutdown until they complete.
 #[derive(Default, Clone)]
 pub struct Exit(Arc<RwLock<()>>);
 

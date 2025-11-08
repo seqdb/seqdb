@@ -15,6 +15,10 @@ pub type ComputeFrom2<I, T, S1I, S1T, S2I, S2T> = for<'a> fn(
     &mut dyn VecIteratorExtended<I = S2I, T = S2T, Item = S2T>,
 ) -> Option<T>;
 
+/// Lazily computed vector deriving values from two source vectors.
+///
+/// Values are computed on-the-fly during iteration using a provided function.
+/// Nothing is stored on disk - all values are recomputed each time they're accessed.
 #[derive(Clone, Allocative)]
 pub struct LazyVecFrom2<I, T, S1I, S1T, S2I, S2T>
 where

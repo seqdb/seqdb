@@ -1,5 +1,7 @@
 use crate::{Stamp, Version};
 
+/// Converts an i64 index to usize, supporting negative indexing.
+/// Negative indices count from the end.
 pub fn i64_to_usize(i: i64, len: usize) -> usize {
     if i >= 0 {
         (i as usize).min(len)
@@ -11,6 +13,7 @@ pub fn i64_to_usize(i: i64, len: usize) -> usize {
 
 pub const SEPARATOR: &str = "_to_";
 
+/// Common trait for all vectors providing metadata and utility methods.
 pub trait AnyVec: Send + Sync {
     fn version(&self) -> Version;
     fn name(&self) -> &str;
@@ -18,12 +21,17 @@ pub trait AnyVec: Send + Sync {
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
+    /// Returns the string representation of the index type.
     fn index_type_to_string(&self) -> &'static str;
+    /// Returns the combined name of the vector.
     fn index_to_name(&self) -> String {
         format!("{}{SEPARATOR}{}", self.index_type_to_string(), self.name())
     }
+    /// Returns the list of region names used by this vector.
     fn region_names(&self) -> Vec<String>;
+    /// Returns the size in bytes of the value type.
     fn value_type_to_size_of(&self) -> usize;
+    /// Generates an ETag for this vector based on stamp and optional end index.
     fn etag(&self, stamp: Stamp, to: Option<i64>) -> String {
         let len = self.len();
         format!(
@@ -41,6 +49,7 @@ pub trait AnyVec: Send + Sync {
         )
     }
 
+    /// Converts an i64 index to usize, supporting negative indexing (Python-style).
     #[inline]
     fn i64_to_usize(&self, i: i64) -> usize {
         let len = self.len();

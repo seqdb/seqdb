@@ -11,6 +11,11 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 use crate::{Error, Result};
 
+/// Version tracking for data schema and computed values.
+///
+/// Used to detect when stored data needs to be recomputed due to changes
+/// in computation logic or source data versions. Supports validation
+/// against persisted versions to ensure compatibility.
 #[derive(
     Allocative,
     Default,

@@ -38,10 +38,10 @@ const BUFFER_SIZE: usize = 512 * ONE_KIB;
 // Branch prediction hints
 #[inline(always)]
 #[cold]
-pub fn cold() {}
+pub(crate) fn cold() {}
 
 #[inline(always)]
-pub fn likely(b: bool) -> bool {
+pub(crate) fn likely(b: bool) -> bool {
     if !b {
         cold();
     }
@@ -49,7 +49,7 @@ pub fn likely(b: bool) -> bool {
 }
 
 #[inline(always)]
-pub fn unlikely(b: bool) -> bool {
+pub(crate) fn unlikely(b: bool) -> bool {
     if b {
         cold();
     }

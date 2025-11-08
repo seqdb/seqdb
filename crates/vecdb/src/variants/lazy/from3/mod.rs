@@ -16,6 +16,10 @@ pub type ComputeFrom3<I, T, S1I, S1T, S2I, S2T, S3I, S3T> = for<'a> fn(
     &mut dyn VecIteratorExtended<I = S3I, T = S3T, Item = S3T>,
 ) -> Option<T>;
 
+/// Lazily computed vector deriving values from three source vectors.
+///
+/// Values are computed on-the-fly during iteration using a provided function.
+/// Nothing is stored on disk - all values are recomputed each time they're accessed.
 #[derive(Clone, Allocative)]
 pub struct LazyVecFrom3<I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where

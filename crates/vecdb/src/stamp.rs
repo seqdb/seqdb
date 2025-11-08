@@ -1,6 +1,9 @@
 use allocative::Allocative;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
+/// Marker for tracking when data was last modified.
+///
+/// Used for change tracking, rollback support, and ETag generation.
 #[derive(
     Debug,
     Default,

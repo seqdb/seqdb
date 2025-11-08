@@ -1,24 +1,29 @@
 use crate::{PrintableIndex, StoredIndex, StoredRaw, VecIterator};
 
+/// Extended vector iterator with type-safe index operations.
 pub trait VecIteratorExtended: VecIterator<Item = Self::T> {
     type I: StoredIndex;
     type T: StoredRaw;
 
+    /// Sets the current position using the typed index.
     #[inline]
     fn set_position(&mut self, i: Self::I) {
         self.set_position_to(i.to_usize());
     }
 
+    /// Sets the exclusive end boundary using the typed index.
     #[inline]
     fn set_end(&mut self, i: Self::I) {
         self.set_end_to(i.to_usize());
     }
 
+    /// Gets the item at the given typed index.
     #[inline]
     fn get(&mut self, i: Self::I) -> Option<Self::Item> {
         self.get_at(i.to_usize())
     }
 
+    /// Gets the item at the given typed index, panics if not found.
     #[inline]
     fn get_unwrap(&mut self, i: Self::I) -> Self::Item {
         self.get(i).unwrap()
