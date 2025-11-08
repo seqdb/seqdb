@@ -160,6 +160,19 @@ where
         self.get_or_read_unwrap(index, &self.create_reader())
     }
 
+    /// Gets value from any layer at usize index using provided reader. Panics on error.
+    #[inline]
+    fn get_or_read_at_unwrap(&self, index: usize, reader: &Reader) -> T {
+        self.get_or_read_at(index, reader).unwrap().unwrap()
+    }
+
+    /// Gets value from any layer at usize index, creating a temporary reader. Panics on error.
+    /// For multiple reads, prefer `get_or_read_at_unwrap()` with a reused reader.
+    #[inline]
+    fn get_or_read_at_unwrap_once(&self, index: usize) -> T {
+        self.get_or_read_at_unwrap(index, &self.create_reader())
+    }
+
     // ============================================================================
     // Get Pushed or Read Operations (skips updated layer)
     // ============================================================================
