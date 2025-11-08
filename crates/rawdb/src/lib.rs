@@ -463,7 +463,6 @@ impl Database {
             .to_string()
     }
 
-    /// Flushes all pending changes to disk.
     pub fn flush(&self) -> Result<()> {
         let mmap = self.mmap.read();
         let regions = self.regions.read();
@@ -476,7 +475,6 @@ impl Database {
         Ok(())
     }
 
-    /// Flushes changes and reclaims unused space via hole punching.
     #[inline]
     pub fn compact(&self) -> Result<()> {
         self.flush()?;

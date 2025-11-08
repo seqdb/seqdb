@@ -22,7 +22,7 @@ pub trait VecIterator: ExactSizeIterator + FusedIterator {
 
     /// Gets the item at the given usize index, panics if not found.
     #[inline]
-    fn get_unwrap_at(&mut self, i: usize) -> Self::Item {
+    fn get_at_unwrap(&mut self, i: usize) -> Self::Item {
         self.get_at(i).unwrap()
     }
 

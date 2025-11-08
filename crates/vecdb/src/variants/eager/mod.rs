@@ -794,7 +794,7 @@ where
                 if prev.is_none() {
                     let i = i.to_usize();
                     prev.replace(if i > 0 {
-                        self.into_iter().get_unwrap_at(i - 1)
+                        self.into_iter().get_at_unwrap(i - 1)
                     } else {
                         T::default()
                     });
@@ -806,7 +806,7 @@ where
                 let sum = if processed_values_count > len {
                     let prev_sum = prev.unwrap();
                     let value_to_subtract =
-                        T::from(other_iter.get_unwrap_at(i.to_usize().checked_sub(len).unwrap()));
+                        T::from(other_iter.get_at_unwrap(i.to_usize().checked_sub(len).unwrap()));
                     prev_sum.checked_sub(value_to_subtract).unwrap() + value
                 } else {
                     prev.unwrap() + value
@@ -848,12 +848,12 @@ where
             .enumerate()
             .skip(skip)
             .try_for_each(|(i, first_index)| {
-                let count = usize::from(indexes_count_iter.get_unwrap_at(i));
+                let count = usize::from(indexes_count_iter.get_at_unwrap(i));
                 let first_index = first_index.to_usize();
                 let range = first_index..first_index + count;
                 let mut sum = T::from(0_usize);
                 range.into_iter().for_each(|i| {
-                    sum = sum + source_iter.get_unwrap_at(i);
+                    sum = sum + source_iter.get_at_unwrap(i);
                 });
                 self.forced_push_at(i, sum, exit)
             })?;
@@ -890,7 +890,7 @@ where
             .try_for_each(|(i, v)| {
                 let mut sum = v;
                 others_iter.iter_mut().for_each(|iter| {
-                    sum = sum + iter.get_unwrap_at(i);
+                    sum = sum + iter.get_at_unwrap(i);
                 });
                 self.forced_push_at(i, sum, exit)
             })?;
@@ -929,7 +929,7 @@ where
                 let min = v;
                 let min = others_iter
                     .iter_mut()
-                    .map(|iter| iter.get_unwrap_at(i))
+                    .map(|iter| iter.get_at_unwrap(i))
                     .min()
                     .map_or(min, |min2| min.min(min2));
                 self.forced_push_at(i, min, exit)
@@ -969,7 +969,7 @@ where
                 let max = v;
                 let max = others_iter
                     .iter_mut()
-                    .map(|iter| iter.get_unwrap_at(i))
+                    .map(|iter| iter.get_at_unwrap(i))
                     .max()
                     .map_or(max, |max2| max.max(max2));
                 self.forced_push_at(i, max, exit)
@@ -1027,7 +1027,7 @@ where
                     if prev.is_none() {
                         let i = i.to_usize();
                         prev.replace(if i > min_prev_i {
-                            self.into_iter().get_unwrap_at(i - 1)
+                            self.into_iter().get_at_unwrap(i - 1)
                         } else {
                             T::from(0.0)
                         });
@@ -1041,7 +1041,7 @@ where
                     let sma = T::from(if processed_values_count > sma {
                         let prev_sum = f32::from(prev.unwrap()) * len as f32;
                         let value_to_subtract = f32::from(
-                            other_iter.get_unwrap_at(i.to_usize().checked_sub(sma).unwrap()),
+                            other_iter.get_at_unwrap(i.to_usize().checked_sub(sma).unwrap()),
                         );
                         (prev_sum - value_to_subtract + value) / len as f32
                     } else {
@@ -1111,7 +1111,7 @@ where
 
                     if prev.is_none() {
                         prev.replace(if i > min_prev_i {
-                            self.into_iter().get_unwrap_at(i - 1)
+                            self.into_iter().get_at_unwrap(i - 1)
                         } else {
                             T::from(0.0)
                         });
@@ -1164,7 +1164,7 @@ where
         (skip.to_usize()..source.len()).try_for_each(|i| {
             let previous_value = i
                 .checked_sub(len)
-                .map(|prev_i| f32::from(source_iter.get_unwrap_at(prev_i)))
+                .map(|prev_i| f32::from(source_iter.get_at_unwrap(prev_i)))
                 .unwrap_or(f32::NAN);
 
             self.forced_push_at(i, T::from(previous_value), exit)
@@ -1198,7 +1198,7 @@ where
             .try_for_each(|(i, current)| {
                 let prev = i
                     .checked_sub(len)
-                    .map(|prev_i| source_iter.get_unwrap_at(prev_i))
+                    .map(|prev_i| source_iter.get_at_unwrap(prev_i))
                     .unwrap_or_default();
 
                 self.forced_push_at(i, current.checked_sub(prev).unwrap(), exit)
@@ -1233,7 +1233,7 @@ where
             .try_for_each(|(i, b)| {
                 let previous_value = f32::from(
                     i.checked_sub(len)
-                        .map(|prev_i| source_iter.get_unwrap_at(prev_i))
+                        .map(|prev_i| source_iter.get_at_unwrap(prev_i))
                         .unwrap_or_default(),
                 );
 
