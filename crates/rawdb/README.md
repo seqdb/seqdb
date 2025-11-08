@@ -51,7 +51,7 @@ fn main() -> Result<()> {
     // remove region (space becomes reusable hole)
     db.remove_region(region1)?;
 
-    db.flush()?; // Should be `db.flush_then_punch()?` but doesn't work with `TempDir`
+    db.flush()?; // Should be `db.compact()?` but doesn't work with with doc-tests
 
     Ok(())
 }
@@ -81,7 +81,3 @@ Operations become durable after calling `flush()`. Before flush, writes are visi
 
 **Recovery:**
 On open, reads all metadata entries and rebuilds in-memory structures. Deleted regions are identified by zeroed metadata.
-
-## Examples
-
-See [examples/](examples/) for usage.

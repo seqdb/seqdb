@@ -76,7 +76,3 @@ Compression via Pcodec works for numeric types only.
 - Space-efficient storage for numeric data
 - Sparse deletions without reindexing
 - Rollback without full snapshots
-
-## Examples
-
-See [examples/](examples/) for usage.

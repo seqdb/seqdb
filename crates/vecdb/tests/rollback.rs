@@ -1,20 +1,26 @@
-use std::{fs, path::Path};
-
+use rawdb::Database;
+use tempfile::TempDir;
 use vecdb::{
-    AnyStoredVec, AnyVec, CollectableVec, Database, GenericStoredVec, ImportOptions, RawVec, Stamp,
+    AnyStoredVec, AnyVec, CollectableVec, GenericStoredVec, ImportOptions, RawVec, Result, Stamp,
     Version,
 };
 
 #[allow(clippy::upper_case_acronyms)]
 type VEC = RawVec<usize, u32>;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// Helper to create a temporary test database
+pub fn setup_test_db() -> Result<(Database, TempDir)> {
+    let temp_dir = TempDir::new()?;
+    let db = Database::open(temp_dir.path())?;
+    Ok((db, temp_dir))
+}
+
+#[test]
+fn test_rollback_comprehensive() -> Result<(), Box<dyn std::error::Error>> {
     let empty_vec: Vec<u32> = vec![];
 
-    let _ = fs::remove_dir_all("rollback_simple");
-
     let version = Version::TWO;
-    let database = Database::open(Path::new("rollback_simple"))?;
+    let (database, _temp) = setup_test_db()?;
     let mut options: ImportOptions = (&database, "vec", version).into();
     options = options.with_saved_stamped_changes(10);
 

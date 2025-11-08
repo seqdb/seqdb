@@ -1,15 +1,22 @@
+use rawdb::Database;
 use sha2::{Digest, Sha256};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::fs;
+use std::path::{Path, PathBuf};
+use tempfile::TempDir;
 use vecdb::{
-    AnyStoredVec, AnyVec, CollectableVec, Database, GenericStoredVec, ImportOptions, RawVec, Stamp,
+    AnyStoredVec, AnyVec, CollectableVec, GenericStoredVec, ImportOptions, RawVec, Result, Stamp,
     Version,
 };
 
+/// Helper to create a temporary test database
+pub fn setup_test_db() -> Result<(Database, TempDir)> {
+    let temp_dir = TempDir::new()?;
+    let db = Database::open(temp_dir.path())?;
+    Ok((db, temp_dir))
+}
+
 /// Compute SHA-256 hash of the vecdb data file and regions directory
-/// Only hashes hash_test/data (file) and hash_test/regions/*, ignoring changes directory
+/// Only hashes data (file) and regions/*, ignoring changes directory
 fn compute_directory_hash(dir: &Path) -> Result<String, Box<dyn std::error::Error>> {
     let mut hasher = Sha256::new();
 
@@ -66,29 +73,17 @@ fn compute_directory_hash(dir: &Path) -> Result<String, Box<dyn std::error::Erro
 /// 1. Data can be correctly read back using individual gets
 /// 2. Data can be correctly read back using iterators
 /// 3. Redo operations produce the same readable state
-///
-/// Tests the full persistence cycle:
-/// - Create vecdb and do work
-/// - Flush to disk (checkpoint 1)
-/// - Do more work and flush (checkpoint 2)
-/// - Rollback to checkpoint 1
-/// - Flush, close, and reopen
-/// - Verify data matches checkpoint 1 using gets and iterators
-/// - Redo operations to checkpoint 2
-/// - Flush, close, and reopen
-/// - Verify data matches checkpoint 2 using gets and iterators
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[test]
+fn test_data_integrity_rollback_flush_reopen() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Data Integrity Test: Rollback + Flush + Reopen ===\n");
     println!("This test verifies:");
     println!("  • Rollback + flush + reopen preserves data correctly");
     println!("  • Data readable via both gets and iterators");
     println!("  • File hashes track physical layout differences\n");
 
-    // Clean up any existing test data
-    let _ = fs::remove_dir_all("hash_test");
-
     // Create database
-    let database = Database::open(Path::new("hash_test"))?;
+    let (database, temp) = setup_test_db()?;
+    let test_path = temp.path();
     let options: ImportOptions = (&database, "vec", Version::TWO).into();
     let options = options.with_saved_stamped_changes(10); // Enable rollback with history
 
@@ -117,7 +112,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n--- Checkpoint 1 ---");
     let checkpoint1_data = vec.collect_holed()?;
     let checkpoint1_stamp = vec.stamp();
-    let checkpoint1_hash = compute_directory_hash(Path::new("hash_test"))?;
+    let checkpoint1_hash = compute_directory_hash(test_path)?;
     println!("✓ Saved checkpoint1 at stamp {:?}", checkpoint1_stamp);
     println!("  Data: {:?}", checkpoint1_data);
     println!("  Length: {}", vec.len());
@@ -154,7 +149,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n--- Checkpoint 2 ---");
     let checkpoint2_data = vec.collect_holed()?;
     let checkpoint2_stamp = vec.stamp();
-    let checkpoint2_hash = compute_directory_hash(Path::new("hash_test"))?;
+    let checkpoint2_hash = compute_directory_hash(test_path)?;
     println!("✓ Saved checkpoint2 at stamp {:?}", checkpoint2_stamp);
     println!("  Data: {:?}", checkpoint2_data);
     println!("  Length: {}", vec.len());
@@ -198,7 +193,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Flush and close
     println!("\n--- Step 10: Flush, close, and reopen ---");
     vec.stamped_flush_with_changes(checkpoint1_stamp)?;
-    let after_flush_hash = compute_directory_hash(Path::new("hash_test"))?;
+    let after_flush_hash = compute_directory_hash(test_path)?;
     println!("✓ Flushed to disk");
     println!("  File hash: {}", after_flush_hash);
     if after_flush_hash != checkpoint1_hash {
@@ -310,7 +305,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Flush and close
     println!("\n--- Step 12: Flush, close, and reopen (after redo) ---");
     vec.stamped_flush_with_changes(checkpoint2_stamp)?;
-    let after_redo_flush_hash = compute_directory_hash(Path::new("hash_test"))?;
+    let after_redo_flush_hash = compute_directory_hash(test_path)?;
     println!("✓ Flushed to disk");
     println!("  File hash: {}", after_redo_flush_hash);
     if after_redo_flush_hash == checkpoint2_hash {
