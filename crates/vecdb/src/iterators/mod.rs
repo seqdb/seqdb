@@ -1,12 +1,12 @@
-mod boxed;
-mod extended;
-mod iterable;
-
 use std::iter::FusedIterator;
 
+mod boxed;
+mod iterable;
+mod typed;
+
 pub use boxed::*;
-pub use extended::*;
 pub use iterable::*;
+pub use typed::*;
 
 /// Base trait for vector iterators with positioning capabilities.
 pub trait VecIterator: ExactSizeIterator + FusedIterator {

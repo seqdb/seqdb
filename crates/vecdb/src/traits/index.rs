@@ -23,7 +23,8 @@ where
         + KnownLayout
         + Send
         + Sync
-        + PrintableIndex,
+        + PrintableIndex
+        + 'static,
 {
     #[inline]
     fn to_usize(self) -> usize {
@@ -55,5 +56,6 @@ impl<I> StoredIndex for I where
         + Send
         + Sync
         + PrintableIndex
+        + 'static
 {
 }

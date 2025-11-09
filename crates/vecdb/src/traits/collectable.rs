@@ -1,9 +1,9 @@
-use crate::{AnyIterableVec, i64_to_usize};
+use crate::{IterableVec, TypedVec, i64_to_usize};
 
 use super::{AnyVec, StoredIndex, StoredRaw};
 
 /// Trait for vectors that can be collected into standard Rust collections with range support.
-pub trait CollectableVec<I, T>: AnyIterableVec<I, T>
+pub trait CollectableVec<I, T>: IterableVec<I, T>
 where
     Self: Clone,
     I: StoredIndex,
@@ -58,23 +58,23 @@ where
         self.iter_range(from, to).map(|v| v.to_string()).collect()
     }
 
-    /// Converts an i64 index to usize, supporting negative indexing.
     #[inline]
-    fn i64_to_usize_(i: i64, len: usize) -> usize {
-        if i >= 0 {
-            (i as usize).min(len)
-        } else {
-            let v = len as i64 + i;
-            if v < 0 { 0 } else { v as usize }
-        }
+    fn iter_range_strings(
+        &self,
+        from: Option<i64>,
+        to: Option<i64>,
+    ) -> Box<dyn Iterator<Item = String> + '_> {
+        let from_usize = from.map(|i| self.i64_to_usize(i));
+        let to_usize = to.map(|i| self.i64_to_usize(i));
+        Box::new(self.iter_range(from_usize, to_usize).map(|v| v.to_string()))
     }
 }
 
 impl<I, T, V> CollectableVec<I, T> for V
 where
-    V: AnyVec + AnyIterableVec<I, T> + Clone,
+    V: IterableVec<I, T> + Clone,
     I: StoredIndex,
-    T: StoredRaw + 'static,
+    T: StoredRaw,
 {
 }
 
@@ -82,6 +82,12 @@ where
 pub trait AnyCollectableVec: AnyVec {
     fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Vec<u8>;
     fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Vec<String>;
+
+    fn iter_range_strings(
+        &self,
+        from: Option<i64>,
+        to: Option<i64>,
+    ) -> Box<dyn Iterator<Item = String> + '_>;
 
     /// Returns the number of items in the specified range.
     fn range_count(&self, from: Option<i64>, to: Option<i64>) -> usize {
@@ -94,5 +100,27 @@ pub trait AnyCollectableVec: AnyVec {
     /// Returns the total size in bytes of items in the specified range.
     fn range_weight(&self, from: Option<i64>, to: Option<i64>) -> usize {
         self.range_count(from, to) * self.value_type_to_size_of()
+    }
+}
+
+impl<V> AnyCollectableVec for V
+where
+    V: TypedVec,
+    V: CollectableVec<V::I, V::T>,
+{
+    fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Vec<u8> {
+        <Self as CollectableVec<V::I, V::T>>::collect_range_json_bytes(self, from, to)
+    }
+
+    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Vec<String> {
+        <Self as CollectableVec<V::I, V::T>>::collect_range_string(self, from, to)
+    }
+
+    fn iter_range_strings(
+        &self,
+        from: Option<i64>,
+        to: Option<i64>,
+    ) -> Box<dyn Iterator<Item = String> + '_> {
+        <Self as CollectableVec<V::I, V::T>>::iter_range_strings(self, from, to)
     }
 }

@@ -1,7 +1,7 @@
 use std::iter::FusedIterator;
 
 use crate::{
-    BoxedVecIterator, LazyVecFrom2, StoredIndex, StoredRaw, VecIterator, VecIteratorExtended,
+    BoxedVecIterator, LazyVecFrom2, StoredIndex, StoredRaw, VecIterator, TypedVecIterator,
 };
 
 pub struct LazyVecFrom2Iterator<'a, I, T, S1I, S1T, S2I, S2T>
@@ -158,7 +158,7 @@ where
     }
 }
 
-impl<I, T, S1I, S1T, S2I, S2T> VecIteratorExtended
+impl<I, T, S1I, S1T, S2I, S2T> TypedVecIterator
     for LazyVecFrom2Iterator<'_, I, T, S1I, S1T, S2I, S2T>
 where
     I: StoredIndex,

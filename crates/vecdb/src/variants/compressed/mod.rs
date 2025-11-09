@@ -10,9 +10,9 @@ use parking_lot::RwLock;
 use rawdb::{Database, Reader, Region};
 
 use crate::{
-    AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, AsInnerSlice, BoxedVecIterator,
-    CollectableVec, Error, Format, FromInnerSlice, GenericStoredVec, HEADER_OFFSET, Header, RawVec,
-    Result, StoredCompressed, StoredIndex, Version, likely, variants::ImportOptions,
+    AnyStoredVec, AnyVec, AsInnerSlice, BoxedVecIterator, Error, Format, FromInnerSlice,
+    GenericStoredVec, HEADER_OFFSET, Header, IterableVec, RawVec, Result, StoredCompressed,
+    StoredIndex, TypedVec, Version, likely, variants::ImportOptions,
 };
 
 mod iterators;
@@ -457,7 +457,7 @@ where
     }
 }
 
-impl<I, T> AnyIterableVec<I, T> for CompressedVec<I, T>
+impl<I, T> IterableVec<I, T> for CompressedVec<I, T>
 where
     I: StoredIndex,
     T: StoredCompressed,
@@ -467,16 +467,11 @@ where
     }
 }
 
-impl<I, T> AnyCollectableVec for CompressedVec<I, T>
+impl<I, T> TypedVec for CompressedVec<I, T>
 where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Vec<u8> {
-        CollectableVec::collect_range_json_bytes(self, from, to)
-    }
-
-    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Vec<String> {
-        CollectableVec::collect_range_string(self, from, to)
-    }
+    type I = I;
+    type T = T;
 }

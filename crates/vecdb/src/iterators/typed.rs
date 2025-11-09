@@ -1,7 +1,7 @@
 use crate::{PrintableIndex, StoredIndex, StoredRaw, VecIterator};
 
 /// Extended vector iterator with type-safe index operations.
-pub trait VecIteratorExtended: VecIterator<Item = Self::T> {
+pub trait TypedVecIterator: VecIterator<Item = Self::T> {
     type I: StoredIndex;
     type T: StoredRaw;
 

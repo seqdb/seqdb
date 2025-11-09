@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use tempfile::TempDir;
 use vecdb::{
     AnyStoredVec, AnyVec, CollectableVec, GenericStoredVec, RawVec, Result, Stamp,
-    VecIteratorExtended, Version,
+    TypedVecIterator, Version,
 };
 
 #[allow(clippy::upper_case_acronyms)]

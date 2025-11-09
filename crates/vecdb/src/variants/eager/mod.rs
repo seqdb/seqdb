@@ -10,9 +10,9 @@ use std::{
 use rawdb::{Database, Reader, Region};
 
 use crate::{
-    AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, BoxedVecIterator, CheckedSub,
-    CollectableVec, Exit, Format, GenericStoredVec, Result, StoredCompressed, StoredIndex,
-    StoredRaw, StoredVec, StoredVecIterator, VecIterator, Version,
+    AnyStoredVec, AnyVec, BoxedVecIterator, CheckedSub, CollectableVec, Exit, Format,
+    GenericStoredVec, IterableVec, Result, StoredCompressed, StoredIndex, StoredRaw, StoredVec,
+    StoredVecIterator, TypedVec, VecIterator, Version,
     variants::{Header, ImportOptions},
 };
 
@@ -92,7 +92,7 @@ where
     pub fn compute_range<A, F>(
         &mut self,
         max_from: I,
-        other: &impl AnyIterableVec<I, A>,
+        other: &impl IterableVec<I, A>,
         t: F,
         exit: &Exit,
     ) -> Result<()>
@@ -106,7 +106,7 @@ where
     pub fn compute_from_index<T2>(
         &mut self,
         max_from: I,
-        other: &impl AnyIterableVec<I, T2>,
+        other: &impl IterableVec<I, T2>,
         exit: &Exit,
     ) -> Result<()>
     where
@@ -125,7 +125,7 @@ where
     pub fn compute_transform<A, B, F>(
         &mut self,
         max_from: A,
-        other: &impl AnyIterableVec<A, B>,
+        other: &impl IterableVec<A, B>,
         mut t: F,
         exit: &Exit,
     ) -> Result<()>
@@ -151,8 +151,8 @@ where
     pub fn compute_transform2<A, B, C, F>(
         &mut self,
         max_from: A,
-        other1: &impl AnyIterableVec<A, B>,
-        other2: &impl AnyIterableVec<A, C>,
+        other1: &impl IterableVec<A, B>,
+        other2: &impl IterableVec<A, C>,
         mut t: F,
         exit: &Exit,
     ) -> Result<()>
@@ -185,9 +185,9 @@ where
     pub fn compute_transform3<A, B, C, D, F>(
         &mut self,
         max_from: A,
-        other1: &impl AnyIterableVec<A, B>,
-        other2: &impl AnyIterableVec<A, C>,
-        other3: &impl AnyIterableVec<A, D>,
+        other1: &impl IterableVec<A, B>,
+        other2: &impl IterableVec<A, C>,
+        other3: &impl IterableVec<A, D>,
         mut t: F,
         exit: &Exit,
     ) -> Result<()>
@@ -232,8 +232,8 @@ where
     pub fn compute_add(
         &mut self,
         max_from: I,
-        added: &impl AnyIterableVec<I, T>,
-        adder: &impl AnyIterableVec<I, T>,
+        added: &impl IterableVec<I, T>,
+        adder: &impl IterableVec<I, T>,
         exit: &Exit,
     ) -> Result<()>
     where
@@ -251,8 +251,8 @@ where
     pub fn compute_subtract(
         &mut self,
         max_from: I,
-        subtracted: &impl AnyIterableVec<I, T>,
-        subtracter: &impl AnyIterableVec<I, T>,
+        subtracted: &impl IterableVec<I, T>,
+        subtracter: &impl IterableVec<I, T>,
         exit: &Exit,
     ) -> Result<()>
     where
@@ -270,8 +270,8 @@ where
     pub fn compute_multiply<T2, T3>(
         &mut self,
         max_from: I,
-        multiplied: &impl AnyIterableVec<I, T2>,
-        multiplier: &impl AnyIterableVec<I, T3>,
+        multiplied: &impl IterableVec<I, T2>,
+        multiplier: &impl IterableVec<I, T3>,
         exit: &Exit,
     ) -> Result<()>
     where
@@ -291,8 +291,8 @@ where
     pub fn compute_divide<T2, T3>(
         &mut self,
         max_from: I,
-        divided: &impl AnyIterableVec<I, T2>,
-        divider: &impl AnyIterableVec<I, T3>,
+        divided: &impl IterableVec<I, T2>,
+        divider: &impl IterableVec<I, T3>,
         exit: &Exit,
     ) -> Result<()>
     where
@@ -312,7 +312,7 @@ where
     pub fn compute_all_time_high<T2>(
         &mut self,
         max_from: I,
-        source: &impl AnyIterableVec<I, T2>,
+        source: &impl IterableVec<I, T2>,
         exit: &Exit,
     ) -> Result<()>
     where
@@ -343,7 +343,7 @@ where
     pub fn compute_all_time_low<T2>(
         &mut self,
         max_from: I,
-        source: &impl AnyIterableVec<I, T2>,
+        source: &impl IterableVec<I, T2>,
         exit: &Exit,
     ) -> Result<()>
     where
@@ -356,7 +356,7 @@ where
     pub fn compute_all_time_low_<T2>(
         &mut self,
         max_from: I,
-        source: &impl AnyIterableVec<I, T2>,
+        source: &impl IterableVec<I, T2>,
         exit: &Exit,
         exclude_default: bool,
     ) -> Result<()>
@@ -372,7 +372,7 @@ where
                 if prev.is_none() {
                     let i = i.to_usize();
                     prev.replace(if i > 0 {
-                        this.iter().nth(i - 1).unwrap()
+                        this.into_iter().nth(i - 1).unwrap()
                     } else {
                         T::from(source.iter().next().unwrap())
                     });
@@ -394,8 +394,8 @@ where
     pub fn compute_percentage<T2, T3>(
         &mut self,
         max_from: I,
-        divided: &impl AnyIterableVec<I, T2>,
-        divider: &impl AnyIterableVec<I, T3>,
+        divided: &impl IterableVec<I, T2>,
+        divider: &impl IterableVec<I, T3>,
         exit: &Exit,
     ) -> Result<()>
     where
@@ -409,8 +409,8 @@ where
     pub fn compute_percentage_difference<T2, T3>(
         &mut self,
         max_from: I,
-        divided: &impl AnyIterableVec<I, T2>,
-        divider: &impl AnyIterableVec<I, T3>,
+        divided: &impl IterableVec<I, T2>,
+        divider: &impl IterableVec<I, T3>,
         exit: &Exit,
     ) -> Result<()>
     where
@@ -424,8 +424,8 @@ where
     pub fn compute_percentage_<T2, T3>(
         &mut self,
         max_from: I,
-        divided: &impl AnyIterableVec<I, T2>,
-        divider: &impl AnyIterableVec<I, T3>,
+        divided: &impl IterableVec<I, T2>,
+        divider: &impl IterableVec<I, T3>,
         exit: &Exit,
         as_difference: bool,
     ) -> Result<()>
@@ -456,7 +456,7 @@ where
     pub fn compute_coarser(
         &mut self,
         max_from: T,
-        other: &impl AnyIterableVec<T, I>,
+        other: &impl IterableVec<T, I>,
         exit: &Exit,
     ) -> Result<()>
     where
@@ -469,7 +469,7 @@ where
 
         let skip = max_from
             .to_usize()
-            .min(self.iter().last().map_or(0_usize, |v| v.to_usize()));
+            .min(self.into_iter().last().map_or(0_usize, |v| v.to_usize()));
 
         let mut prev_i = None;
         other
@@ -534,8 +534,8 @@ where
     pub fn compute_count_from_indexes<T2, T3>(
         &mut self,
         max_from: I,
-        first_indexes: &impl AnyIterableVec<I, T2>,
-        other_to_else: &impl AnyIterableVec<T2, T3>,
+        first_indexes: &impl IterableVec<I, T2>,
+        other_to_else: &impl IterableVec<T2, T3>,
         exit: &Exit,
     ) -> Result<()>
     where
@@ -557,8 +557,8 @@ where
     pub fn compute_filtered_count_from_indexes<T2, T3, F>(
         &mut self,
         max_from: I,
-        first_indexes: &impl AnyIterableVec<I, T2>,
-        other_to_else: &impl AnyIterableVec<T2, T3>,
+        first_indexes: &impl IterableVec<I, T2>,
+        other_to_else: &impl IterableVec<T2, T3>,
         filter: F,
         exit: &Exit,
     ) -> Result<()>
@@ -587,8 +587,8 @@ where
     fn compute_filtered_count_from_indexes_<T2, T3>(
         &mut self,
         max_from: I,
-        first_indexes: &impl AnyIterableVec<I, T2>,
-        other_to_else: &impl AnyIterableVec<T2, T3>,
+        first_indexes: &impl IterableVec<I, T2>,
+        other_to_else: &impl IterableVec<T2, T3>,
         mut filter: Option<Box<dyn FnMut(T2) -> bool + '_>>,
         exit: &Exit,
     ) -> Result<()>
@@ -638,8 +638,8 @@ where
     pub fn compute_is_first_ordered<A>(
         &mut self,
         max_from: I,
-        self_to_other: &impl AnyIterableVec<I, A>,
-        other_to_self: &impl AnyIterableVec<A, I>,
+        self_to_other: &impl IterableVec<I, A>,
+        other_to_self: &impl IterableVec<A, I>,
         exit: &Exit,
     ) -> Result<()>
     where
@@ -674,7 +674,7 @@ where
     pub fn compute_max<T2>(
         &mut self,
         max_from: I,
-        source: &impl AnyIterableVec<I, T2>,
+        source: &impl IterableVec<I, T2>,
         window: usize,
         exit: &Exit,
     ) -> Result<()>
@@ -721,7 +721,7 @@ where
     pub fn compute_min<T2>(
         &mut self,
         max_from: I,
-        source: &impl AnyIterableVec<I, T2>,
+        source: &impl IterableVec<I, T2>,
         window: usize,
         exit: &Exit,
     ) -> Result<()>
@@ -768,7 +768,7 @@ where
     pub fn compute_sum<T2>(
         &mut self,
         max_from: I,
-        source: &impl AnyIterableVec<I, T2>,
+        source: &impl IterableVec<I, T2>,
         window: usize,
         exit: &Exit,
     ) -> Result<()>
@@ -821,9 +821,9 @@ where
     pub fn compute_sum_from_indexes<T2, T3>(
         &mut self,
         max_from: I,
-        first_indexes: &impl AnyIterableVec<I, T2>,
-        indexes_count: &impl AnyIterableVec<I, T3>,
-        source: &impl AnyIterableVec<T2, T>,
+        first_indexes: &impl IterableVec<I, T2>,
+        indexes_count: &impl IterableVec<I, T3>,
+        source: &impl IterableVec<T2, T>,
         exit: &Exit,
     ) -> Result<()>
     where
@@ -863,7 +863,7 @@ where
     pub fn compute_sum_of_others(
         &mut self,
         max_from: I,
-        others: &[&impl AnyIterableVec<I, T>],
+        others: &[&impl IterableVec<I, T>],
         exit: &Exit,
     ) -> Result<()>
     where
@@ -900,7 +900,7 @@ where
     pub fn compute_min_of_others(
         &mut self,
         max_from: I,
-        others: &[&impl AnyIterableVec<I, T>],
+        others: &[&impl IterableVec<I, T>],
         exit: &Exit,
     ) -> Result<()>
     where
@@ -940,7 +940,7 @@ where
     pub fn compute_max_of_others(
         &mut self,
         max_from: I,
-        others: &[&impl AnyIterableVec<I, T>],
+        others: &[&impl IterableVec<I, T>],
         exit: &Exit,
     ) -> Result<()>
     where
@@ -980,7 +980,7 @@ where
     pub fn compute_sma<T2>(
         &mut self,
         max_from: I,
-        source: &impl AnyIterableVec<I, T2>,
+        source: &impl IterableVec<I, T2>,
         sma: usize,
         exit: &Exit,
     ) -> Result<()>
@@ -995,7 +995,7 @@ where
     pub fn compute_sma_<T2>(
         &mut self,
         max_from: I,
-        source: &impl AnyIterableVec<I, T2>,
+        source: &impl IterableVec<I, T2>,
         sma: usize,
         exit: &Exit,
         min_i: Option<I>,
@@ -1143,7 +1143,7 @@ where
     pub fn compute_previous_value<T2>(
         &mut self,
         max_from: I,
-        source: &impl AnyIterableVec<I, T2>,
+        source: &impl IterableVec<I, T2>,
         len: usize,
         exit: &Exit,
     ) -> Result<()>
@@ -1175,7 +1175,7 @@ where
     pub fn compute_change(
         &mut self,
         max_from: I,
-        source: &impl AnyIterableVec<I, T>,
+        source: &impl IterableVec<I, T>,
         len: usize,
         exit: &Exit,
     ) -> Result<()>
@@ -1209,7 +1209,7 @@ where
     pub fn compute_percentage_change<T2>(
         &mut self,
         max_from: I,
-        source: &impl AnyIterableVec<I, T2>,
+        source: &impl IterableVec<I, T2>,
         len: usize,
         exit: &Exit,
     ) -> Result<()>
@@ -1249,7 +1249,7 @@ where
     pub fn compute_cagr<T2>(
         &mut self,
         max_from: I,
-        percentage_returns: &impl AnyIterableVec<I, T2>,
+        percentage_returns: &impl IterableVec<I, T2>,
         days: usize,
         exit: &Exit,
     ) -> Result<()>
@@ -1288,9 +1288,9 @@ where
     pub fn compute_zscore<T2, T3, T4>(
         &mut self,
         max_from: I,
-        source: &impl AnyIterableVec<I, T2>,
-        sma: &impl AnyIterableVec<I, T3>,
-        sd: &impl AnyIterableVec<I, T4>,
+        source: &impl IterableVec<I, T2>,
+        sma: &impl IterableVec<I, T3>,
+        sd: &impl IterableVec<I, T4>,
         exit: &Exit,
     ) -> Result<()>
     where
@@ -1502,7 +1502,7 @@ where
     }
 }
 
-impl<I, T> AnyIterableVec<I, T> for EagerVec<I, T>
+impl<I, T> IterableVec<I, T> for EagerVec<I, T>
 where
     I: StoredIndex,
     T: StoredCompressed,
@@ -1516,16 +1516,11 @@ where
     }
 }
 
-impl<I, T> AnyCollectableVec for EagerVec<I, T>
+impl<I, T> TypedVec for EagerVec<I, T>
 where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Vec<u8> {
-        CollectableVec::collect_range_json_bytes(self, from, to)
-    }
-
-    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Vec<String> {
-        CollectableVec::collect_range_string(self, from, to)
-    }
+    type I = I;
+    type T = T;
 }

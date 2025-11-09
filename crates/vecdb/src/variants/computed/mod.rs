@@ -1,7 +1,6 @@
 use crate::{
-    AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BoxedVecIterator,
-    CollectableVec, Exit, Format, Result, StoredCompressed, StoredIndex, StoredRaw, Version,
-    variants::ImportOptions,
+    AnyVec, BoxedVecIterator, Exit, Format, IterableBoxedVec, IterableVec, Result,
+    StoredCompressed, StoredIndex, StoredRaw, TypedVec, Version, variants::ImportOptions,
 };
 
 use super::{
@@ -22,16 +21,16 @@ where
     S2T: Clone,
     S3T: Clone,
 {
-    From1(AnyBoxedIterableVec<S1I, S1T>, ComputeFrom1<I, T, S1I, S1T>),
+    From1(IterableBoxedVec<S1I, S1T>, ComputeFrom1<I, T, S1I, S1T>),
     From2(
-        (AnyBoxedIterableVec<S1I, S1T>, AnyBoxedIterableVec<S2I, S2T>),
+        (IterableBoxedVec<S1I, S1T>, IterableBoxedVec<S2I, S2T>),
         ComputeFrom2<I, T, S1I, S1T, S2I, S2T>,
     ),
     From3(
         (
-            AnyBoxedIterableVec<S1I, S1T>,
-            AnyBoxedIterableVec<S2I, S2T>,
-            AnyBoxedIterableVec<S3I, S3T>,
+            IterableBoxedVec<S1I, S1T>,
+            IterableBoxedVec<S2I, S2T>,
+            IterableBoxedVec<S3I, S3T>,
         ),
         ComputeFrom3<I, T, S1I, S1T, S2I, S2T, S3I, S3T>,
     ),
@@ -82,7 +81,7 @@ where
         version: Version,
         computation: Computation,
         format: Format,
-        source: AnyBoxedIterableVec<S1I, S1T>,
+        source: IterableBoxedVec<S1I, S1T>,
         compute: ComputeFrom1<I, T, S1I, S1T>,
     ) -> Result<Self> {
         Self::forced_import_or_init_from_1_with(
@@ -98,7 +97,7 @@ where
         options: ImportOptions,
         computation: Computation,
         format: Format,
-        source: AnyBoxedIterableVec<S1I, S1T>,
+        source: IterableBoxedVec<S1I, S1T>,
         compute: ComputeFrom1<I, T, S1I, S1T>,
     ) -> Result<Self> {
         Ok(match computation {
@@ -122,8 +121,8 @@ where
         version: Version,
         computation: Computation,
         format: Format,
-        source1: AnyBoxedIterableVec<S1I, S1T>,
-        source2: AnyBoxedIterableVec<S2I, S2T>,
+        source1: IterableBoxedVec<S1I, S1T>,
+        source2: IterableBoxedVec<S2I, S2T>,
         compute: ComputeFrom2<I, T, S1I, S1T, S2I, S2T>,
     ) -> Result<Self> {
         Self::forced_import_or_init_from_2_with(
@@ -141,8 +140,8 @@ where
         options: ImportOptions,
         computation: Computation,
         format: Format,
-        source1: AnyBoxedIterableVec<S1I, S1T>,
-        source2: AnyBoxedIterableVec<S2I, S2T>,
+        source1: IterableBoxedVec<S1I, S1T>,
+        source2: IterableBoxedVec<S2I, S2T>,
         compute: ComputeFrom2<I, T, S1I, S1T, S2I, S2T>,
     ) -> Result<Self> {
         Ok(match computation {
@@ -167,9 +166,9 @@ where
         version: Version,
         computation: Computation,
         format: Format,
-        source1: AnyBoxedIterableVec<S1I, S1T>,
-        source2: AnyBoxedIterableVec<S2I, S2T>,
-        source3: AnyBoxedIterableVec<S3I, S3T>,
+        source1: IterableBoxedVec<S1I, S1T>,
+        source2: IterableBoxedVec<S2I, S2T>,
+        source3: IterableBoxedVec<S3I, S3T>,
         compute: ComputeFrom3<I, T, S1I, S1T, S2I, S2T, S3I, S3T>,
     ) -> Result<Self> {
         Self::forced_import_or_init_from_3_with(
@@ -188,9 +187,9 @@ where
         options: ImportOptions,
         computation: Computation,
         format: Format,
-        source1: AnyBoxedIterableVec<S1I, S1T>,
-        source2: AnyBoxedIterableVec<S2I, S2T>,
-        source3: AnyBoxedIterableVec<S3I, S3T>,
+        source1: IterableBoxedVec<S1I, S1T>,
+        source2: IterableBoxedVec<S2I, S2T>,
+        source3: IterableBoxedVec<S3I, S3T>,
         compute: ComputeFrom3<I, T, S1I, S1T, S2I, S2T, S3I, S3T>,
     ) -> Result<Self> {
         Ok(match computation {
@@ -212,7 +211,7 @@ where
     pub fn compute_if_necessary<T2>(
         &mut self,
         max_from: I,
-        len_source: &impl AnyIterableVec<I, T2>,
+        len_source: &impl IterableVec<I, T2>,
         exit: &Exit,
     ) -> Result<()> {
         let (vec, dependencies) = if let ComputedVec::Eager {
@@ -339,7 +338,7 @@ where
     }
 }
 
-impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> AnyIterableVec<I, T>
+impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> IterableVec<I, T>
     for ComputedVec<I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where
     I: StoredIndex,
@@ -356,7 +355,7 @@ where
     }
 }
 
-impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> AnyCollectableVec
+impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> TypedVec
     for ComputedVec<I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where
     I: StoredIndex,
@@ -368,11 +367,6 @@ where
     S3I: StoredIndex,
     S3T: StoredRaw,
 {
-    fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Vec<u8> {
-        CollectableVec::collect_range_json_bytes(self, from, to)
-    }
-
-    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Vec<String> {
-        CollectableVec::collect_range_string(self, from, to)
-    }
+    type I = I;
+    type T = T;
 }

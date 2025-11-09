@@ -1,6 +1,6 @@
 use crate::{
-    AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BoxedVecIterator,
-    CollectableVec, StoredIndex, StoredRaw, VecIteratorExtended, Version,
+    AnyVec, BoxedVecIterator, IterableBoxedVec, IterableVec, StoredIndex, StoredRaw, TypedVec,
+    TypedVecIterator, Version,
 };
 
 mod iterator;
@@ -8,7 +8,7 @@ mod iterator;
 pub use iterator::*;
 
 pub type ComputeFrom1<I, T, S1I, S1T> =
-    for<'a> fn(I, &mut dyn VecIteratorExtended<I = S1I, T = S1T, Item = S1T>) -> Option<T>;
+    for<'a> fn(I, &mut dyn TypedVecIterator<I = S1I, T = S1T, Item = S1T>) -> Option<T>;
 
 /// Lazily computed vector deriving values from one source vector.
 ///
@@ -21,7 +21,7 @@ where
 {
     name: String,
     version: Version,
-    source: AnyBoxedIterableVec<S1I, S1T>,
+    source: IterableBoxedVec<S1I, S1T>,
     compute: ComputeFrom1<I, T, S1I, S1T>,
 }
 
@@ -35,7 +35,7 @@ where
     pub fn init(
         name: &str,
         version: Version,
-        source: AnyBoxedIterableVec<S1I, S1T>,
+        source: IterableBoxedVec<S1I, S1T>,
         compute: ComputeFrom1<I, T, S1I, S1T>,
     ) -> Self {
         if I::to_string() != S1I::to_string() {
@@ -104,7 +104,7 @@ where
     }
 }
 
-impl<I, T, S1I, S1T> AnyIterableVec<I, T> for LazyVecFrom1<I, T, S1I, S1T>
+impl<I, T, S1I, S1T> IterableVec<I, T> for LazyVecFrom1<I, T, S1I, S1T>
 where
     I: StoredIndex,
     T: StoredRaw,
@@ -116,18 +116,13 @@ where
     }
 }
 
-impl<I, T, S1I, S1T> AnyCollectableVec for LazyVecFrom1<I, T, S1I, S1T>
+impl<I, T, S1I, S1T> TypedVec for LazyVecFrom1<I, T, S1I, S1T>
 where
     I: StoredIndex,
     T: StoredRaw,
     S1I: StoredIndex,
     S1T: StoredRaw,
 {
-    fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Vec<u8> {
-        CollectableVec::collect_range_json_bytes(self, from, to)
-    }
-
-    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Vec<String> {
-        CollectableVec::collect_range_string(self, from, to)
-    }
+    type I = I;
+    type T = T;
 }

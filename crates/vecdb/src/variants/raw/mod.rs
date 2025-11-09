@@ -14,8 +14,8 @@ use rawdb::{Database, Reader, Region};
 use zerocopy::{FromBytes, IntoBytes};
 
 use crate::{
-    AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, BUFFER_SIZE, BoxedVecIterator,
-    CollectableVec, Error, GenericStoredVec, Result, StoredIndex, StoredRaw, Version,
+    AnyStoredVec, AnyVec, BUFFER_SIZE, BoxedVecIterator, Error, GenericStoredVec, IterableVec,
+    Result, StoredIndex, StoredRaw, TypedVec, Version,
 };
 
 use super::Format;
@@ -521,7 +521,7 @@ where
     }
 }
 
-impl<I, T> AnyIterableVec<I, T> for RawVec<I, T>
+impl<I, T> IterableVec<I, T> for RawVec<I, T>
 where
     I: StoredIndex,
     T: StoredRaw,
@@ -531,16 +531,11 @@ where
     }
 }
 
-impl<I, T> AnyCollectableVec for RawVec<I, T>
+impl<I, T> TypedVec for RawVec<I, T>
 where
     I: StoredIndex,
     T: StoredRaw,
 {
-    fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Vec<u8> {
-        CollectableVec::collect_range_json_bytes(self, from, to)
-    }
-
-    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Vec<String> {
-        CollectableVec::collect_range_string(self, from, to)
-    }
+    type I = I;
+    type T = T;
 }

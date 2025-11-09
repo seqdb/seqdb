@@ -8,7 +8,7 @@ use parking_lot::RwLockReadGuard;
 use rawdb::RegionMetadata;
 
 use crate::{
-    AnyStoredVec, RawVec, Result, StoredIndex, StoredRaw, VecIterator, VecIteratorExtended, likely,
+    AnyStoredVec, RawVec, Result, StoredIndex, StoredRaw, VecIterator, TypedVecIterator, likely,
     unlikely, variants::HEADER_OFFSET,
 };
 
@@ -254,7 +254,7 @@ where
     }
 }
 
-impl<I, T> VecIteratorExtended for CleanRawVecIterator<'_, I, T>
+impl<I, T> TypedVecIterator for CleanRawVecIterator<'_, I, T>
 where
     I: StoredIndex,
     T: StoredRaw,

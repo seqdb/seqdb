@@ -1,6 +1,6 @@
 use crate::{
-    AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BoxedVecIterator,
-    CollectableVec, StoredIndex, StoredRaw, VecIteratorExtended, Version,
+    AnyVec, BoxedVecIterator, IterableBoxedVec, IterableVec, StoredIndex, StoredRaw, TypedVec,
+    TypedVecIterator, Version,
 };
 
 mod iterator;
@@ -9,9 +9,9 @@ pub use iterator::*;
 
 pub type ComputeFrom3<I, T, S1I, S1T, S2I, S2T, S3I, S3T> = for<'a> fn(
     I,
-    &mut dyn VecIteratorExtended<I = S1I, T = S1T, Item = S1T>,
-    &mut dyn VecIteratorExtended<I = S2I, T = S2T, Item = S2T>,
-    &mut dyn VecIteratorExtended<I = S3I, T = S3T, Item = S3T>,
+    &mut dyn TypedVecIterator<I = S1I, T = S1T, Item = S1T>,
+    &mut dyn TypedVecIterator<I = S2I, T = S2T, Item = S2T>,
+    &mut dyn TypedVecIterator<I = S3I, T = S3T, Item = S3T>,
 ) -> Option<T>;
 
 /// Lazily computed vector deriving values from three source vectors.
@@ -27,9 +27,9 @@ where
 {
     name: String,
     version: Version,
-    source1: AnyBoxedIterableVec<S1I, S1T>,
-    source2: AnyBoxedIterableVec<S2I, S2T>,
-    source3: AnyBoxedIterableVec<S3I, S3T>,
+    source1: IterableBoxedVec<S1I, S1T>,
+    source2: IterableBoxedVec<S2I, S2T>,
+    source3: IterableBoxedVec<S3I, S3T>,
     compute: ComputeFrom3<I, T, S1I, S1T, S2I, S2T, S3I, S3T>,
 }
 
@@ -47,9 +47,9 @@ where
     pub fn init(
         name: &str,
         version: Version,
-        source1: AnyBoxedIterableVec<S1I, S1T>,
-        source2: AnyBoxedIterableVec<S2I, S2T>,
-        source3: AnyBoxedIterableVec<S3I, S3T>,
+        source1: IterableBoxedVec<S1I, S1T>,
+        source2: IterableBoxedVec<S2I, S2T>,
+        source3: IterableBoxedVec<S3I, S3T>,
         compute: ComputeFrom3<I, T, S1I, S1T, S2I, S2T, S3I, S3T>,
     ) -> Self {
         if ([
@@ -153,7 +153,7 @@ where
     }
 }
 
-impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> AnyIterableVec<I, T>
+impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> IterableVec<I, T>
     for LazyVecFrom3<I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where
     I: StoredIndex,
@@ -170,7 +170,7 @@ where
     }
 }
 
-impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> AnyCollectableVec
+impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> TypedVec
     for LazyVecFrom3<I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where
     I: StoredIndex,
@@ -182,11 +182,6 @@ where
     S3I: StoredIndex,
     S3T: StoredRaw,
 {
-    fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Vec<u8> {
-        CollectableVec::collect_range_json_bytes(self, from, to)
-    }
-
-    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Vec<String> {
-        CollectableVec::collect_range_string(self, from, to)
-    }
+    type I = I;
+    type T = T;
 }

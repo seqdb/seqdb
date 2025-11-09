@@ -2,7 +2,7 @@ use std::iter::FusedIterator;
 
 use crate::{
     AnyStoredVec, GenericStoredVec, RawVec, Result, StoredIndex, StoredRaw, VecIterator,
-    VecIteratorExtended, likely, unlikely,
+    TypedVecIterator, likely, unlikely,
 };
 
 use super::CleanRawVecIterator;
@@ -198,7 +198,7 @@ where
     }
 }
 
-impl<I, T> VecIteratorExtended for DirtyRawVecIterator<'_, I, T>
+impl<I, T> TypedVecIterator for DirtyRawVecIterator<'_, I, T>
 where
     I: StoredIndex,
     T: StoredRaw,

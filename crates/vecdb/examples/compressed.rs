@@ -2,7 +2,7 @@ use std::{collections::BTreeSet, fs, path::Path};
 
 use vecdb::{
     AnyStoredVec, AnyVec, CollectableVec, CompressedVec, Database, GenericStoredVec, Stamp,
-    VecIteratorExtended, Version,
+    TypedVecIterator, Version,
 };
 
 #[allow(clippy::upper_case_acronyms)]

@@ -1,6 +1,6 @@
 use crate::{
-    AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BoxedVecIterator,
-    CollectableVec, StoredIndex, StoredRaw, VecIteratorExtended, Version,
+    AnyVec, BoxedVecIterator, IterableBoxedVec, IterableVec, StoredIndex, StoredRaw, TypedVec,
+    TypedVecIterator, Version,
 };
 
 mod iterator;
@@ -9,8 +9,8 @@ pub use iterator::*;
 
 pub type ComputeFrom2<I, T, S1I, S1T, S2I, S2T> = for<'a> fn(
     I,
-    &mut dyn VecIteratorExtended<I = S1I, T = S1T, Item = S1T>,
-    &mut dyn VecIteratorExtended<I = S2I, T = S2T, Item = S2T>,
+    &mut dyn TypedVecIterator<I = S1I, T = S1T, Item = S1T>,
+    &mut dyn TypedVecIterator<I = S2I, T = S2T, Item = S2T>,
 ) -> Option<T>;
 
 /// Lazily computed vector deriving values from two source vectors.
@@ -25,8 +25,8 @@ where
 {
     name: String,
     version: Version,
-    source1: AnyBoxedIterableVec<S1I, S1T>,
-    source2: AnyBoxedIterableVec<S2I, S2T>,
+    source1: IterableBoxedVec<S1I, S1T>,
+    source2: IterableBoxedVec<S2I, S2T>,
     compute: ComputeFrom2<I, T, S1I, S1T, S2I, S2T>,
 }
 
@@ -42,8 +42,8 @@ where
     pub fn init(
         name: &str,
         version: Version,
-        source1: AnyBoxedIterableVec<S1I, S1T>,
-        source2: AnyBoxedIterableVec<S2I, S2T>,
+        source1: IterableBoxedVec<S1I, S1T>,
+        source2: IterableBoxedVec<S2I, S2T>,
         compute: ComputeFrom2<I, T, S1I, S1T, S2I, S2T>,
     ) -> Self {
         if ([
@@ -135,7 +135,7 @@ where
     }
 }
 
-impl<I, T, S1I, S1T, S2I, S2T> AnyIterableVec<I, T> for LazyVecFrom2<I, T, S1I, S1T, S2I, S2T>
+impl<I, T, S1I, S1T, S2I, S2T> IterableVec<I, T> for LazyVecFrom2<I, T, S1I, S1T, S2I, S2T>
 where
     I: StoredIndex,
     T: StoredRaw,
@@ -149,7 +149,7 @@ where
     }
 }
 
-impl<I, T, S1I, S1T, S2I, S2T> AnyCollectableVec for LazyVecFrom2<I, T, S1I, S1T, S2I, S2T>
+impl<I, T, S1I, S1T, S2I, S2T> TypedVec for LazyVecFrom2<I, T, S1I, S1T, S2I, S2T>
 where
     I: StoredIndex,
     T: StoredRaw,
@@ -158,11 +158,6 @@ where
     S2I: StoredIndex,
     S2T: StoredRaw,
 {
-    fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Vec<u8> {
-        CollectableVec::collect_range_json_bytes(self, from, to)
-    }
-
-    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Vec<String> {
-        CollectableVec::collect_range_string(self, from, to)
-    }
+    type I = I;
+    type T = T;
 }

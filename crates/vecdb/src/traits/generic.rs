@@ -17,9 +17,8 @@ const MAX_CACHE_SIZE: usize = 256 * ONE_MIB;
 
 use super::{StoredIndex, StoredRaw};
 
-pub trait GenericStoredVec<I, T>: Send + Sync
+pub trait GenericStoredVec<I, T>: AnyStoredVec + Send + Sync
 where
-    Self: AnyStoredVec,
     I: StoredIndex,
     T: StoredRaw,
 {

@@ -5,7 +5,7 @@ use rawdb::Reader;
 
 use crate::{
     AnyStoredVec, BUFFER_SIZE, CompressedVec, GenericStoredVec, Result, StoredCompressed,
-    StoredIndex, VecIterator, VecIteratorExtended, likely, unlikely,
+    StoredIndex, TypedVecIterator, VecIterator, likely, unlikely,
     variants::MAX_UNCOMPRESSED_PAGE_SIZE,
 };
 
@@ -281,7 +281,7 @@ where
     }
 }
 
-impl<I, T> VecIteratorExtended for CleanCompressedVecIterator<'_, I, T>
+impl<I, T> TypedVecIterator for CleanCompressedVecIterator<'_, I, T>
 where
     I: StoredIndex,
     T: StoredCompressed,

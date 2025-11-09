@@ -1,6 +1,6 @@
 use std::iter::FusedIterator;
 
-use crate::{RawVec, Result, StoredIndex, StoredRaw, VecIterator, VecIteratorExtended};
+use crate::{RawVec, Result, StoredIndex, StoredRaw, VecIterator, TypedVecIterator};
 
 mod clean;
 mod dirty;
@@ -104,7 +104,7 @@ where
     }
 }
 
-impl<I, T> VecIteratorExtended for RawVecIterator<'_, I, T>
+impl<I, T> TypedVecIterator for RawVecIterator<'_, I, T>
 where
     I: StoredIndex,
     T: StoredRaw,

@@ -6,9 +6,8 @@ use std::{
 use rawdb::{Database, Reader, Region};
 
 use crate::{
-    AnyCollectableVec, AnyIterableVec, AnyStoredVec, AnyVec, BoxedVecIterator, CollectableVec,
-    GenericStoredVec, Header, Result, StoredCompressed, StoredIndex, Version,
-    variants::ImportOptions,
+    AnyStoredVec, AnyVec, BoxedVecIterator, GenericStoredVec, Header, IterableVec, Result,
+    StoredCompressed, StoredIndex, TypedVec, Version, variants::ImportOptions,
 };
 
 use super::{CompressedVec, RawVec};
@@ -333,7 +332,7 @@ where
     }
 }
 
-impl<I, T> AnyIterableVec<I, T> for StoredVec<I, T>
+impl<I, T> IterableVec<I, T> for StoredVec<I, T>
 where
     I: StoredIndex,
     T: StoredCompressed,
@@ -343,16 +342,11 @@ where
     }
 }
 
-impl<I, T> AnyCollectableVec for StoredVec<I, T>
+impl<I, T> TypedVec for StoredVec<I, T>
 where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Vec<u8> {
-        CollectableVec::collect_range_json_bytes(self, from, to)
-    }
-
-    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Vec<String> {
-        CollectableVec::collect_range_string(self, from, to)
-    }
+    type I = I;
+    type T = T;
 }
