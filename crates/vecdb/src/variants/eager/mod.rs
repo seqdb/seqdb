@@ -7,7 +7,6 @@ use std::{
     path::PathBuf,
 };
 
-use allocative::Allocative;
 use rawdb::{Database, Reader, Region};
 
 use crate::{
@@ -22,7 +21,7 @@ use crate::{
 /// Wraps a StoredVec and provides various computation methods (transform, arithmetic operations,
 /// moving averages, etc.) to eagerly compute and persist derived data. Results are stored on disk
 /// and incrementally updated when source data changes.
-#[derive(Debug, Clone, Allocative)]
+#[derive(Debug, Clone)]
 pub struct EagerVec<I, T>(StoredVec<I, T>);
 
 impl<I, T> EagerVec<I, T>

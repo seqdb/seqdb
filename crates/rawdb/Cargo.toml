@@ -13,6 +13,7 @@ build = "build.rs"
 
 [dependencies]
 libc = "0.2.177"
+log = { workspace = true }
 memmap2 = "0.9.9"
 parking_lot = { workspace = true }
 rayon = { workspace = true }

@@ -15,7 +15,6 @@ build = "build.rs"
 derive = ["vecdb_derive"]
 
 [dependencies]
-allocative = { version = "0.3.4", features = ["parking_lot"] }
 ctrlc = { version = "3.5.1", features = ["termination"] }
 log = { workspace = true }
 parking_lot = { workspace = true }
@@ -23,14 +22,14 @@ pco = "0.4.7"
 rawdb = { workspace = true }
 serde = "1.0.228"
 serde_derive = "1.0.228"
-sonic-rs = "0.5.5"
+sonic-rs = "0.5.6"
 vecdb_derive = { workspace = true, optional = true }
 zerocopy = { workspace = true }
 
 [dev-dependencies]
 sha2 = "0.10"
 tempfile = { workspace = true }
-walkdir = "2.4"
+walkdir = "2.5"
 
 [package.metadata.docs.rs]
 all-features = true

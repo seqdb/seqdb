@@ -9,7 +9,6 @@ use std::{
     },
 };
 
-use allocative::Allocative;
 use log::info;
 use rawdb::{Database, Reader, Region};
 use zerocopy::{FromBytes, IntoBytes};
@@ -36,9 +35,8 @@ const VERSION: Version = Version::ONE;
 /// This is the most basic storage format, writing values directly to disk
 /// with minimal overhead. Ideal for random access patterns and data that
 /// doesn't compress well.
-#[derive(Debug, Allocative)]
+#[derive(Debug)]
 pub struct RawVec<I, T> {
-    #[allocative(skip)]
     region: Region,
 
     header: Header,

@@ -3,7 +3,6 @@ use std::{
     path::PathBuf,
 };
 
-use allocative::Allocative;
 use rawdb::{Database, Reader, Region};
 
 use crate::{
@@ -24,7 +23,7 @@ pub use iterator::*;
 ///
 /// This allows runtime selection between RawVec and CompressedVec storage formats
 /// based on the data characteristics and access patterns.
-#[derive(Debug, Clone, Allocative)]
+#[derive(Debug, Clone)]
 pub enum StoredVec<I, T> {
     Raw(RawVec<I, T>),
     Compressed(CompressedVec<I, T>),

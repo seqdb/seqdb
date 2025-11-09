@@ -5,7 +5,6 @@ use std::{
     sync::Arc,
 };
 
-use allocative::Allocative;
 use log::info;
 use parking_lot::RwLock;
 use rawdb::{Database, Reader, Region};
@@ -35,7 +34,7 @@ const VERSION: Version = Version::TWO;
 /// Values are compressed in pages for better space efficiency. Best for sequential
 /// access patterns of numerical data. Random access is possible but less efficient
 /// than RawVec - prefer the latter for random access workloads.
-#[derive(Debug, Allocative)]
+#[derive(Debug)]
 pub struct CompressedVec<I, T> {
     inner: RawVec<I, T>,
     pages: Arc<RwLock<Pages>>,

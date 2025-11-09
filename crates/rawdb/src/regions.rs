@@ -23,23 +23,21 @@ pub struct Regions {
 }
 
 impl Regions {
-    pub fn open(path: &Path) -> Result<Self> {
-        let path = path.join("regions");
-
-        fs::create_dir_all(&path)?;
+    pub fn open(parent: &Path) -> Result<Self> {
+        fs::create_dir_all(parent)?;
 
         let file = OpenOptions::new()
             .read(true)
             .create(true)
             .write(true)
             .truncate(false)
-            .open(path.join("index_to_region"))?;
+            .open(parent.join("regions"))?;
         file.try_lock()?;
 
         let file_len = file.metadata()?.len();
 
         // Ensure directory entries are durable
-        File::open(&path)?.sync_data()?;
+        File::open(parent)?.sync_data()?;
 
         Ok(Self {
             id_to_index: HashMap::new(),

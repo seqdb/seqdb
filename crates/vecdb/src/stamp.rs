@@ -1,4 +1,3 @@
-use allocative::Allocative;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 /// Marker for tracking when data was last modified.
@@ -17,7 +16,6 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
     IntoBytes,
     Immutable,
     KnownLayout,
-    Allocative,
 )]
 pub struct Stamp(u64);
 

@@ -14,6 +14,7 @@ use std::{
 };
 
 use libc::off_t;
+use log::debug;
 use memmap2::{MmapMut, MmapOptions};
 use parking_lot::{RwLock, RwLockReadGuard};
 
@@ -66,11 +67,15 @@ impl Database {
             .write(true)
             .truncate(false)
             .open(Self::data_path_(path))?;
+        debug!("File opened successfully.");
+
         file.try_lock()?;
+        debug!("File locked successfully.");
 
         let file_len = file.metadata()?.len();
         if file_len < min_len {
             file.set_len(min_len)?;
+            debug!("Extended successfully.");
             file.sync_all()?;
         }
 

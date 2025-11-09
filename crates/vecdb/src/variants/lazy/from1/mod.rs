@@ -1,5 +1,3 @@
-use allocative::Allocative;
-
 use crate::{
     AnyBoxedIterableVec, AnyCollectableVec, AnyIterableVec, AnyVec, BoxedVecIterator,
     CollectableVec, StoredIndex, StoredRaw, VecIteratorExtended, Version,
@@ -16,16 +14,14 @@ pub type ComputeFrom1<I, T, S1I, S1T> =
 ///
 /// Values are computed on-the-fly during iteration using a provided function.
 /// Nothing is stored on disk - all values are recomputed each time they're accessed.
-#[derive(Clone, Allocative)]
+#[derive(Clone)]
 pub struct LazyVecFrom1<I, T, S1I, S1T>
 where
     S1T: Clone,
 {
     name: String,
     version: Version,
-    #[allocative(skip)]
     source: AnyBoxedIterableVec<S1I, S1T>,
-    #[allocative(skip)]
     compute: ComputeFrom1<I, T, S1I, S1T>,
 }
 

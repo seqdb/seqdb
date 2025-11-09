@@ -6,7 +6,6 @@ use std::{
     path::Path,
 };
 
-use allocative::Allocative;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 use crate::{Error, Result};
@@ -17,7 +16,6 @@ use crate::{Error, Result};
 /// in computation logic or source data versions. Supports validation
 /// against persisted versions to ensure compatibility.
 #[derive(
-    Allocative,
     Default,
     Debug,
     Clone,

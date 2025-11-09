@@ -1,4 +1,3 @@
-use allocative::Allocative;
 use rawdb::{Database, Region};
 use zerocopy::{FromBytes, IntoBytes};
 
@@ -6,9 +5,8 @@ use crate::Result;
 
 use super::Page;
 
-#[derive(Debug, Clone, Allocative)]
+#[derive(Debug, Clone)]
 pub struct Pages {
-    #[allocative(skip)]
     region: Region,
     vec: Vec<Page>,
     change_at: Option<usize>,
