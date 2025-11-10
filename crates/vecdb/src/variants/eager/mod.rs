@@ -1507,7 +1507,7 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    fn boxed_iter(&self) -> BoxedVecIterator<'_, I, T>
+    fn iter(&self) -> BoxedVecIterator<'_, I, T>
     where
         I: StoredIndex,
         T: StoredRaw,

@@ -462,7 +462,7 @@ where
     I: StoredIndex,
     T: StoredCompressed,
 {
-    fn boxed_iter(&self) -> BoxedVecIterator<'_, I, T> {
+    fn iter(&self) -> BoxedVecIterator<'_, I, T> {
         Box::new(self.into_iter())
     }
 }

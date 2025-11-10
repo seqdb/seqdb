@@ -60,42 +60,16 @@ where
     }
 }
 
-impl TransparentStoredCompressed<u16> for u16 {}
-impl StoredCompressed for u16 {
-    type NumberType = u16;
+macro_rules! impl_stored_compressed {
+    ($($t:ty),*) => {
+        $(
+            impl
+TransparentStoredCompressed<$t> for $t {}
+            impl StoredCompressed for $t {
+                type NumberType = $t;
+            }
+        )*
+    };
 }
 
-impl TransparentStoredCompressed<u32> for u32 {}
-impl StoredCompressed for u32 {
-    type NumberType = u32;
-}
-
-impl TransparentStoredCompressed<u64> for u64 {}
-impl StoredCompressed for u64 {
-    type NumberType = u64;
-}
-
-impl TransparentStoredCompressed<i16> for i16 {}
-impl StoredCompressed for i16 {
-    type NumberType = i16;
-}
-
-impl TransparentStoredCompressed<i32> for i32 {}
-impl StoredCompressed for i32 {
-    type NumberType = i32;
-}
-
-impl TransparentStoredCompressed<i64> for i64 {}
-impl StoredCompressed for i64 {
-    type NumberType = i64;
-}
-
-impl TransparentStoredCompressed<f32> for f32 {}
-impl StoredCompressed for f32 {
-    type NumberType = f32;
-}
-
-impl TransparentStoredCompressed<f64> for f64 {}
-impl StoredCompressed for f64 {
-    type NumberType = f64;
-}
+impl_stored_compressed!(u16, u32, u64, i16, i32, i64, f32, f64);

@@ -36,9 +36,6 @@ impl Regions {
 
         let file_len = file.metadata()?.len();
 
-        // Ensure directory entries are durable
-        File::open(parent)?.sync_data()?;
-
         Ok(Self {
             id_to_index: HashMap::new(),
             index_to_region: vec![],
@@ -48,6 +45,8 @@ impl Regions {
     }
 
     pub fn fill_index_to_region(&mut self, db: &Database) -> Result<()> {
+        assert_eq!(self.file_len % SIZE_OF_REGION_METADATA as u64, 0);
+
         let num_slots = (self.file_len / SIZE_OF_REGION_METADATA as u64) as usize;
 
         self.index_to_region

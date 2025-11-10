@@ -3,10 +3,12 @@ use std::iter::FusedIterator;
 mod boxed;
 mod iterable;
 mod typed;
+mod writer;
 
 pub use boxed::*;
 pub use iterable::*;
 pub use typed::*;
+pub use writer::*;
 
 /// Base trait for vector iterators with positioning capabilities.
 pub trait VecIterator: ExactSizeIterator + FusedIterator {

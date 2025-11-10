@@ -67,20 +67,21 @@ impl Database {
             .write(true)
             .truncate(false)
             .open(Self::data_path_(path))?;
-        debug!("File opened successfully.");
+        debug!("File opened.");
 
         file.try_lock()?;
-        debug!("File locked successfully.");
+        debug!("File locked.");
 
         let file_len = file.metadata()?.len();
         if file_len < min_len {
             file.set_len(min_len)?;
-            debug!("Extended successfully.");
+            debug!("File extended.");
             file.sync_all()?;
         }
 
         let regions = Regions::open(path)?;
         let mmap = Self::create_mmap(&file)?;
+        debug!("Mmap created.");
 
         let db = Self(Arc::new(DatabaseInner {
             path: path.to_owned(),
@@ -91,10 +92,9 @@ impl Database {
         }));
 
         db.regions.write().fill_index_to_region(&db)?;
+        debug!("Filled regions.");
         *db.layout.write() = Layout::from(&*db.regions.read());
-
-        // Ensure directory entries are durable
-        File::open(path)?.sync_data()?;
+        debug!("Layout created.");
 
         Ok(db)
     }

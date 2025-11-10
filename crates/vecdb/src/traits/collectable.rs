@@ -81,7 +81,6 @@ where
 /// Type-erased trait for collectable vectors.
 pub trait AnyCollectableVec: AnyVec {
     fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Vec<u8>;
-    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Vec<String>;
 
     fn iter_range_strings(
         &self,
@@ -110,10 +109,6 @@ where
 {
     fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Vec<u8> {
         <Self as CollectableVec<V::I, V::T>>::collect_range_json_bytes(self, from, to)
-    }
-
-    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Vec<String> {
-        <Self as CollectableVec<V::I, V::T>>::collect_range_string(self, from, to)
     }
 
     fn iter_range_strings(

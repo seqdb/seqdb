@@ -144,7 +144,7 @@ where
     S2I: StoredIndex,
     S2T: StoredRaw,
 {
-    fn boxed_iter(&self) -> BoxedVecIterator<'_, I, T> {
+    fn iter(&self) -> BoxedVecIterator<'_, I, T> {
         Box::new(self.into_iter())
     }
 }

@@ -11,6 +11,7 @@ pub type Result<T, E = Error> = result::Result<T, E>;
 #[derive(Debug)]
 pub enum Error {
     IO(io::Error),
+    Format(fmt::Error),
     TryLockError(fs::TryLockError),
     ZeroCopyError,
     SystemTimeError(time::SystemTimeError),
@@ -39,6 +40,12 @@ impl From<time::SystemTimeError> for Error {
 impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self {
         Self::IO(value)
+    }
+}
+
+impl From<fmt::Error> for Error {
+    fn from(value: fmt::Error) -> Self {
+        Self::Format(value)
     }
 }
 
@@ -82,6 +89,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::IO(error) => Display::fmt(&error, f),
+            Error::Format(error) => Display::fmt(&error, f),
             Error::Sonic(error) => Display::fmt(&error, f),
             Error::RawDB(error) => Display::fmt(&error, f),
             Error::TryLockError(_) => write!(

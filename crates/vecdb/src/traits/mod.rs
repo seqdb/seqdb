@@ -9,6 +9,7 @@ mod printable;
 mod raw;
 mod stored;
 mod typed;
+mod writable;
 
 pub use any::*;
 pub use checked_sub::*;
@@ -21,3 +22,4 @@ pub use printable::*;
 pub use raw::*;
 pub use stored::*;
 pub use typed::*;
+pub use writable::*;
