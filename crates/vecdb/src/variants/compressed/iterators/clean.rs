@@ -4,8 +4,8 @@ use parking_lot::RwLockReadGuard;
 use rawdb::Reader;
 
 use crate::{
-    AnyStoredVec, BUFFER_SIZE, CompressedVec, GenericStoredVec, Result, StoredCompressed,
-    StoredIndex, TypedVecIterator, VecIterator, likely, unlikely,
+    AnyStoredVec, BUFFER_SIZE, Compressable, CompressedVec, GenericStoredVec, Result,
+    TypedVecIterator, VecIndex, VecIterator, likely, unlikely,
     variants::MAX_UNCOMPRESSED_PAGE_SIZE,
 };
 
@@ -31,8 +31,8 @@ pub struct CleanCompressedVecIterator<'a, I, T> {
 
 impl<'a, I, T> CleanCompressedVecIterator<'a, I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     const SIZE_OF_T: usize = size_of::<T>();
     const PER_PAGE: usize = MAX_UNCOMPRESSED_PAGE_SIZE / Self::SIZE_OF_T;
@@ -185,8 +185,8 @@ where
 
 impl<I, T> Iterator for CleanCompressedVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     type Item = T;
 
@@ -253,8 +253,8 @@ where
 
 impl<I, T> VecIterator for CleanCompressedVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     fn set_position_to(&mut self, i: usize) {
         let new_index = i.min(self.stored_len).min(self.end_index);
@@ -283,8 +283,8 @@ where
 
 impl<I, T> TypedVecIterator for CleanCompressedVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     type I = I;
     type T = T;
@@ -292,8 +292,8 @@ where
 
 impl<I, T> ExactSizeIterator for CleanCompressedVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     #[inline(always)]
     fn len(&self) -> usize {
@@ -303,8 +303,8 @@ where
 
 impl<I, T> FusedIterator for CleanCompressedVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
 }
 

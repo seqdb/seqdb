@@ -1,7 +1,7 @@
 use std::iter::FusedIterator;
 
 use crate::{
-    ComputedVec, StoredCompressed, StoredIndex, StoredRaw, VecIterator, TypedVecIterator,
+    Compressable, ComputedVec, TypedVecIterator, VecIndex, VecIterator, VecValue,
     variants::{
         LazyVecFrom1Iterator, LazyVecFrom2Iterator, LazyVecFrom3Iterator, StoredVecIterator,
     },
@@ -22,14 +22,14 @@ where
 impl<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T>
     ComputedVecIterator<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
-    S3I: StoredIndex,
-    S3T: StoredRaw,
+    I: VecIndex,
+    T: Compressable,
+    S1I: VecIndex,
+    S1T: VecValue,
+    S2I: VecIndex,
+    S2T: VecValue,
+    S3I: VecIndex,
+    S3T: VecValue,
 {
     pub fn new(computed: &'a ComputedVec<I, T, S1I, S1T, S2I, S2T, S3I, S3T>) -> Self {
         match computed {
@@ -44,14 +44,14 @@ where
 impl<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T> Iterator
     for ComputedVecIterator<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
-    S3I: StoredIndex,
-    S3T: StoredRaw,
+    I: VecIndex,
+    T: Compressable,
+    S1I: VecIndex,
+    S1T: VecValue,
+    S2I: VecIndex,
+    S2T: VecValue,
+    S3I: VecIndex,
+    S3T: VecValue,
 {
     type Item = T;
 
@@ -109,14 +109,14 @@ where
 impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> VecIterator
     for ComputedVecIterator<'_, I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
-    S3I: StoredIndex,
-    S3T: StoredRaw,
+    I: VecIndex,
+    T: Compressable,
+    S1I: VecIndex,
+    S1T: VecValue,
+    S2I: VecIndex,
+    S2T: VecValue,
+    S3I: VecIndex,
+    S3T: VecValue,
 {
     fn set_position_to(&mut self, i: usize) {
         match self {
@@ -140,14 +140,14 @@ where
 impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> TypedVecIterator
     for ComputedVecIterator<'_, I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
-    S3I: StoredIndex,
-    S3T: StoredRaw,
+    I: VecIndex,
+    T: Compressable,
+    S1I: VecIndex,
+    S1T: VecValue,
+    S2I: VecIndex,
+    S2T: VecValue,
+    S3I: VecIndex,
+    S3T: VecValue,
 {
     type I = I;
     type T = T;
@@ -156,14 +156,14 @@ where
 impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> ExactSizeIterator
     for ComputedVecIterator<'_, I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
-    S3I: StoredIndex,
-    S3T: StoredRaw,
+    I: VecIndex,
+    T: Compressable,
+    S1I: VecIndex,
+    S1T: VecValue,
+    S2I: VecIndex,
+    S2T: VecValue,
+    S3I: VecIndex,
+    S3T: VecValue,
 {
     #[inline(always)]
     fn len(&self) -> usize {
@@ -179,13 +179,13 @@ where
 impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> FusedIterator
     for ComputedVecIterator<'_, I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
-    S3I: StoredIndex,
-    S3T: StoredRaw,
+    I: VecIndex,
+    T: Compressable,
+    S1I: VecIndex,
+    S1T: VecValue,
+    S2I: VecIndex,
+    S2T: VecValue,
+    S3I: VecIndex,
+    S3T: VecValue,
 {
 }

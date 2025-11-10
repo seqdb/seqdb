@@ -1,6 +1,6 @@
-use crate::{AnyVec, StoredIndex, StoredRaw};
+use crate::{AnyVec, VecIndex, VecValue};
 
 pub trait TypedVec: AnyVec {
-    type I: StoredIndex;
-    type T: StoredRaw;
+    type I: VecIndex;
+    type T: VecValue;
 }

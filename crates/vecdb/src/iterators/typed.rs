@@ -1,9 +1,9 @@
-use crate::{PrintableIndex, StoredIndex, StoredRaw, VecIterator};
+use crate::{PrintableIndex, VecIndex, VecIterator, VecValue};
 
 /// Extended vector iterator with type-safe index operations.
 pub trait TypedVecIterator: VecIterator<Item = Self::T> {
-    type I: StoredIndex;
-    type T: StoredRaw;
+    type I: VecIndex;
+    type T: VecValue;
 
     /// Sets the current position using the typed index.
     #[inline]

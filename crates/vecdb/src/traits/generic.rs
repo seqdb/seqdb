@@ -15,12 +15,12 @@ const ONE_KIB: usize = 1024;
 const ONE_MIB: usize = ONE_KIB * ONE_KIB;
 const MAX_CACHE_SIZE: usize = 256 * ONE_MIB;
 
-use super::{StoredIndex, StoredRaw};
+use super::{VecIndex, VecValue};
 
 pub trait GenericStoredVec<I, T>: AnyStoredVec + Send + Sync
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     const SIZE_OF_T: usize = size_of::<T>();
 

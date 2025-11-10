@@ -9,7 +9,7 @@
 
 pub use rawdb::{Database, Error as RawDBError, PAGE_SIZE, Reader};
 #[cfg(feature = "derive")]
-pub use vecdb_derive::StoredCompressed;
+pub use vecdb_derive::Compressable;
 
 mod error;
 mod exit;

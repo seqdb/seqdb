@@ -4,7 +4,7 @@ use zerocopy::{Immutable, IntoBytes, KnownLayout, TryFromBytes};
 
 use crate::PrintableIndex;
 
-pub trait StoredIndex
+pub trait VecIndex
 where
     Self: Debug
         + Default
@@ -37,7 +37,7 @@ where
     }
 }
 
-impl<I> StoredIndex for I where
+impl<I> VecIndex for I where
     I: Debug
         + Default
         + Copy

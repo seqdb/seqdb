@@ -10,9 +10,9 @@ use parking_lot::RwLock;
 use rawdb::{Database, Reader, Region};
 
 use crate::{
-    AnyStoredVec, AnyVec, AsInnerSlice, BoxedVecIterator, Error, Format, FromInnerSlice,
-    GenericStoredVec, HEADER_OFFSET, Header, IterableVec, RawVec, Result, StoredCompressed,
-    StoredIndex, TypedVec, Version, likely, variants::ImportOptions,
+    AnyStoredVec, AnyVec, AsInnerSlice, BoxedVecIterator, Compressable, Error, Format,
+    FromInnerSlice, GenericStoredVec, HEADER_OFFSET, Header, IterableVec, RawVec, Result, TypedVec,
+    VecIndex, Version, likely, variants::ImportOptions,
 };
 
 mod iterators;
@@ -42,8 +42,8 @@ pub struct CompressedVec<I, T> {
 
 impl<I, T> CompressedVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     const PER_PAGE: usize = MAX_UNCOMPRESSED_PAGE_SIZE / Self::SIZE_OF_T;
 
@@ -197,8 +197,8 @@ impl<I, T> Clone for CompressedVec<I, T> {
 
 impl<I, T> AnyVec for CompressedVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     #[inline]
     fn version(&self) -> Version {
@@ -235,8 +235,8 @@ where
 
 impl<I, T> AnyStoredVec for CompressedVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     #[inline]
     fn db_path(&self) -> PathBuf {
@@ -361,8 +361,8 @@ where
 
 impl<I, T> GenericStoredVec<I, T> for CompressedVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     #[inline]
     fn read_at(&self, index: usize, reader: &Reader) -> Result<T> {
@@ -446,8 +446,8 @@ where
 
 impl<'a, I, T> IntoIterator for &'a CompressedVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     type Item = T;
     type IntoIter = CompressedVecIterator<'a, I, T>;
@@ -459,8 +459,8 @@ where
 
 impl<I, T> IterableVec<I, T> for CompressedVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     fn iter(&self) -> BoxedVecIterator<'_, I, T> {
         Box::new(self.into_iter())
@@ -469,8 +469,8 @@ where
 
 impl<I, T> TypedVec for CompressedVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     type I = I;
     type T = T;

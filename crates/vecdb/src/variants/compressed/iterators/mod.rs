@@ -1,8 +1,6 @@
 use std::iter::FusedIterator;
 
-use crate::{
-    CompressedVec, Result, StoredCompressed, StoredIndex, VecIterator, TypedVecIterator,
-};
+use crate::{Compressable, CompressedVec, Result, TypedVecIterator, VecIndex, VecIterator};
 
 mod clean;
 mod dirty;
@@ -17,8 +15,8 @@ pub enum CompressedVecIterator<'a, I, T> {
 
 impl<'a, I, T> CompressedVecIterator<'a, I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     #[inline]
     pub fn new(vec: &'a CompressedVec<I, T>) -> Result<Self> {
@@ -32,8 +30,8 @@ where
 
 impl<I, T> Iterator for CompressedVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     type Item = T;
 
@@ -80,8 +78,8 @@ where
 
 impl<I, T> VecIterator for CompressedVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     fn set_position_to(&mut self, i: usize) {
         match self {
@@ -100,8 +98,8 @@ where
 
 impl<I, T> TypedVecIterator for CompressedVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     type I = I;
     type T = T;
@@ -109,8 +107,8 @@ where
 
 impl<I, T> ExactSizeIterator for CompressedVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     #[inline(always)]
     fn len(&self) -> usize {
@@ -123,7 +121,7 @@ where
 
 impl<I, T> FusedIterator for CompressedVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
 }

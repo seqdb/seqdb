@@ -1,13 +1,13 @@
 use crate::{IterableVec, TypedVec, i64_to_usize};
 
-use super::{AnyVec, StoredIndex, StoredRaw};
+use super::{AnyVec, VecIndex, VecValue};
 
 /// Trait for vectors that can be collected into standard Rust collections with range support.
 pub trait CollectableVec<I, T>: IterableVec<I, T>
 where
     Self: Clone,
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     /// Returns an iterator over the specified range.
     fn iter_range(&self, from: Option<usize>, to: Option<usize>) -> impl Iterator<Item = T> {
@@ -52,29 +52,35 @@ where
         bytes
     }
 
-    /// Collects values in the specified range as strings.
-    #[inline]
-    fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Vec<String> {
-        self.iter_range(from, to).map(|v| v.to_string()).collect()
-    }
+    // /// Collects values in the specified range as strings.
+    // #[inline]
+    // fn collect_range_string(&self, from: Option<usize>, to: Option<usize>) -> Vec<String>
+    // where
+    //     T: Formattable,
+    // {
+    //     self.iter_range(from, to).map(|v| v.to()).collect()
+    // }
 
-    #[inline]
-    fn iter_range_strings(
-        &self,
-        from: Option<i64>,
-        to: Option<i64>,
-    ) -> Box<dyn Iterator<Item = String> + '_> {
-        let from_usize = from.map(|i| self.i64_to_usize(i));
-        let to_usize = to.map(|i| self.i64_to_usize(i));
-        Box::new(self.iter_range(from_usize, to_usize).map(|v| v.to_string()))
-    }
+    // #[inline]
+    // fn iter_range_strings(
+    //     &self,
+    //     from: Option<i64>,
+    //     to: Option<i64>,
+    // ) -> Box<dyn Iterator<Item = String> + '_>
+    // where
+    //     T: Formattable,
+    // {
+    //     let from_usize = from.map(|i| self.i64_to_usize(i));
+    //     let to_usize = to.map(|i| self.i64_to_usize(i));
+    //     Box::new(self.iter_range(from_usize, to_usize).map(|v| v.to_string()))
+    // }
 }
 
 impl<I, T, V> CollectableVec<I, T> for V
 where
     V: IterableVec<I, T> + Clone,
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
 }
 
@@ -82,11 +88,11 @@ where
 pub trait AnyCollectableVec: AnyVec {
     fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Vec<u8>;
 
-    fn iter_range_strings(
-        &self,
-        from: Option<i64>,
-        to: Option<i64>,
-    ) -> Box<dyn Iterator<Item = String> + '_>;
+    // fn iter_range_strings(
+    //     &self,
+    //     from: Option<i64>,
+    //     to: Option<i64>,
+    // ) -> Box<dyn Iterator<Item = String> + '_>;
 
     /// Returns the number of items in the specified range.
     fn range_count(&self, from: Option<i64>, to: Option<i64>) -> usize {
@@ -111,11 +117,11 @@ where
         <Self as CollectableVec<V::I, V::T>>::collect_range_json_bytes(self, from, to)
     }
 
-    fn iter_range_strings(
-        &self,
-        from: Option<i64>,
-        to: Option<i64>,
-    ) -> Box<dyn Iterator<Item = String> + '_> {
-        <Self as CollectableVec<V::I, V::T>>::iter_range_strings(self, from, to)
-    }
+    // fn iter_range_strings(
+    //     &self,
+    //     from: Option<i64>,
+    //     to: Option<i64>,
+    // ) -> Box<dyn Iterator<Item = String> + '_> {
+    //     <Self as CollectableVec<V::I, V::T>>::iter_range_strings(self, from, to)
+    // }
 }

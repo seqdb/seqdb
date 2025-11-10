@@ -13,9 +13,9 @@ cargo add vecdb --features derive
 ## Usage
 
 ```rust
-use vecdb_derive::StoredCompressed;
+use vecdb_derive::Compressable;
 
-#[derive(StoredCompressed)]
+#[derive(Compressable)]
 struct Timestamp(u64);
 
 // Now works with CompressedVec
@@ -23,10 +23,10 @@ let mut vec: CompressedVec<usize, Timestamp> = ...;
 vec.push(Timestamp(12345));
 ```
 
-## `#[derive(StoredCompressed)]`
+## `#[derive(Compressable)]`
 
-Implements `StoredCompressed` for single-field tuple structs. The wrapper inherits compression characteristics from the inner type.
+Implements `Compressable` for single-field tuple structs. The wrapper inherits compression characteristics from the inner type.
 
 **Requirements:**
 - Must be a tuple struct with exactly one field
-- Inner type must implement `StoredCompressed`
+- Inner type must implement `Compressable`

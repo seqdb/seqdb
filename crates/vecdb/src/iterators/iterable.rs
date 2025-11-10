@@ -1,12 +1,12 @@
-use crate::{AnyStoredVec, AnyVec, BoxedVecIterator, StoredIndex, StoredRaw};
+use crate::{AnyStoredVec, AnyVec, BoxedVecIterator, VecIndex, VecValue};
 
 /// Trait for vectors that can be iterated.
 pub trait IterableVec<I, T>: AnyVec {
     #[allow(clippy::wrong_self_convention)]
     fn iter(&self) -> BoxedVecIterator<'_, I, T>
     where
-        I: StoredIndex,
-        T: StoredRaw;
+        I: VecIndex,
+        T: VecValue;
 }
 
 /// Trait combining stored and iterable vector capabilities.

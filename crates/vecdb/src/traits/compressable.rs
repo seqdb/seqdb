@@ -1,12 +1,12 @@
 use pco::data_types::Number;
 
-use super::StoredRaw;
+use super::VecValue;
 
-pub trait TransparentStoredCompressed<T> {}
+pub trait TransparentCompressable<T> {}
 
-pub trait StoredCompressed
+pub trait Compressable
 where
-    Self: StoredRaw + Copy + 'static + TransparentStoredCompressed<Self::NumberType>,
+    Self: VecValue + Copy + 'static + TransparentCompressable<Self::NumberType>,
 {
     type NumberType: pco::data_types::Number;
 }
@@ -20,7 +20,7 @@ where
 
 impl<T> AsInnerSlice<T::NumberType> for [T]
 where
-    T: StoredCompressed,
+    T: Compressable,
 {
     fn as_inner_slice(&self) -> &[T::NumberType] {
         assert_eq!(
@@ -43,7 +43,7 @@ pub trait FromInnerSlice<T> {
 
 impl<T> FromInnerSlice<T::NumberType> for T
 where
-    T: StoredCompressed,
+    T: Compressable,
 {
     fn from_inner_slice(vec: Vec<T::NumberType>) -> Vec<T> {
         assert_eq!(
@@ -64,8 +64,8 @@ macro_rules! impl_stored_compressed {
     ($($t:ty),*) => {
         $(
             impl
-TransparentStoredCompressed<$t> for $t {}
-            impl StoredCompressed for $t {
+TransparentCompressable<$t> for $t {}
+impl Compressable for $t {
                 type NumberType = $t;
             }
         )*

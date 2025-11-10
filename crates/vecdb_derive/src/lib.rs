@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{Data, DataStruct, DeriveInput, Fields, parse_macro_input};
 
-#[proc_macro_derive(StoredCompressed)]
+#[proc_macro_derive(Compressable)]
 pub fn derive_stored_compressed(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let struct_name = &input.ident;
@@ -17,7 +17,7 @@ pub fn derive_stored_compressed(input: TokenStream) -> TokenStream {
         _ => {
             return syn::Error::new_spanned(
                 &input.ident,
-                "StoredCompressed can only be derived for single-field tuple structs",
+                "Compressable can only be derived for single-field tuple structs",
             )
             .to_compile_error()
             .into();
@@ -29,24 +29,24 @@ pub fn derive_stored_compressed(input: TokenStream) -> TokenStream {
 
     let expanded = if has_generics {
         let where_clause = if where_clause.is_some() {
-            quote! { #where_clause #inner_type: StoredCompressed, }
+            quote! { #where_clause #inner_type: Compressable, }
         } else {
-            quote! { where #inner_type: StoredCompressed, }
+            quote! { where #inner_type: Compressable, }
         };
 
         quote! {
-            impl #impl_generics ::vecdb::TransparentStoredCompressed<<#inner_type as StoredCompressed>::NumberType> for #struct_name #ty_generics #where_clause {}
+            impl #impl_generics ::vecdb::TransparentCompressable<<#inner_type as Compressable>::NumberType> for #struct_name #ty_generics #where_clause {}
 
-            impl #impl_generics StoredCompressed for #struct_name #ty_generics #where_clause {
-                type NumberType = <#inner_type as StoredCompressed>::NumberType;
+            impl #impl_generics Compressable for #struct_name #ty_generics #where_clause {
+                type NumberType = <#inner_type as Compressable>::NumberType;
             }
         }
     } else {
         quote! {
-            impl ::vecdb::TransparentStoredCompressed<<#inner_type as StoredCompressed>::NumberType> for #struct_name {}
+            impl ::vecdb::TransparentCompressable<<#inner_type as Compressable>::NumberType> for #struct_name {}
 
-            impl StoredCompressed for #struct_name {
-                type NumberType = <#inner_type as StoredCompressed>::NumberType;
+            impl Compressable for #struct_name {
+                type NumberType = <#inner_type as Compressable>::NumberType;
             }
         }
     };

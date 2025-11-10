@@ -8,7 +8,7 @@ use parking_lot::RwLockReadGuard;
 use rawdb::RegionMetadata;
 
 use crate::{
-    AnyStoredVec, RawVec, Result, StoredIndex, StoredRaw, VecIterator, TypedVecIterator, likely,
+    AnyStoredVec, RawVec, Result, TypedVecIterator, VecIndex, VecIterator, VecValue, likely,
     unlikely, variants::HEADER_OFFSET,
 };
 
@@ -27,8 +27,8 @@ pub struct CleanRawVecIterator<'a, I, T> {
 
 impl<'a, I, T> CleanRawVecIterator<'a, I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     const SIZE_OF_T: usize = size_of::<T>();
     const NORMAL_BUFFER_SIZE: usize = RawVec::<I, T>::aligned_buffer_size();
@@ -162,8 +162,8 @@ where
 
 impl<I, T> Iterator for CleanRawVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     type Item = T;
 
@@ -226,8 +226,8 @@ where
 
 impl<I, T> VecIterator for CleanRawVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     fn set_position_to(&mut self, i: usize) {
         let target_offset = self.start_offset + Self::index_to_bytes(i);
@@ -256,8 +256,8 @@ where
 
 impl<I, T> TypedVecIterator for CleanRawVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     type I = I;
     type T = T;
@@ -265,8 +265,8 @@ where
 
 impl<I, T> ExactSizeIterator for CleanRawVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     #[inline(always)]
     fn len(&self) -> usize {
@@ -276,8 +276,8 @@ where
 
 impl<I, T> FusedIterator for CleanRawVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
 }
 

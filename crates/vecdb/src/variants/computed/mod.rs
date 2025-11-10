@@ -1,6 +1,6 @@
 use crate::{
-    AnyVec, BoxedVecIterator, Exit, Format, IterableBoxedVec, IterableVec, Result,
-    StoredCompressed, StoredIndex, StoredRaw, TypedVec, Version, variants::ImportOptions,
+    AnyVec, BoxedVecIterator, Compressable, Exit, Format, IterableBoxedVec, IterableVec, Result,
+    TypedVec, VecIndex, VecValue, Version, variants::ImportOptions,
 };
 
 use super::{
@@ -66,14 +66,14 @@ where
 
 impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> ComputedVec<I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
-    S3I: StoredIndex,
-    S3T: StoredRaw,
+    I: VecIndex,
+    T: Compressable,
+    S1I: VecIndex,
+    S1T: VecValue,
+    S2I: VecIndex,
+    S2T: VecValue,
+    S3I: VecIndex,
+    S3T: VecValue,
 {
     pub fn forced_import_or_init_from_1(
         db: &Database,
@@ -262,14 +262,14 @@ where
 
 impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> AnyVec for ComputedVec<I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
-    S3I: StoredIndex,
-    S3T: StoredRaw,
+    I: VecIndex,
+    T: Compressable,
+    S1I: VecIndex,
+    S1T: VecValue,
+    S2I: VecIndex,
+    S2T: VecValue,
+    S3I: VecIndex,
+    S3T: VecValue,
 {
     fn version(&self) -> Version {
         match self {
@@ -321,14 +321,14 @@ where
 impl<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T> IntoIterator
     for &'a ComputedVec<I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
-    S3I: StoredIndex,
-    S3T: StoredRaw,
+    I: VecIndex,
+    T: Compressable,
+    S1I: VecIndex,
+    S1T: VecValue,
+    S2I: VecIndex,
+    S2T: VecValue,
+    S3I: VecIndex,
+    S3T: VecValue,
 {
     type Item = T;
     type IntoIter = ComputedVecIterator<'a, I, T, S1I, S1T, S2I, S2T, S3I, S3T>;
@@ -341,14 +341,14 @@ where
 impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> IterableVec<I, T>
     for ComputedVec<I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
-    S3I: StoredIndex,
-    S3T: StoredRaw,
+    I: VecIndex,
+    T: Compressable,
+    S1I: VecIndex,
+    S1T: VecValue,
+    S2I: VecIndex,
+    S2T: VecValue,
+    S3I: VecIndex,
+    S3T: VecValue,
 {
     fn iter(&self) -> BoxedVecIterator<'_, I, T> {
         Box::new(self.into_iter())
@@ -358,14 +358,14 @@ where
 impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> TypedVec
     for ComputedVec<I, T, S1I, S1T, S2I, S2T, S3I, S3T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
-    S3I: StoredIndex,
-    S3T: StoredRaw,
+    I: VecIndex,
+    T: Compressable,
+    S1I: VecIndex,
+    S1T: VecValue,
+    S2I: VecIndex,
+    S2T: VecValue,
+    S3I: VecIndex,
+    S3T: VecValue,
 {
     type I = I;
     type T = T;

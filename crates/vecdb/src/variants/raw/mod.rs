@@ -15,7 +15,7 @@ use zerocopy::{FromBytes, IntoBytes};
 
 use crate::{
     AnyStoredVec, AnyVec, BUFFER_SIZE, BoxedVecIterator, Error, GenericStoredVec, IterableVec,
-    Result, StoredIndex, StoredRaw, TypedVec, Version,
+    Result, TypedVec, VecIndex, VecValue, Version,
 };
 
 use super::Format;
@@ -58,8 +58,8 @@ pub struct RawVec<I, T> {
 
 impl<I, T> RawVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     /// Same as import but will reset the vec under certain errors, so be careful !
     pub fn forced_import(db: &Database, name: &str, version: Version) -> Result<Self> {
@@ -223,8 +223,8 @@ impl<I, T> Clone for RawVec<I, T> {
 
 impl<I, T> AnyVec for RawVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     #[inline]
     fn version(&self) -> Version {
@@ -259,8 +259,8 @@ where
 
 impl<I, T> AnyStoredVec for RawVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     #[inline]
     fn db_path(&self) -> PathBuf {
@@ -432,8 +432,8 @@ where
 
 impl<I, T> GenericStoredVec<I, T> for RawVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     #[inline(always)]
     fn read_at(&self, index: usize, reader: &Reader) -> Result<T> {
@@ -510,8 +510,8 @@ where
 
 impl<'a, I, T> IntoIterator for &'a RawVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     type Item = T;
     type IntoIter = RawVecIterator<'a, I, T>;
@@ -523,8 +523,8 @@ where
 
 impl<I, T> IterableVec<I, T> for RawVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     fn iter(&self) -> BoxedVecIterator<'_, I, T> {
         Box::new(self.into_iter())
@@ -533,8 +533,8 @@ where
 
 impl<I, T> TypedVec for RawVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     type I = I;
     type T = T;

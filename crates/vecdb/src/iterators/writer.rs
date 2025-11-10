@@ -1,11 +1,11 @@
-use std::{fmt::Write, marker::PhantomData};
+use std::marker::PhantomData;
 
-use crate::{Result, StoredRaw};
+use crate::{Error, Formattable, Result, VecValue};
 
 /// A stateful writer that can write one value at a time to a buffer
 pub trait ValueWriter {
     /// Write the next value to the buffer, returns false if no more values
-    fn write_next(&mut self, buf: &mut String) -> Result<bool>;
+    fn write_next(&mut self, buf: &mut String) -> Result<()>;
 }
 
 pub struct VecIteratorWriter<'a, I, T> {
@@ -15,14 +15,14 @@ pub struct VecIteratorWriter<'a, I, T> {
 
 impl<'a, I, T> ValueWriter for VecIteratorWriter<'a, I, T>
 where
-    T: StoredRaw,
+    T: VecValue + Formattable,
 {
-    fn write_next(&mut self, buf: &mut String) -> Result<bool> {
+    fn write_next(&mut self, buf: &mut String) -> Result<()> {
         if let Some(value) = self.iter.next() {
-            write!(buf, "{}", value)?;
-            Ok(true)
+            value.fmt_csv(buf)?;
+            Ok(())
         } else {
-            Ok(false)
+            Err(Error::WrongLength)
         }
     }
 }

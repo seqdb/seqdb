@@ -1,9 +1,9 @@
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 
 use serde::Serialize;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
-pub trait StoredRaw
+pub trait VecValue
 where
     Self: Sized
         + Debug
@@ -12,15 +12,14 @@ where
         + IntoBytes
         + Immutable
         + KnownLayout
+        + Serialize
         + Send
         + Sync
-        + Serialize
-        + Display
         + 'static,
 {
 }
 
-impl<T> StoredRaw for T where
+impl<T> VecValue for T where
     T: Sized
         + Debug
         + Clone
@@ -28,10 +27,9 @@ impl<T> StoredRaw for T where
         + IntoBytes
         + Immutable
         + KnownLayout
+        + Serialize
         + Send
         + Sync
-        + Serialize
-        + Display
         + 'static
 {
 }

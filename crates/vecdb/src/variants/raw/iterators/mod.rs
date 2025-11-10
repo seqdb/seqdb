@@ -1,6 +1,6 @@
 use std::iter::FusedIterator;
 
-use crate::{RawVec, Result, StoredIndex, StoredRaw, VecIterator, TypedVecIterator};
+use crate::{RawVec, Result, TypedVecIterator, VecIndex, VecIterator, VecValue};
 
 mod clean;
 mod dirty;
@@ -15,8 +15,8 @@ pub enum RawVecIterator<'a, I, T> {
 
 impl<'a, I, T> RawVecIterator<'a, I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     #[inline]
     pub fn new(vec: &'a RawVec<I, T>) -> Result<Self> {
@@ -38,8 +38,8 @@ where
 
 impl<I, T> Iterator for RawVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     type Item = T;
 
@@ -86,8 +86,8 @@ where
 
 impl<I, T> VecIterator for RawVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     fn set_position_to(&mut self, i: usize) {
         match self {
@@ -106,8 +106,8 @@ where
 
 impl<I, T> TypedVecIterator for RawVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     type I = I;
     type T = T;
@@ -115,8 +115,8 @@ where
 
 impl<I, T> ExactSizeIterator for RawVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     #[inline(always)]
     fn len(&self) -> usize {
@@ -129,7 +129,7 @@ where
 
 impl<I, T> FusedIterator for RawVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
 }

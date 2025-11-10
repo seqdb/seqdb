@@ -1,8 +1,8 @@
 use std::iter::FusedIterator;
 
 use crate::{
-    AnyStoredVec, GenericStoredVec, RawVec, Result, StoredIndex, StoredRaw, VecIterator,
-    TypedVecIterator, likely, unlikely,
+    AnyStoredVec, GenericStoredVec, RawVec, Result, TypedVecIterator, VecIndex, VecIterator,
+    VecValue, likely, unlikely,
 };
 
 use super::CleanRawVecIterator;
@@ -19,8 +19,8 @@ pub struct DirtyRawVecIterator<'a, I, T> {
 
 impl<'a, I, T> DirtyRawVecIterator<'a, I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     const SIZE_OF_T: usize = size_of::<T>();
 
@@ -78,8 +78,8 @@ where
 
 impl<I, T> Iterator for DirtyRawVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     type Item = T;
 
@@ -181,8 +181,8 @@ where
 
 impl<I, T> VecIterator for DirtyRawVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     fn set_position_to(&mut self, i: usize) {
         self.index = i.min(self.vec_len());
@@ -200,8 +200,8 @@ where
 
 impl<I, T> TypedVecIterator for DirtyRawVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     type I = I;
     type T = T;
@@ -209,8 +209,8 @@ where
 
 impl<I, T> ExactSizeIterator for DirtyRawVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
     #[inline(always)]
     fn len(&self) -> usize {
@@ -220,8 +220,8 @@ where
 
 impl<I, T> FusedIterator for DirtyRawVecIterator<'_, I, T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
 {
 }
 

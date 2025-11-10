@@ -6,8 +6,8 @@ use std::{
 use rawdb::{Database, Reader, Region};
 
 use crate::{
-    AnyStoredVec, AnyVec, BoxedVecIterator, GenericStoredVec, Header, IterableVec, Result,
-    StoredCompressed, StoredIndex, TypedVec, Version, variants::ImportOptions,
+    AnyStoredVec, AnyVec, BoxedVecIterator, Compressable, GenericStoredVec, Header, IterableVec,
+    Result, TypedVec, VecIndex, Version, variants::ImportOptions,
 };
 
 use super::{CompressedVec, RawVec};
@@ -30,8 +30,8 @@ pub enum StoredVec<I, T> {
 
 impl<I, T> StoredVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     pub fn forced_import(
         db: &Database,
@@ -60,8 +60,8 @@ where
 
 impl<I, T> AnyVec for StoredVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     #[inline]
     fn version(&self) -> Version {
@@ -104,8 +104,8 @@ where
 
 impl<I, T> AnyStoredVec for StoredVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     #[inline]
     fn db_path(&self) -> PathBuf {
@@ -180,8 +180,8 @@ where
 
 impl<I, T> GenericStoredVec<I, T> for StoredVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     #[inline]
     fn read_at(&self, index: usize, reader: &Reader) -> Result<T> {
@@ -318,8 +318,8 @@ where
 
 impl<'a, I, T> IntoIterator for &'a StoredVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     type Item = T;
     type IntoIter = StoredVecIterator<'a, I, T>;
@@ -334,8 +334,8 @@ where
 
 impl<I, T> IterableVec<I, T> for StoredVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     fn iter(&self) -> BoxedVecIterator<'_, I, T> {
         Box::new(self.into_iter())
@@ -344,8 +344,8 @@ where
 
 impl<I, T> TypedVec for StoredVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     type I = I;
     type T = T;

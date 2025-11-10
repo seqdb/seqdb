@@ -1,8 +1,6 @@
 use std::iter::FusedIterator;
 
-use crate::{
-    BoxedVecIterator, LazyVecFrom2, StoredIndex, StoredRaw, VecIterator, TypedVecIterator,
-};
+use crate::{BoxedVecIterator, LazyVecFrom2, TypedVecIterator, VecIndex, VecIterator, VecValue};
 
 pub struct LazyVecFrom2Iterator<'a, I, T, S1I, S1T, S2I, S2T>
 where
@@ -20,12 +18,12 @@ where
 
 impl<'a, I, T, S1I, S1T, S2I, S2T> LazyVecFrom2Iterator<'a, I, T, S1I, S1T, S2I, S2T>
 where
-    I: StoredIndex,
-    T: StoredRaw + 'a,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
+    I: VecIndex,
+    T: VecValue + 'a,
+    S1I: VecIndex,
+    S1T: VecValue,
+    S2I: VecIndex,
+    S2T: VecValue,
 {
     #[inline]
     pub fn new(lazy: &'a LazyVecFrom2<I, T, S1I, S1T, S2I, S2T>) -> Self {
@@ -58,12 +56,12 @@ where
 
 impl<'a, I, T, S1I, S1T, S2I, S2T> Iterator for LazyVecFrom2Iterator<'a, I, T, S1I, S1T, S2I, S2T>
 where
-    I: StoredIndex,
-    T: StoredRaw + 'a,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
+    I: VecIndex,
+    T: VecValue + 'a,
+    S1I: VecIndex,
+    S1T: VecValue,
+    S2I: VecIndex,
+    S2T: VecValue,
 {
     type Item = T;
 
@@ -130,12 +128,12 @@ where
 
 impl<I, T, S1I, S1T, S2I, S2T> VecIterator for LazyVecFrom2Iterator<'_, I, T, S1I, S1T, S2I, S2T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
+    S1I: VecIndex,
+    S1T: VecValue,
+    S2I: VecIndex,
+    S2T: VecValue,
 {
     fn set_position_to(&mut self, i: usize) {
         self.index = i.min(self.end_index);
@@ -161,12 +159,12 @@ where
 impl<I, T, S1I, S1T, S2I, S2T> TypedVecIterator
     for LazyVecFrom2Iterator<'_, I, T, S1I, S1T, S2I, S2T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
+    S1I: VecIndex,
+    S1T: VecValue,
+    S2I: VecIndex,
+    S2T: VecValue,
 {
     type I = I;
     type T = T;
@@ -175,12 +173,12 @@ where
 impl<'a, I, T, S1I, S1T, S2I, S2T> ExactSizeIterator
     for LazyVecFrom2Iterator<'a, I, T, S1I, S1T, S2I, S2T>
 where
-    I: StoredIndex,
-    T: StoredRaw + 'a,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
+    I: VecIndex,
+    T: VecValue + 'a,
+    S1I: VecIndex,
+    S1T: VecValue,
+    S2I: VecIndex,
+    S2T: VecValue,
 {
     #[inline(always)]
     fn len(&self) -> usize {
@@ -191,11 +189,11 @@ where
 impl<'a, I, T, S1I, S1T, S2I, S2T> FusedIterator
     for LazyVecFrom2Iterator<'a, I, T, S1I, S1T, S2I, S2T>
 where
-    I: StoredIndex,
-    T: StoredRaw + 'a,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
-    S2I: StoredIndex,
-    S2T: StoredRaw,
+    I: VecIndex,
+    T: VecValue + 'a,
+    S1I: VecIndex,
+    S1T: VecValue,
+    S2I: VecIndex,
+    S2T: VecValue,
 {
 }

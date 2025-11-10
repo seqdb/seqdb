@@ -1,6 +1,6 @@
 use crate::{
-    AnyVec, BoxedVecIterator, IterableBoxedVec, IterableVec, StoredIndex, StoredRaw, TypedVec,
-    TypedVecIterator, Version,
+    AnyVec, BoxedVecIterator, IterableBoxedVec, IterableVec, TypedVec, TypedVecIterator, VecIndex,
+    VecValue, Version,
 };
 
 mod iterator;
@@ -27,10 +27,10 @@ where
 
 impl<I, T, S1I, S1T> LazyVecFrom1<I, T, S1I, S1T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
+    S1I: VecIndex,
+    S1T: VecValue,
 {
     pub fn init(
         name: &str,
@@ -57,10 +57,10 @@ where
 
 impl<'a, I, T, S1I, S1T> IntoIterator for &'a LazyVecFrom1<I, T, S1I, S1T>
 where
-    I: StoredIndex,
-    T: StoredRaw + 'a,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
+    I: VecIndex,
+    T: VecValue + 'a,
+    S1I: VecIndex,
+    S1T: VecValue,
 {
     type Item = T;
     type IntoIter = LazyVecFrom1Iterator<'a, I, T, S1I, S1T>;
@@ -72,10 +72,10 @@ where
 
 impl<I, T, S1I, S1T> AnyVec for LazyVecFrom1<I, T, S1I, S1T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
+    S1I: VecIndex,
+    S1T: VecValue,
 {
     fn version(&self) -> Version {
         self.version()
@@ -106,10 +106,10 @@ where
 
 impl<I, T, S1I, S1T> IterableVec<I, T> for LazyVecFrom1<I, T, S1I, S1T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
+    S1I: VecIndex,
+    S1T: VecValue,
 {
     fn iter(&self) -> BoxedVecIterator<'_, I, T> {
         Box::new(self.into_iter())
@@ -118,10 +118,10 @@ where
 
 impl<I, T, S1I, S1T> TypedVec for LazyVecFrom1<I, T, S1I, S1T>
 where
-    I: StoredIndex,
-    T: StoredRaw,
-    S1I: StoredIndex,
-    S1T: StoredRaw,
+    I: VecIndex,
+    T: VecValue,
+    S1I: VecIndex,
+    S1T: VecValue,
 {
     type I = I;
     type T = T;

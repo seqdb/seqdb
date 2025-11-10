@@ -10,9 +10,9 @@ use std::{
 use rawdb::{Database, Reader, Region};
 
 use crate::{
-    AnyStoredVec, AnyVec, BoxedVecIterator, CheckedSub, CollectableVec, Exit, Format,
-    GenericStoredVec, IterableVec, Result, StoredCompressed, StoredIndex, StoredRaw, StoredVec,
-    StoredVecIterator, TypedVec, VecIterator, Version,
+    AnyStoredVec, AnyVec, BoxedVecIterator, CheckedSub, CollectableVec, Compressable, Exit, Format,
+    GenericStoredVec, IterableVec, Result, StoredVec, StoredVecIterator, TypedVec, VecIndex,
+    VecIterator, VecValue, Version,
     variants::{Header, ImportOptions},
 };
 
@@ -26,8 +26,8 @@ pub struct EagerVec<I, T>(StoredVec<I, T>);
 
 impl<I, T> EagerVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     pub fn forced_import_compressed(db: &Database, name: &str, version: Version) -> Result<Self> {
         Self::forced_import_compressed_with((db, name, version).into())
@@ -97,7 +97,7 @@ where
         exit: &Exit,
     ) -> Result<()>
     where
-        A: StoredRaw,
+        A: VecValue,
         F: FnMut(I) -> (I, T),
     {
         self.compute_to(max_from, other.len(), other.version(), t, exit)
@@ -111,7 +111,7 @@ where
     ) -> Result<()>
     where
         T: From<I>,
-        T2: StoredRaw,
+        T2: VecValue,
     {
         self.compute_to(
             max_from,
@@ -130,8 +130,8 @@ where
         exit: &Exit,
     ) -> Result<()>
     where
-        A: StoredIndex,
-        B: StoredRaw,
+        A: VecIndex,
+        B: VecValue,
         F: FnMut((A, B, &Self)) -> (I, T),
     {
         self.validate_computed_version_or_reset(
@@ -157,9 +157,9 @@ where
         exit: &Exit,
     ) -> Result<()>
     where
-        A: StoredIndex,
-        B: StoredRaw,
-        C: StoredRaw,
+        A: VecIndex,
+        B: VecValue,
+        C: VecValue,
         F: FnMut((A, B, C, &Self)) -> (I, T),
     {
         self.validate_computed_version_or_reset(
@@ -192,10 +192,10 @@ where
         exit: &Exit,
     ) -> Result<()>
     where
-        A: StoredIndex,
-        B: StoredRaw,
-        C: StoredRaw,
-        D: StoredRaw,
+        A: VecIndex,
+        B: VecValue,
+        C: VecValue,
+        D: VecValue,
         F: FnMut((A, B, C, D, &Self)) -> (I, T),
     {
         self.validate_computed_version_or_reset(
@@ -275,8 +275,8 @@ where
         exit: &Exit,
     ) -> Result<()>
     where
-        T2: StoredRaw,
-        T3: StoredRaw,
+        T2: VecValue,
+        T3: VecValue,
         T: From<T2> + Mul<T3, Output = T>,
     {
         self.compute_transform2(
@@ -296,8 +296,8 @@ where
         exit: &Exit,
     ) -> Result<()>
     where
-        T2: StoredRaw,
-        T3: StoredRaw,
+        T2: VecValue,
+        T3: VecValue,
         T: From<T2> + Mul<usize, Output = T> + Div<T3, Output = T> + CheckedSub<usize>,
     {
         self.compute_transform2(
@@ -317,7 +317,7 @@ where
     ) -> Result<()>
     where
         T: From<T2> + Ord,
-        T2: StoredRaw,
+        T2: VecValue,
     {
         let mut prev = None;
         self.compute_transform(
@@ -348,7 +348,7 @@ where
     ) -> Result<()>
     where
         T: From<T2> + Ord + Default,
-        T2: StoredRaw,
+        T2: VecValue,
     {
         self.compute_all_time_low_(max_from, source, exit, false)
     }
@@ -362,7 +362,7 @@ where
     ) -> Result<()>
     where
         T: From<T2> + Ord + Default,
-        T2: StoredRaw,
+        T2: VecValue,
     {
         let mut prev = None;
         self.compute_transform(
@@ -399,8 +399,8 @@ where
         exit: &Exit,
     ) -> Result<()>
     where
-        T2: StoredRaw,
-        T3: StoredRaw,
+        T2: VecValue,
+        T3: VecValue,
         T: From<T2> + From<T3> + Mul<usize, Output = T> + Div<T, Output = T> + CheckedSub<usize>,
     {
         self.compute_percentage_(max_from, divided, divider, exit, false)
@@ -414,8 +414,8 @@ where
         exit: &Exit,
     ) -> Result<()>
     where
-        T2: StoredRaw,
-        T3: StoredRaw,
+        T2: VecValue,
+        T3: VecValue,
         T: From<T2> + From<T3> + Mul<usize, Output = T> + Div<T, Output = T> + CheckedSub<usize>,
     {
         self.compute_percentage_(max_from, divided, divider, exit, true)
@@ -430,8 +430,8 @@ where
         as_difference: bool,
     ) -> Result<()>
     where
-        T2: StoredRaw,
-        T3: StoredRaw,
+        T2: VecValue,
+        T3: VecValue,
         T: From<T2> + From<T3> + Mul<usize, Output = T> + Div<T, Output = T> + CheckedSub<usize>,
     {
         let multiplier = 100;
@@ -460,8 +460,8 @@ where
         exit: &Exit,
     ) -> Result<()>
     where
-        I: StoredRaw + StoredIndex,
-        T: StoredIndex,
+        I: VecValue + VecIndex,
+        T: VecIndex,
     {
         self.validate_computed_version_or_reset(
             Version::ZERO + self.inner_version() + other.version(),
@@ -540,15 +540,15 @@ where
     ) -> Result<()>
     where
         T: From<T2>,
-        T2: StoredRaw
-            + StoredIndex
+        T2: VecValue
+            + VecIndex
             + Copy
             + Add<usize, Output = T2>
             + CheckedSub<T2>
             + TryInto<T>
             + Default,
         <T2 as TryInto<T>>::Error: core::error::Error + 'static,
-        T3: StoredRaw,
+        T3: VecValue,
     {
         let opt: Option<Box<dyn FnMut(T2) -> bool>> = None;
         self.compute_filtered_count_from_indexes_(max_from, first_indexes, other_to_else, opt, exit)
@@ -564,15 +564,15 @@ where
     ) -> Result<()>
     where
         T: From<T2>,
-        T2: StoredRaw
-            + StoredIndex
+        T2: VecValue
+            + VecIndex
             + Copy
             + Add<usize, Output = T2>
             + CheckedSub<T2>
             + TryInto<T>
             + Default,
         <T2 as TryInto<T>>::Error: core::error::Error + 'static,
-        T3: StoredRaw,
+        T3: VecValue,
         F: FnMut(T2) -> bool,
     {
         self.compute_filtered_count_from_indexes_(
@@ -594,14 +594,14 @@ where
     ) -> Result<()>
     where
         T: From<T2>,
-        T2: StoredRaw
-            + StoredIndex
+        T2: VecValue
+            + VecIndex
             + Copy
             + Add<usize, Output = T2>
             + CheckedSub<T2>
             + TryInto<T>
             + Default,
-        T3: StoredRaw,
+        T3: VecValue,
         <T2 as TryInto<T>>::Error: core::error::Error + 'static,
     {
         self.validate_computed_version_or_reset(
@@ -643,9 +643,9 @@ where
         exit: &Exit,
     ) -> Result<()>
     where
-        I: StoredRaw,
+        I: VecValue,
         T: From<bool>,
-        A: StoredIndex + StoredRaw,
+        A: VecIndex + VecValue,
     {
         self.validate_computed_version_or_reset(
             Version::ZERO
@@ -679,7 +679,7 @@ where
         exit: &Exit,
     ) -> Result<()>
     where
-        T2: StoredRaw + Ord,
+        T2: VecValue + Ord,
         T: From<T2>,
     {
         self.validate_computed_version_or_reset(
@@ -726,7 +726,7 @@ where
         exit: &Exit,
     ) -> Result<()>
     where
-        T2: StoredRaw + Ord,
+        T2: VecValue + Ord,
         T: From<T2>,
     {
         self.validate_computed_version_or_reset(
@@ -774,7 +774,7 @@ where
     ) -> Result<()>
     where
         T: Add<T, Output = T> + From<T2> + Default + CheckedSub,
-        T2: StoredRaw,
+        T2: VecValue,
     {
         self.validate_computed_version_or_reset(
             Version::ONE + self.inner_version() + source.version(),
@@ -828,8 +828,8 @@ where
     ) -> Result<()>
     where
         T: From<usize> + Add<T, Output = T>,
-        T2: StoredIndex + StoredRaw,
-        T3: StoredRaw,
+        T2: VecIndex + VecValue,
+        T3: VecValue,
         usize: From<T3>,
     {
         self.validate_computed_version_or_reset(
@@ -986,7 +986,7 @@ where
     ) -> Result<()>
     where
         T: Add<T, Output = T> + From<T2> + Div<usize, Output = T> + From<f32>,
-        T2: StoredRaw,
+        T2: VecValue,
         f32: From<T> + From<T2>,
     {
         self.compute_sma_(max_from, source, sma, exit, None)
@@ -1002,7 +1002,7 @@ where
     ) -> Result<()>
     where
         T: Add<T, Output = T> + From<T2> + Div<usize, Output = T> + From<f32>,
-        T2: StoredRaw,
+        T2: VecValue,
         f32: From<T> + From<T2>,
     {
         self.validate_computed_version_or_reset(
@@ -1066,7 +1066,7 @@ where
     ) -> Result<()>
     where
         T: From<T2> + From<f32>,
-        T2: StoredRaw + Div<usize, Output = T2> + Sum,
+        T2: VecValue + Div<usize, Output = T2> + Sum,
         f32: From<T2> + From<T>,
     {
         self.compute_ema_(max_from, source, ema, exit, None)
@@ -1082,7 +1082,7 @@ where
     ) -> Result<()>
     where
         T: From<T2> + From<f32>,
-        T2: StoredRaw + Div<usize, Output = T2> + Sum,
+        T2: VecValue + Div<usize, Output = T2> + Sum,
         f32: From<T2> + From<T>,
     {
         self.validate_computed_version_or_reset(
@@ -1149,7 +1149,7 @@ where
     ) -> Result<()>
     where
         I: CheckedSub,
-        T2: StoredRaw + Default,
+        T2: VecValue + Default,
         f32: From<T2>,
         T: From<f32>,
     {
@@ -1215,7 +1215,7 @@ where
     ) -> Result<()>
     where
         I: CheckedSub,
-        T2: StoredRaw + Default,
+        T2: VecValue + Default,
         f32: From<T2>,
         T: From<f32>,
     {
@@ -1255,7 +1255,7 @@ where
     ) -> Result<()>
     where
         I: CheckedSub,
-        T2: StoredRaw + Default,
+        T2: VecValue + Default,
         f32: From<T2>,
         T: From<f32>,
     {
@@ -1295,10 +1295,10 @@ where
     ) -> Result<()>
     where
         T: From<f32>,
-        T2: StoredRaw + Sub<T3, Output = T2> + Div<T4, Output = T>,
-        T3: StoredRaw,
-        T4: StoredRaw,
-        T2: StoredRaw,
+        T2: VecValue + Sub<T3, Output = T2> + Div<T4, Output = T>,
+        T3: VecValue,
+        T4: VecValue,
+        T2: VecValue,
         f32: From<T2> + From<T3> + From<T4>,
     {
         let mut sma_iter = sma.iter();
@@ -1319,8 +1319,8 @@ where
 
 impl<I, T> AnyVec for EagerVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     #[inline]
     fn version(&self) -> Version {
@@ -1355,8 +1355,8 @@ where
 
 impl<I, T> AnyStoredVec for EagerVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     #[inline]
     fn db_path(&self) -> PathBuf {
@@ -1405,8 +1405,8 @@ where
 
 impl<I, T> GenericStoredVec<I, T> for EagerVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     #[inline]
     fn read_at(&self, index: usize, reader: &Reader) -> Result<T> {
@@ -1491,8 +1491,8 @@ where
 
 impl<'a, I, T> IntoIterator for &'a EagerVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     type Item = T;
     type IntoIter = StoredVecIterator<'a, I, T>;
@@ -1504,13 +1504,13 @@ where
 
 impl<I, T> IterableVec<I, T> for EagerVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     fn iter(&self) -> BoxedVecIterator<'_, I, T>
     where
-        I: StoredIndex,
-        T: StoredRaw,
+        I: VecIndex,
+        T: VecValue,
     {
         Box::new(self.0.into_iter())
     }
@@ -1518,8 +1518,8 @@ where
 
 impl<I, T> TypedVec for EagerVec<I, T>
 where
-    I: StoredIndex,
-    T: StoredCompressed,
+    I: VecIndex,
+    T: Compressable,
 {
     type I = I;
     type T = T;
