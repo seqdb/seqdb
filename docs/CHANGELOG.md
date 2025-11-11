@@ -7,6 +7,60 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.17](https://github.com/anydb-rs/anydb/releases/tag/v0.3.17) - 2025-11-11
+
+### Breaking Changes
+#### `vecdb`
+- **Trait renamed for better semantics**: `StoredCompressed` → `Compressable` ([`src/traits/compressable.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.17/crates/vecdb/src/traits/compressable.rs))
+  - Introduces `TransparentCompressable<T>` marker trait
+  - Adds associated type `NumberType` for compression
+  - Includes `AsInnerSlice` and `FromInnerSlice` helper traits
+- **Trait renamed for clarity**: `StoredRaw` → `VecValue` ([`src/traits/value.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.17/crates/vecdb/src/traits/value.rs))
+  - Represents values that can be stored in vectors
+  - Consolidates requirements: Debug, Clone, FromBytes, IntoBytes, Immutable, KnownLayout, Serialize, Send, Sync
+- **Iterator module renamed**: `iterators/extended.rs` → `iterators/typed.rs` to align with new `TypedVec` trait ([`src/iterators/typed.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.17/crates/vecdb/src/iterators/typed.rs))
+- **GenericVec read API refactored for safety**: `read_at()` is now concrete with bounds checking, variants must implement new `unchecked_read_at()` instead ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.17/crates/vecdb/src/traits/generic.rs#L62-L71))
+  - `read_at()` now checks `index < self.len()` before delegating to `unchecked_read_at()`
+  - Prevents out-of-bounds reads at the trait level
+  - All variant implementations updated to implement `unchecked_read_at()`
+
+### New Features
+#### `vecdb`
+- Added `Formattable` trait for CSV formatting with automatic escaping ([`src/traits/formattable.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.17/crates/vecdb/src/traits/formattable.rs))
+  - `fmt_csv()` method writes values in CSV format, adding quotes around values containing commas
+  - `may_need_escaping()` indicates if type might need escaping
+  - Implemented for all numeric types (no escaping needed)
+- Added `TypedVec` trait for associating index and value types ([`src/traits/typed.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.17/crates/vecdb/src/traits/typed.rs))
+  - Associates `I: VecIndex` and `T: VecValue` with implementing type
+  - Enables type-safe generic programming over vectors
+- Added `AnyWritableVec` trait with `create_writer()` method for stateful value writing ([`src/traits/writable.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.17/crates/vecdb/src/traits/writable.rs))
+  - Creates `ValueWriter` that can write one value at a time to a buffer
+  - Supports range specification with `from` and `to` parameters
+- Added `ValueWriter` trait and `VecIteratorWriter` implementation for row-by-row writing ([`src/iterators/writer.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.17/crates/vecdb/src/iterators/writer.rs))
+  - `write_next()` writes next value to string buffer using CSV formatting
+  - Integrates with `Formattable` trait for proper escaping
+- Added `Exit::register_cleanup()` method for registering cleanup callbacks that run on program exit or CTRL-C ([`src/exit.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.17/crates/vecdb/src/exit.rs#L27-L32))
+  - Callbacks are `Fn() + Send + Sync + 'static`
+  - Enables graceful cleanup during shutdown
+
+### Bug Fixes
+#### `vecdb`
+- Fixed critical bug where `read_at()` could not read beyond logical length during `serialize_changes()` ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.17/crates/vecdb/src/traits/generic.rs#L62-L71))
+  - After rollback operations, `serialize_changes()` needs to read indices beyond current logical length to capture truncated values
+  - Bounds checking in `read_at()` was preventing these reads, causing `IndexTooHigh` errors
+  - Fixed by introducing `unchecked_read_at()` that variants implement without bounds checking
+  - `get_or_read_at()` and `get_pushed_or_read_at()` now use `unchecked_read_at()` internally ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.17/crates/vecdb/src/traits/generic.rs#L150))
+  - Resolves test failure in `test_data_integrity_rollback_flush_reopen`
+
+### Internal Changes
+#### `vecdb`
+- Updated all variant implementations (`RawVec`, `CompressedVec`, `StoredVec`, `EagerVec`, lazy variants) to use new trait names
+- Updated all iterator implementations to use renamed iterator module
+- Updated all computation logic to work with `Compressable` and `VecValue` traits
+- Refactored `Exit` struct to include cleanup callbacks storage with `Arc<Mutex<Vec<>>>` for thread-safe callback management
+
+[View changes](https://github.com/anydb-rs/anydb/compare/v0.3.16...v0.3.17)
+
 ## [v0.3.16](https://github.com/anydb-rs/anydb/releases/tag/v0.3.16) - 2025-11-09
 
 ### Changed
