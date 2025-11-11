@@ -19,7 +19,7 @@ pub enum Database {
     Fjall3,
     Redb,
     Lmdb,
-    RocksDb,
+    // RocksDb,
 }
 
 impl Database {
@@ -31,7 +31,7 @@ impl Database {
             Database::Fjall2,
             Database::Redb,
             Database::Lmdb,
-            Database::RocksDb,
+            // Database::RocksDb,
         ]
     }
 }

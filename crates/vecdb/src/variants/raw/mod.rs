@@ -436,7 +436,7 @@ where
     T: VecValue,
 {
     #[inline(always)]
-    fn read_at(&self, index: usize, reader: &Reader) -> Result<T> {
+    fn unchecked_read_at(&self, index: usize, reader: &Reader) -> Result<T> {
         T::read_from_prefix(reader.prefixed((index * Self::SIZE_OF_T) as u64 + HEADER_OFFSET))
             .map(|(v, _)| v)
             .map_err(Error::from)

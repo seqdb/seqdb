@@ -9,7 +9,7 @@ use log::info;
 use rawdb::Reader;
 use zerocopy::FromBytes;
 
-use crate::{AnyStoredVec, Error, Exit, Result, SEPARATOR, Stamp, Version};
+use crate::{AnyStoredVec, Error, Exit, Result, SEPARATOR, Stamp, Version, likely};
 
 const ONE_KIB: usize = 1024;
 const ONE_MIB: usize = ONE_KIB * ONE_KIB;
@@ -58,7 +58,17 @@ where
     }
 
     /// Reads value at usize index using provided reader.
-    fn read_at(&self, index: usize, reader: &Reader) -> Result<T>;
+    #[inline]
+    fn read_at(&self, index: usize, reader: &Reader) -> Result<T> {
+        if likely(index < self.len()) {
+            self.unchecked_read_at(index, reader)
+        } else {
+            Err(Error::IndexTooHigh)
+        }
+    }
+
+    #[doc(hidden)]
+    fn unchecked_read_at(&self, index: usize, reader: &Reader) -> Result<T>;
 
     /// Reads value at usize index, creating a temporary reader.
     /// For multiple reads, prefer `read_at()` with a reused reader.
@@ -137,7 +147,7 @@ where
         }
 
         // Fall back to reading from storage
-        Ok(Some(self.read_at(index, reader)?))
+        Ok(Some(self.unchecked_read_at(index, reader)?))
     }
 
     /// Gets value from any layer at usize index, creating a temporary reader.
@@ -200,7 +210,7 @@ where
             return Ok(self.get_pushed_at(index, stored_len).cloned());
         }
 
-        Ok(Some(self.read_at(index, reader)?))
+        Ok(Some(self.unchecked_read_at(index, reader)?))
     }
 
     /// Gets value from pushed layer or storage at usize index, creating a temporary reader.

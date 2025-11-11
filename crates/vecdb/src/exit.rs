@@ -1,18 +1,34 @@
 use std::{process::exit, sync::Arc};
 
 use log::info;
-use parking_lot::{RwLock, RwLockReadGuard};
+use parking_lot::{Mutex, RwLock, RwLockReadGuard};
+
+type Callbacks = Arc<Mutex<Vec<Box<dyn Fn() + Send + Sync>>>>;
 
 /// Graceful shutdown coordinator for ensuring data consistency during program exit.
 ///
 /// Uses a read-write lock to coordinate between operations and shutdown signals (e.g., Ctrl-C).
 /// Operations hold read locks during critical sections, preventing shutdown until they complete.
+/// Registered rollbacks will be ran on exit.
 #[derive(Default, Clone)]
-pub struct Exit(Arc<RwLock<()>>);
+pub struct Exit {
+    lock: Arc<RwLock<()>>,
+    cleanup_callbacks: Callbacks,
+}
 
 impl Exit {
     pub fn new() -> Self {
-        Self(Arc::new(RwLock::new(())))
+        Self {
+            lock: Arc::new(RwLock::new(())),
+            cleanup_callbacks: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    pub fn register_cleanup<F>(&self, callback: F)
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        self.cleanup_callbacks.lock().push(Box::new(callback));
     }
 
     ///
@@ -21,13 +37,20 @@ impl Exit {
     /// Make sure that no other crate sets one
     ///
     pub fn set_ctrlc_handler(&self) {
-        let copy = self.0.clone();
+        let lock_copy = self.lock.clone();
+        let callbacks = self.cleanup_callbacks.clone();
 
         ctrlc::set_handler(move || {
-            if copy.is_locked() {
+            // Run cleanup callbacks
+            for callback in callbacks.lock().iter() {
+                callback();
+            }
+
+            if lock_copy.is_locked() {
                 info!("Waiting to exit safely...");
             }
-            let _lock = copy.write();
+            let _lock = lock_copy.write();
+
             info!("Exiting...");
             exit(0);
         })
@@ -35,6 +58,6 @@ impl Exit {
     }
 
     pub fn lock(&self) -> RwLockReadGuard<'_, ()> {
-        self.0.read()
+        self.lock.read()
     }
 }

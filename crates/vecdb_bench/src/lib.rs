@@ -7,7 +7,7 @@ mod fjall2_impl;
 mod fjall3_impl;
 mod lmdb_impl;
 mod redb_impl;
-mod rocksdb_impl;
+// mod rocksdb_impl;
 mod runner;
 mod vecdb_compressed_impl;
 mod vecdb_raw_impl;
@@ -18,7 +18,7 @@ use fjall2_impl::*;
 use fjall3_impl::*;
 use lmdb_impl::*;
 use redb_impl::*;
-use rocksdb_impl::*;
+// use rocksdb_impl::*;
 use runner::*;
 pub use runner::{BenchConfig, Database};
 use vecdb_compressed_impl::*;
@@ -245,10 +245,9 @@ pub fn run(configs: &[BenchConfig]) -> Result<()> {
                 }
                 Database::Lmdb => {
                     db_benchmarks.push(Box::new(DbBenchmark::<LmdbBench>::new(&runner)?));
-                }
-                Database::RocksDb => {
-                    db_benchmarks.push(Box::new(DbBenchmark::<RocksDbBench>::new(&runner)?));
-                }
+                } // Database::RocksDb => {
+                  //     db_benchmarks.push(Box::new(DbBenchmark::<RocksDbBench>::new(&runner)?));
+                  // }
             }
         }
 

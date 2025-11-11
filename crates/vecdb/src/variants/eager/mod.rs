@@ -1409,8 +1409,8 @@ where
     T: Compressable,
 {
     #[inline]
-    fn read_at(&self, index: usize, reader: &Reader) -> Result<T> {
-        self.0.read_at(index, reader)
+    fn unchecked_read_at(&self, index: usize, reader: &Reader) -> Result<T> {
+        self.0.unchecked_read_at(index, reader)
     }
 
     #[inline]
