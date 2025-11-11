@@ -1094,7 +1094,7 @@ dependencies = [
 
 [[package]]
 name = "rawdb"
-version = "0.3.16"
+version = "0.3.17"
 dependencies = [
  "libc",
  "log",
@@ -1603,7 +1603,7 @@ dependencies = [
 
 [[package]]
 name = "vecdb"
-version = "0.3.16"
+version = "0.3.17"
 dependencies = [
  "ctrlc",
  "log",
@@ -1622,7 +1622,7 @@ dependencies = [
 
 [[package]]
 name = "vecdb_bench"
-version = "0.3.16"
+version = "0.3.17"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -1633,13 +1633,13 @@ dependencies = [
  "rayon",
  "redb",
  "vecdb 0.2.17",
- "vecdb 0.3.16",
+ "vecdb 0.3.17",
  "walkdir",
 ]
 
 [[package]]
 name = "vecdb_derive"
-version = "0.3.16"
+version = "0.3.17"
 dependencies = [
  "quote",
  "syn 2.0.109",
