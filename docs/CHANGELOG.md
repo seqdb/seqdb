@@ -7,6 +7,254 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.16](https://github.com/anydb-rs/anydb/releases/tag/v0.3.16) - 2025-11-09
+
+### Changed
+#### `rawdb`
+- Renamed internal fields in `Regions` struct for clarity ([`src/regions.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.16/crates/rawdb/src/regions.rs#L21-L22))
+  - `index_to_region_file` → `file`
+  - `index_to_region_file_len` → `file_len`
+- Simplified `Regions::open()` path handling by accepting parent directory path and constructing regions file path internally ([`src/regions.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.16/crates/rawdb/src/regions.rs#L26))
+
+### Internal Changes
+#### `rawdb`
+- Converted example code to integration tests for better test coverage ([`tests/mod.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.16/crates/rawdb/tests/mod.rs))
+
+#### `vecdb`
+- Removed unused `use allocative::Allocative;` imports from `Stamp` and `Version` modules
+- Removed `#[allocative(skip)]` attributes from fields in lazy variant types (`LazyVecFrom1`, `LazyVecFrom2`, `LazyVecFrom3`) and `Pages` struct
+- Converted example code to integration tests across multiple test modules (compressed, integrity, raw, rollback)
+
+[View changes](https://github.com/anydb-rs/anydb/compare/v0.3.15...v0.3.16)
+
+## [v0.3.15](https://github.com/anydb-rs/anydb/releases/tag/v0.3.15) - 2025-11-08
+
+### New Features
+#### `vecdb`
+- Added `get_or_read_at_unwrap()` method for getting value from any layer at usize index using provided reader, panics on error ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.15/crates/vecdb/src/traits/generic.rs#L165-L167))
+  - Complements existing `get_or_read_unwrap()` method by providing usize-specific version
+  - Useful when working directly with usize indices and wanting panic-on-error semantics
+- Added `get_or_read_at_unwrap_once()` method for getting value from any layer at usize index creating temporary reader, panics on error ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.15/crates/vecdb/src/traits/generic.rs#L172-L174))
+  - One-shot variant of `get_or_read_at_unwrap()` that creates temporary reader
+  - For multiple reads, prefer `get_or_read_at_unwrap()` with reused reader
+
+[View changes](https://github.com/anydb-rs/anydb/compare/v0.3.14...v0.3.15)
+
+## [v0.3.14](https://github.com/anydb-rs/anydb/releases/tag/v0.3.14) - 2025-11-08
+
+### New Features
+#### `vecdb`
+- Added `get_at_or_default()` method to `VecIterator` trait for safely accessing iterator elements at usize index with default fallback ([`src/iterators/mod.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.14/crates/vecdb/src/iterators/mod.rs#L31-L36))
+  - Returns `Item::default()` if index not found instead of panicking
+  - Useful for safe iteration when index may be out of bounds
+- Added `get_or_default()` method to `ExtendedVecIterator` trait for safely accessing iterator elements at typed index with default fallback ([`src/iterators/extended.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.14/crates/vecdb/src/iterators/extended.rs#L34-L39))
+  - Returns `Item::default()` if index not found instead of panicking
+  - Works with typed indices (generic over index type)
+
+[View changes](https://github.com/anydb-rs/anydb/compare/v0.3.13...v0.3.14)
+
+## [v0.3.13](https://github.com/anydb-rs/anydb/releases/tag/v0.3.13) - 2025-11-08
+
+### Breaking Changes
+#### `vecdb`
+- **Iterator method renamed for consistency**: `get_unwrap_at()` → `get_at_unwrap()` to match naming pattern where operation comes first (`get_at`), then modifier (`_unwrap`) ([`src/iterators/mod.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.13/crates/vecdb/src/iterators/mod.rs#L25))
+  - Aligns with other method naming like `read_at_unwrap()` for consistency across the API
+
+### Changed
+#### `rawdb`
+- Added documentation comments for `flush()` and `compact()` methods ([`src/lib.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.13/crates/rawdb/src/lib.rs))
+
+### Internal Changes
+#### `vecdb`
+- Updated all `EagerVec` computation methods (rolling sum, window sum, sum across vecs, min/max across vecs, SMA, EMA, lag, diff, pct_change) to use `get_at_unwrap()` instead of `get_unwrap_at()`
+
+[View changes](https://github.com/anydb-rs/anydb/compare/v0.3.12...v0.3.13)
+
+## [v0.3.12](https://github.com/anydb-rs/anydb/releases/tag/v0.3.12) - 2025-11-08
+
+### Breaking Changes
+#### `vecdb`
+- **Major API simplification by removing `_with` suffix**: Methods that accept a reader parameter no longer use `_with` suffix ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.12/crates/vecdb/src/traits/generic.rs))
+  - `read_with()` → `read()` - reads value using provided reader
+  - `get_or_read_with()` → `get_or_read()` - gets from any layer using provided reader
+  - `get_pushed_or_read_with()` → `get_pushed_or_read()` - gets from pushed or storage using provided reader
+  - `take_with()` → `take()` - removes and returns value using provided reader
+- **New `_once` suffix for one-shot operations**: Methods that create temporary readers now use `_once` suffix ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.12/crates/vecdb/src/traits/generic.rs))
+  - Old `read()` (one-shot) → `read_once()` - reads value creating temporary reader
+  - Old `get_or_read()` (one-shot) → `get_or_read_once()` - gets from any layer creating temporary reader
+  - Added `read_at_once()` - reads at usize index creating temporary reader
+  - Added `get_or_read_at_once()` - gets at usize index creating temporary reader
+  - Added `get_pushed_or_read_once()` - gets from pushed/storage creating temporary reader
+  - Added `get_pushed_or_read_at_once()` - gets from pushed/storage at usize index creating temporary reader
+  - Added `read_unwrap_once()` - reads value creating temporary reader, panics on error
+  - Added `read_at_unwrap_once()` - reads at usize index creating temporary reader, panics on error
+
+### Changed
+#### `vecdb`
+- Reorganized trait methods with section comments for better code organization: Reader Creation, Read Operations, Get or Read Operations, Pushed-only Operations ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.12/crates/vecdb/src/traits/generic.rs))
+- Improved documentation for reader creation methods explaining deadlock prevention
+- Enhanced method documentation explaining when to use reused readers vs temporary readers
+
+### Internal Changes
+#### `rawdb`
+- Added documentation comments to error types, library functions, reader, and region structs
+
+#### `vecdb`
+- Added documentation comments across iterators, traits, variants, and utility modules
+- Updated all examples (compressed, raw, integrity, rollback) to use new method names without `_with` suffix
+- Updated all variant implementations to match new API
+
+[View changes](https://github.com/anydb-rs/anydb/compare/v0.3.11...v0.3.12)
+
+## [v0.3.11](https://github.com/anydb-rs/anydb/releases/tag/v0.3.11) - 2025-11-07
+
+### New Features
+#### `rawdb`
+- Added `open_with_min_len()` method to allow specifying minimum file length when opening database ([`src/lib.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.11/crates/rawdb/src/lib.rs#L54))
+  - Enables preallocating database file to specific size on open
+  - Existing `open()` method now calls `open_with_min_len(path, 0)` maintaining backward compatibility
+
+### Changed
+#### `rawdb`
+- Generalized file initialization logic to support custom minimum lengths by changing condition from `if file_len == 0` to `if file_len < min_len` ([`src/lib.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.11/crates/rawdb/src/lib.rs#L66-L69))
+- Simplified `set_min_len()` implementation with early return pattern when file length already meets requirement ([`src/lib.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.11/crates/rawdb/src/lib.rs#L99-L107))
+
+### Bug Fixes
+#### `rawdb`
+- Fixed example code by adding missing `compact()` calls after region removal operations ([`examples/db.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.11/crates/rawdb/examples/db.rs))
+
+[View changes](https://github.com/anydb-rs/anydb/compare/v0.3.10...v0.3.11)
+
+## [v0.3.10](https://github.com/anydb-rs/anydb/releases/tag/v0.3.10) - 2025-11-06
+
+### Bug Fixes
+#### `rawdb`
+- Improved database file initialization durability by adding `file.sync_all()` after setting file length for empty database files ([`src/lib.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.10/crates/rawdb/src/lib.rs#L64))
+  - Ensures file length change is persisted to disk before database operations begin
+  - Prevents potential corruption if process crashes between file length change and natural sync
+
+[View changes](https://github.com/anydb-rs/anydb/compare/v0.3.9...v0.3.10)
+
+## [v0.3.9](https://github.com/anydb-rs/anydb/releases/tag/v0.3.9) - 2025-11-06
+
+### Bug Fixes
+#### `rawdb`
+- Fixed database file initialization by automatically setting file length to PAGE_SIZE when opening empty (zero-length) database files ([`src/lib.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.9/crates/rawdb/src/lib.rs#L61-L64))
+  - Prevents potential errors from attempting to memory map zero-length files
+  - Ensures proper initialization for newly created database files
+
+[View changes](https://github.com/anydb-rs/anydb/compare/v0.3.8...v0.3.9)
+
+## [v0.3.8](https://github.com/anydb-rs/anydb/releases/tag/v0.3.8) - 2025-11-06
+
+### Breaking Changes
+#### `vecdb`
+- **VecIterator trait now requires ExactSizeIterator and FusedIterator**: Changed trait bounds from `VecIterator: Iterator` to `VecIterator: ExactSizeIterator + FusedIterator` ([`src/iterators/mod.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.8/crates/vecdb/src/iterators/mod.rs#L11))
+  - All iterator implementations must now implement `ExactSizeIterator`, providing accurate `len()` and size information
+  - All iterator implementations must now implement `FusedIterator`, guaranteeing that once iterator returns `None`, it will always return `None` on subsequent calls
+  - Enables better optimization opportunities and more predictable iterator behavior for users
+
+[View changes](https://github.com/anydb-rs/anydb/compare/v0.3.7...v0.3.8)
+
+## [v0.3.7](https://github.com/anydb-rs/anydb/releases/tag/v0.3.7) - 2025-11-06
+
+### Breaking Changes
+#### `vecdb`
+- **Delete operation method renamed**: `take()` with reader parameter → `take_with()` to match naming convention where methods with `_with` suffix accept a reader ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.7/crates/vecdb/src/traits/generic.rs#L272))
+- **Forced push API simplified**: `forced_push_at()` → `forced_push()` for generic index version, internal usize version remains `forced_push_at()` ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.7/crates/vecdb/src/traits/generic.rs#L201-L206))
+- **Internal length method renamed for clarity**: `len_()` → `dirty_len()` to better indicate it returns stored + pushed length including dirty state ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.7/crates/vecdb/src/traits/generic.rs#L155))
+- **Internal methods standardized with `_at` suffix**:
+  - `has_()` → `has_at()` - checks if index exists in dirty state ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.7/crates/vecdb/src/traits/generic.rs#L367))
+  - `update_()` → `update_at()` - updates value at usize index ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.7/crates/vecdb/src/traits/generic.rs#L309))
+  - `truncate_if_needed_()` → `truncate_if_needed_at()` - truncates at usize index ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.7/crates/vecdb/src/traits/generic.rs#L379))
+- **Clear method renamed**: `reset_()` → `clear()` for better semantic clarity - resets vector to empty state ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.7/crates/vecdb/src/traits/generic.rs#L334))
+- **Read method name reordered for consistency**: `read_unwrap_at()` → `read_at_unwrap()` to match pattern where operation comes first, then modifier ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.7/crates/vecdb/src/traits/generic.rs#L54))
+
+### Internal Changes
+#### `vecdb`
+- Updated all variant implementations (`RawVec`, `CompressedVec`, `EagerVec`) to use new method names
+- Updated all `EagerVec` computation methods (map, filter, sum, min, max, SMA, EMA, diff, pct_change, CAGR) to use `forced_push()` instead of `forced_push_at()`
+- Updated `RawVec` and `CompressedVec` `len()` implementations to call `dirty_len()` instead of `len_()`
+- Updated rollback logic to use `update_at()` and `truncate_if_needed_at()` for internal operations
+- Updated all examples (integrity, raw, rollback) to use `take_with()` instead of `take()`
+
+[View changes](https://github.com/anydb-rs/anydb/compare/v0.3.6...v0.3.7)
+
+## [v0.3.6](https://github.com/anydb-rs/anydb/releases/tag/v0.3.6) - 2025-11-06
+
+### Breaking Changes
+#### `vecdb`
+- **Iterator trait methods renamed for clarity**: ([`src/iterators/mod.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.6/crates/vecdb/src/iterators/mod.rs))
+  - `set_position_()` → `set_position_to()` - sets iterator position to specific index
+  - `set_end_()` → `set_end_to()` - sets iterator end position
+  - `get_()` → `get_at()` - gets element at specific position by repositioning iterator
+  - `unsafe_get_()` → `get_unwrap_at()` - gets element and unwraps result
+  - `unsafe_get()` → `get_unwrap()` - generic index version of get and unwrap
+- **Generic trait method terminology changed from "unchecked" to "unwrap"**: ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.6/crates/vecdb/src/traits/generic.rs))
+  - `read_unchecked()` → `read_unwrap()` - reads value using provided reader, panics on error
+  - `read_unchecked_at()` → `read_unwrap_at()` - reads value at usize index, panics on error
+  - `get_or_read_unchecked()` → `get_or_read_unwrap()` - gets from any layer, panics on error
+
+### Changed
+#### `vecdb`
+- Improved safety of `get_unwrap()` and `get_unwrap_at()` by replacing `unsafe { unwrap_unchecked() }` with regular `.unwrap()` ([`src/iterators/extended.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.6/crates/vecdb/src/iterators/extended.rs#L24), [`src/iterators/mod.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.6/crates/vecdb/src/iterators/mod.rs#L20))
+
+### Internal Changes
+#### `vecdb`
+- Updated all iterator implementations (raw clean/dirty, compressed clean/dirty, stored, computed, eager, lazy from1/from2/from3) to use new method names
+- Updated all test cases to use renamed iterator methods (`set_position_to`, `set_end_to`)
+- Updated internal variant code (`RawVec` serialize_changes) to use `read_unwrap_at()` instead of `read_unchecked_at()`
+
+[View changes](https://github.com/anydb-rs/anydb/compare/v0.3.5...v0.3.6)
+
+## [v0.3.5](https://github.com/anydb-rs/anydb/releases/tag/v0.3.5) - 2025-11-06
+
+### Breaking Changes
+#### `vecdb`
+- **Read API renamed for consistency**: Multiple method renames to establish clear naming pattern ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.5/crates/vecdb/src/traits/generic.rs))
+  - `unwrap_read()` → `read_unchecked()` - reads value with panic on error
+  - `read()` with reader parameter → `read_with()` - reads value using provided reader
+  - `read_()` → `read_at()` - internal implementation using usize index
+  - Old `one_shot_read()` removed, new `read()` now creates temporary reader automatically
+- **Get/read API renamed for consistency**:
+  - `get_any_or_read()` with reader → `get_or_read_with()` - gets from any layer (updated/pushed/storage) using provided reader
+  - Old `one_shot_get_any_or_read()` removed, new `get_or_read()` now creates temporary reader automatically
+  - `get_any_or_read_()` → `get_or_read_at()` - internal implementation
+- **Pushed-only API renamed**:
+  - `get_pushed_or_read()` with reader → `get_pushed_or_read_with()` - gets from pushed or storage using provided reader
+  - Old `one_shot_get_pushed_or_read()` removed, new `get_pushed_or_read()` now creates temporary reader automatically
+  - `get_pushed_or_read_()` → `get_pushed_or_read_at()` - internal implementation
+  - `get_pushed()` → `get_pushed_at()` - gets value from pushed layer only
+
+### New Features
+#### `vecdb`
+- Added `read_unchecked()` and `read_unchecked_at()` convenience methods that panic on error instead of returning Result ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.5/crates/vecdb/src/traits/generic.rs#L47-L56))
+- Added `get_or_read_unchecked()` convenience method that gets from any layer and panics on error ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.5/crates/vecdb/src/traits/generic.rs#L76-L78))
+
+### Changed
+#### `vecdb`
+- **New naming convention established** across all read/get operations:
+  - Methods without suffix (e.g., `read()`, `get_or_read()`) now create temporary readers for one-shot operations
+  - Methods with `_with` suffix (e.g., `read_with()`) accept a reused reader parameter for better performance
+  - Methods with `_at` suffix are internal implementations using usize indices
+  - Methods with `_unchecked` suffix panic on errors instead of returning Result
+- Improved `get_pushed_at()` safety by using `checked_sub()` to prevent integer underflow when calculating pushed layer offset ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.5/crates/vecdb/src/traits/generic.rs#L154))
+- Improved `get_or_read_at()` logic by moving holes check to the beginning and reordering checks (holes → pushed → updated → storage) for better performance ([`src/traits/generic.rs`](https://github.com/anydb-rs/anydb/blob/v0.3.5/crates/vecdb/src/traits/generic.rs#L96-L118))
+
+### Internal Changes
+#### `vecdb`
+- Updated all variant implementations (`RawVec`, `CompressedVec`, `StoredVec`, `EagerVec`) to use new method names
+- Updated all iterator implementations (raw and compressed dirty iterators) to use `get_pushed_at()` instead of `get_pushed()`
+- Updated all examples (compressed, raw, integrity, rollback) and documentation to demonstrate new API usage
+
+[View changes](https://github.com/anydb-rs/anydb/compare/v0.3.4...v0.3.5)
+
+## [v0.3.4](https://github.com/anydb-rs/anydb/releases/tag/v0.3.4) - 2025-11-04
+
+This release contains only workspace version number updates with no functional changes.
+
+[View changes](https://github.com/anydb-rs/anydb/compare/v0.3.3...v0.3.4)
+
 ## [v0.3.3](https://github.com/anydb-rs/anydb/releases/tag/v0.3.3) - 2025-11-04
 
 ### Breaking Changes

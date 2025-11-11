@@ -377,10 +377,11 @@ where
             let truncated_vals = (stored_len..prev_stored_len)
                 .map(|i| {
                     // Prefer prev_updated, then read from disk
+                    // Use unchecked_read_at since these indices may be beyond current logical length
                     self.prev_updated
                         .get(&i)
                         .cloned()
-                        .unwrap_or_else(|| self.read_at_unwrap(i, &reader))
+                        .unwrap_or_else(|| self.unchecked_read_at(i, &reader).unwrap())
                 })
                 .collect::<Vec<_>>();
             bytes.extend(truncated_vals.as_bytes());
@@ -406,11 +407,12 @@ where
             .keys()
             .map(|&i| {
                 // Prefer prev_updated values over disk values (for post-rollback state)
+                // Use unchecked_read_at since after rollback, indices may be beyond current logical length
                 let val = self
                     .prev_updated
                     .get(&i)
                     .cloned()
-                    .unwrap_or_else(|| self.read_at_unwrap(i, &reader));
+                    .unwrap_or_else(|| self.unchecked_read_at(i, &reader).unwrap());
                 (i, val)
             })
             .collect::<(Vec<_>, Vec<_>)>();
