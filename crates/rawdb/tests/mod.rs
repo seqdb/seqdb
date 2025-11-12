@@ -1789,7 +1789,7 @@ fn test_basic_region_rename() -> Result<()> {
     }
 
     // Rename the region
-    region.rename("new_name".to_string())?;
+    region.rename("new_name")?;
 
     // Verify new name exists and old name doesn't
     {
@@ -1820,7 +1820,7 @@ fn test_rename_with_persistence() -> Result<()> {
         let db = Database::open(path)?;
         let region = db.create_region_if_needed("original")?;
         db.write_all_to_region(&region, b"Persistent data")?;
-        region.rename("renamed".to_string())?;
+        region.rename("renamed")?;
         db.flush()?;
     }
 
@@ -1848,7 +1848,7 @@ fn test_rename_to_existing_name_fails() -> Result<()> {
     let _region2 = db.create_region_if_needed("region2")?;
 
     // Trying to rename region1 to region2 should fail
-    let result = region1.rename("region2".to_string());
+    let result = region1.rename("region2");
     assert!(result.is_err());
 
     // Verify region1 still has its original name
@@ -1873,7 +1873,7 @@ fn test_rename_after_remove_and_recreate() -> Result<()> {
     db.write_all_to_region(&region2, b"New data")?;
 
     // Rename the new region
-    region2.rename("renamed".to_string())?;
+    region2.rename("renamed")?;
 
     // Verify the rename worked
     let regions = db.regions();
@@ -1895,9 +1895,9 @@ fn test_multiple_renames() -> Result<()> {
     db.write_all_to_region(&region, b"Data")?;
 
     // Rename multiple times
-    region.rename("name2".to_string())?;
-    region.rename("name3".to_string())?;
-    region.rename("name4".to_string())?;
+    region.rename("name2")?;
+    region.rename("name3")?;
+    region.rename("name4")?;
 
     // Verify final name
     let regions = db.regions();
@@ -1930,7 +1930,7 @@ fn test_rename_preserves_region_metadata() -> Result<()> {
     };
 
     // Rename
-    region.rename("renamed".to_string())?;
+    region.rename("renamed")?;
 
     // Verify metadata preserved (except id)
     {
@@ -1956,17 +1956,29 @@ fn test_rename_with_special_characters() -> Result<()> {
     let region = db.create_region_if_needed("simple")?;
 
     // Rename with special characters (but not control characters)
-    region.rename("name-with-dashes".to_string())?;
-    assert!(db.regions().get_region_from_id("name-with-dashes").is_some());
+    region.rename("name-with-dashes")?;
+    assert!(
+        db.regions()
+            .get_region_from_id("name-with-dashes")
+            .is_some()
+    );
 
-    region.rename("name_with_underscores".to_string())?;
-    assert!(db.regions().get_region_from_id("name_with_underscores").is_some());
+    region.rename("name_with_underscores")?;
+    assert!(
+        db.regions()
+            .get_region_from_id("name_with_underscores")
+            .is_some()
+    );
 
-    region.rename("name.with.dots".to_string())?;
+    region.rename("name.with.dots")?;
     assert!(db.regions().get_region_from_id("name.with.dots").is_some());
 
-    region.rename("name:with:colons".to_string())?;
-    assert!(db.regions().get_region_from_id("name:with:colons").is_some());
+    region.rename("name:with:colons")?;
+    assert!(
+        db.regions()
+            .get_region_from_id("name:with:colons")
+            .is_some()
+    );
 
     Ok(())
 }
@@ -1985,11 +1997,7 @@ fn test_concurrent_renames() -> Result<()> {
     let handles: Vec<_> = regions
         .into_iter()
         .enumerate()
-        .map(|(i, region)| {
-            thread::spawn(move || {
-                region.rename(format!("renamed_{}", i))
-            })
-        })
+        .map(|(i, region)| thread::spawn(move || region.rename(&format!("renamed_{}", i))))
         .collect();
 
     // Wait for all renames
@@ -2000,8 +2008,16 @@ fn test_concurrent_renames() -> Result<()> {
     // Verify all renames succeeded
     let regions_lock = db.regions();
     for i in 0..10 {
-        assert!(regions_lock.get_region_from_id(&format!("region_{}", i)).is_none());
-        assert!(regions_lock.get_region_from_id(&format!("renamed_{}", i)).is_some());
+        assert!(
+            regions_lock
+                .get_region_from_id(&format!("region_{}", i))
+                .is_none()
+        );
+        assert!(
+            regions_lock
+                .get_region_from_id(&format!("renamed_{}", i))
+                .is_some()
+        );
     }
 
     Ok(())

@@ -67,8 +67,7 @@ where
     }
 
     /// Same as import but will reset the vec under certain errors, so be careful !
-    pub fn forced_import_with(mut options: ImportOptions) -> Result<Self> {
-        options.version = options.version + VERSION;
+    pub fn forced_import_with(options: ImportOptions) -> Result<Self> {
         let res = Self::import_with(options);
         match res {
             Err(Error::DifferentCompressionMode)
@@ -92,7 +91,8 @@ where
         Self::import_with((db, name, version).into())
     }
 
-    pub fn import_with(options: ImportOptions) -> Result<Self> {
+    pub fn import_with(mut options: ImportOptions) -> Result<Self> {
+        options.version = options.version + VERSION;
         Self::import_(options, Format::Raw)
     }
 

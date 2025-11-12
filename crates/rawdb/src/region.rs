@@ -101,7 +101,7 @@ impl Region {
         self.db().truncate_write_all_to_region(self, from, data)
     }
 
-    pub fn rename(&self, new_id: String) -> Result<()> {
+    pub fn rename(&self, new_id: &str) -> Result<()> {
         let old_id = self.meta().read().id().to_string();
         self.db().rename_region(&old_id, new_id)
     }

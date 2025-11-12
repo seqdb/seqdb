@@ -126,7 +126,7 @@ impl Regions {
         &self.id_to_index
     }
 
-    pub fn rename_region(&mut self, old_id: &str, new_id: String) -> Result<()> {
+    pub fn rename_region(&mut self, old_id: &str, new_id: &str) -> Result<()> {
         // Check that old_id exists
         let index = self
             .id_to_index
@@ -135,7 +135,7 @@ impl Regions {
             .ok_or(Error::RegionNotFound)?;
 
         // Check that new_id doesn't already exist
-        if self.id_to_index.contains_key(&new_id) {
+        if self.id_to_index.contains_key(new_id) {
             return Err(Error::RegionAlreadyExists);
         }
 
@@ -144,11 +144,11 @@ impl Regions {
             .get_region_from_index(index)
             .ok_or(Error::RegionNotFound)?;
 
-        region.meta().write().set_id(new_id.clone());
+        region.meta().write().set_id(new_id.to_string());
 
         // Update the id_to_index mapping
         self.id_to_index.remove(old_id);
-        self.id_to_index.insert(new_id, index);
+        self.id_to_index.insert(new_id.to_string(), index);
 
         Ok(())
     }
