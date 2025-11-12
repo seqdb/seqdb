@@ -8,8 +8,8 @@ use parking_lot::RwLockReadGuard;
 use rawdb::RegionMetadata;
 
 use crate::{
-    AnyStoredVec, RawVec, Result, TypedVecIterator, VecIndex, VecIterator, VecValue, likely,
-    unlikely, variants::HEADER_OFFSET,
+    AnyStoredVec, GenericStoredVec, RawVec, Result, TypedVecIterator, VecIndex, VecIterator,
+    VecValue, likely, unlikely, variants::HEADER_OFFSET,
 };
 
 /// Clean raw vec iterator, to read on disk data
@@ -229,6 +229,7 @@ where
     I: VecIndex,
     T: VecValue,
 {
+    #[inline]
     fn set_position_to(&mut self, i: usize) {
         let target_offset = self.start_offset + Self::index_to_bytes(i);
 
@@ -248,9 +249,15 @@ where
         self.seek(target_offset);
     }
 
+    #[inline]
     fn set_end_to(&mut self, i: usize) {
         let byte_offset = self.start_offset + Self::index_to_bytes(i);
         self.end_offset = self.end_offset.min(byte_offset);
+    }
+
+    #[inline]
+    fn vec_len(&self) -> usize {
+        self._vec.len_()
     }
 }
 

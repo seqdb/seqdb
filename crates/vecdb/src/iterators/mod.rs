@@ -39,4 +39,7 @@ pub trait VecIterator: ExactSizeIterator + FusedIterator {
 
     /// Sets the exclusive end boundary to the given usize index.
     fn set_end_to(&mut self, i: usize);
+
+    /// Returns the total number of elements in the underlying Vector.
+    fn vec_len(&self) -> usize;
 }

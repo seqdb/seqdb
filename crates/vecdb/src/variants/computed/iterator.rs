@@ -118,6 +118,7 @@ where
     S3I: VecIndex,
     S3T: VecValue,
 {
+    #[inline]
     fn set_position_to(&mut self, i: usize) {
         match self {
             Self::Eager(iter) => iter.set_position_to(i),
@@ -127,6 +128,7 @@ where
         }
     }
 
+    #[inline]
     fn set_end_to(&mut self, i: usize) {
         match self {
             Self::Eager(iter) => iter.set_end_to(i),
@@ -134,6 +136,16 @@ where
             Self::LazyFrom2(iter) => iter.set_end_to(i),
             Self::LazyFrom3(iter) => iter.set_end_to(i),
         };
+    }
+
+    #[inline]
+    fn vec_len(&self) -> usize {
+        match self {
+            Self::Eager(iter) => iter.vec_len(),
+            Self::LazyFrom1(iter) => iter.vec_len(),
+            Self::LazyFrom2(iter) => iter.vec_len(),
+            Self::LazyFrom3(iter) => iter.vec_len(),
+        }
     }
 }
 

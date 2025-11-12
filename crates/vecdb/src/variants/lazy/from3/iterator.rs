@@ -188,6 +188,19 @@ where
             self.source3.set_end_to(i);
         }
     }
+
+    #[inline]
+    fn vec_len(&self) -> usize {
+        if self.source1_same_index {
+            self.source1.vec_len()
+        } else if self.source2_same_index {
+            self.source2.vec_len()
+        } else if self.source3_same_index {
+            self.source3.vec_len()
+        } else {
+            unreachable!()
+        }
+    }
 }
 
 impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> TypedVecIterator

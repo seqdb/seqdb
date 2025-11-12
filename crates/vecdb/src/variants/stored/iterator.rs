@@ -77,6 +77,7 @@ where
     I: VecIndex,
     T: Compressable,
 {
+    #[inline]
     fn set_position_to(&mut self, i: usize) {
         match self {
             Self::Raw(iter) => iter.set_position_to(i),
@@ -84,11 +85,20 @@ where
         };
     }
 
+    #[inline]
     fn set_end_to(&mut self, i: usize) {
         match self {
             Self::Raw(iter) => iter.set_end_to(i),
             Self::Compressed(iter) => iter.set_end_to(i),
         };
+    }
+
+    #[inline]
+    fn vec_len(&self) -> usize {
+        match self {
+            Self::Raw(iter) => iter.vec_len(),
+            Self::Compressed(iter) => iter.vec_len(),
+        }
     }
 }
 

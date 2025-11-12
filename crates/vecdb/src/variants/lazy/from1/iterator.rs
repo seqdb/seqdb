@@ -103,14 +103,21 @@ where
     S1I: VecIndex,
     S1T: VecValue,
 {
+    #[inline]
     fn set_position_to(&mut self, i: usize) {
         self.index = i.min(self.end_index);
         self.source.set_position_to(i);
     }
 
+    #[inline]
     fn set_end_to(&mut self, i: usize) {
         self.end_index = i.min(self.end_index);
         self.source.set_end_to(i);
+    }
+
+    #[inline]
+    fn vec_len(&self) -> usize {
+        self.source.vec_len()
     }
 }
 

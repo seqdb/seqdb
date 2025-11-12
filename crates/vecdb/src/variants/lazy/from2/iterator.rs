@@ -135,6 +135,7 @@ where
     S2I: VecIndex,
     S2T: VecValue,
 {
+    #[inline]
     fn set_position_to(&mut self, i: usize) {
         self.index = i.min(self.end_index);
         if self.source1_same_index {
@@ -145,6 +146,7 @@ where
         }
     }
 
+    #[inline]
     fn set_end_to(&mut self, i: usize) {
         self.end_index = i.min(self.end_index);
         if self.source1_same_index {
@@ -152,6 +154,17 @@ where
         }
         if self.source2_same_index {
             self.source2.set_end_to(i);
+        }
+    }
+
+    #[inline]
+    fn vec_len(&self) -> usize {
+        if self.source1_same_index {
+            self.source1.vec_len()
+        } else if self.source2_same_index {
+            self.source2.vec_len()
+        } else {
+            unreachable!()
         }
     }
 }

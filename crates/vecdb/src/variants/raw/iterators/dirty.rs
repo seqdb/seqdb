@@ -184,6 +184,7 @@ where
     I: VecIndex,
     T: VecValue,
 {
+    #[inline]
     fn set_position_to(&mut self, i: usize) {
         self.index = i.min(self.vec_len());
 
@@ -193,8 +194,14 @@ where
         }
     }
 
+    #[inline]
     fn set_end_to(&mut self, i: usize) {
         self.set_absolute_end(i);
+    }
+
+    #[inline]
+    fn vec_len(&self) -> usize {
+        self.vec_len()
     }
 }
 

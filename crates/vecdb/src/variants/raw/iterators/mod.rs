@@ -89,6 +89,7 @@ where
     I: VecIndex,
     T: VecValue,
 {
+    #[inline]
     fn set_position_to(&mut self, i: usize) {
         match self {
             Self::Clean(iter) => iter.set_position_to(i),
@@ -96,11 +97,19 @@ where
         };
     }
 
+    #[inline]
     fn set_end_to(&mut self, i: usize) {
         match self {
             Self::Clean(iter) => iter.set_end_to(i),
             Self::Dirty(iter) => iter.set_end_to(i),
         };
+    }
+
+    fn vec_len(&self) -> usize {
+        match self {
+            Self::Clean(iter) => iter.vec_len(),
+            Self::Dirty(iter) => iter.vec_len(),
+        }
     }
 }
 

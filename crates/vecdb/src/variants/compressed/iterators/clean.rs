@@ -276,8 +276,14 @@ where
         self.index = new_index;
     }
 
+    #[inline]
     fn set_end_to(&mut self, i: usize) {
         self.set_absolute_end(i);
+    }
+
+    #[inline]
+    fn vec_len(&self) -> usize {
+        self._vec.len_()
     }
 }
 
