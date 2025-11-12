@@ -173,6 +173,11 @@ where
         DirtyCompressedVecIterator::new(self)
     }
 
+    #[inline]
+    pub fn boxed_iter(&self) -> Result<BoxedVecIterator<'_, I, T>> {
+        Ok(Box::new(CompressedVecIterator::new(self)?))
+    }
+
     fn pages_region_name(&self) -> String {
         Self::pages_region_name_(self.name())
     }

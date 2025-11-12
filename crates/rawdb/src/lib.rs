@@ -387,6 +387,10 @@ impl Database {
         self.remove_region(region)
     }
 
+    pub fn rename_region(&self, old_id: &str, new_id: String) -> Result<()> {
+        self.regions.write().rename_region(old_id, new_id)
+    }
+
     pub fn remove_region(&self, region: Region) -> Result<Option<Region>> {
         let mut regions = self.regions.write();
         let mut layout = self.layout.write();

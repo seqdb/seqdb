@@ -41,7 +41,7 @@ const BUFFER_SIZE: usize = 512 * ONE_KIB;
 pub(crate) fn cold() {}
 
 #[inline(always)]
-pub(crate) fn likely(b: bool) -> bool {
+pub fn likely(b: bool) -> bool {
     if !b {
         cold();
     }
@@ -49,7 +49,7 @@ pub(crate) fn likely(b: bool) -> bool {
 }
 
 #[inline(always)]
-pub(crate) fn unlikely(b: bool) -> bool {
+pub fn unlikely(b: bool) -> bool {
     if b {
         cold();
     }

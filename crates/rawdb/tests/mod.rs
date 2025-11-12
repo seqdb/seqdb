@@ -1769,3 +1769,240 @@ fn test_comprehensive_db_operations() -> Result<()> {
 
     Ok(())
 }
+
+// ============================================================================
+// Region Rename Tests
+// ============================================================================
+
+#[test]
+fn test_basic_region_rename() -> Result<()> {
+    let (db, _temp) = setup_test_db()?;
+
+    let region = db.create_region_if_needed("old_name")?;
+    db.write_all_to_region(&region, b"Test data")?;
+
+    // Verify old name exists
+    {
+        let regions = db.regions();
+        assert!(regions.get_region_from_id("old_name").is_some());
+        assert!(regions.get_region_from_id("new_name").is_none());
+    }
+
+    // Rename the region
+    region.rename("new_name".to_string())?;
+
+    // Verify new name exists and old name doesn't
+    {
+        let regions = db.regions();
+        assert!(regions.get_region_from_id("old_name").is_none());
+        assert!(regions.get_region_from_id("new_name").is_some());
+    }
+
+    // Verify data is still intact
+    let reader = region.create_reader();
+    assert_eq!(reader.read_all(), b"Test data");
+    drop(reader);
+
+    // Verify metadata was updated
+    let meta = region.meta().read();
+    assert_eq!(meta.id(), "new_name");
+
+    Ok(())
+}
+
+#[test]
+fn test_rename_with_persistence() -> Result<()> {
+    let temp = TempDir::new()?;
+    let path = temp.path();
+
+    // Create and rename region
+    {
+        let db = Database::open(path)?;
+        let region = db.create_region_if_needed("original")?;
+        db.write_all_to_region(&region, b"Persistent data")?;
+        region.rename("renamed".to_string())?;
+        db.flush()?;
+    }
+
+    // Reopen and verify rename persisted
+    {
+        let db = Database::open(path)?;
+        let regions = db.regions();
+
+        assert!(regions.get_region_from_id("original").is_none());
+        let renamed = regions.get_region_from_id("renamed");
+        assert!(renamed.is_some());
+
+        let reader = renamed.unwrap().create_reader();
+        assert_eq!(reader.read_all(), b"Persistent data");
+    }
+
+    Ok(())
+}
+
+#[test]
+fn test_rename_to_existing_name_fails() -> Result<()> {
+    let (db, _temp) = setup_test_db()?;
+
+    let region1 = db.create_region_if_needed("region1")?;
+    let _region2 = db.create_region_if_needed("region2")?;
+
+    // Trying to rename region1 to region2 should fail
+    let result = region1.rename("region2".to_string());
+    assert!(result.is_err());
+
+    // Verify region1 still has its original name
+    let regions = db.regions();
+    assert!(regions.get_region_from_id("region1").is_some());
+    assert!(regions.get_region_from_id("region2").is_some());
+
+    Ok(())
+}
+
+#[test]
+fn test_rename_after_remove_and_recreate() -> Result<()> {
+    let (db, _temp) = setup_test_db()?;
+
+    // Create a region, write some data, then remove it
+    let region1 = db.create_region_if_needed("temp")?;
+    db.write_all_to_region(&region1, b"Old data")?;
+    region1.remove()?;
+
+    // Create a new region with the same name
+    let region2 = db.create_region_if_needed("temp")?;
+    db.write_all_to_region(&region2, b"New data")?;
+
+    // Rename the new region
+    region2.rename("renamed".to_string())?;
+
+    // Verify the rename worked
+    let regions = db.regions();
+    assert!(regions.get_region_from_id("temp").is_none());
+    assert!(regions.get_region_from_id("renamed").is_some());
+
+    // Verify it has the new data (not old)
+    let reader = region2.create_reader();
+    assert_eq!(reader.read_all(), b"New data");
+
+    Ok(())
+}
+
+#[test]
+fn test_multiple_renames() -> Result<()> {
+    let (db, _temp) = setup_test_db()?;
+
+    let region = db.create_region_if_needed("name1")?;
+    db.write_all_to_region(&region, b"Data")?;
+
+    // Rename multiple times
+    region.rename("name2".to_string())?;
+    region.rename("name3".to_string())?;
+    region.rename("name4".to_string())?;
+
+    // Verify final name
+    let regions = db.regions();
+    assert!(regions.get_region_from_id("name1").is_none());
+    assert!(regions.get_region_from_id("name2").is_none());
+    assert!(regions.get_region_from_id("name3").is_none());
+    assert!(regions.get_region_from_id("name4").is_some());
+
+    // Verify data is still intact
+    let reader = region.create_reader();
+    assert_eq!(reader.read_all(), b"Data");
+
+    Ok(())
+}
+
+#[test]
+fn test_rename_preserves_region_metadata() -> Result<()> {
+    let (db, _temp) = setup_test_db()?;
+
+    let region = db.create_region_if_needed("original")?;
+
+    // Write large data to trigger expansion
+    let large_data = vec![42u8; (PAGE_SIZE * 2) as usize];
+    db.write_all_to_region(&region, &large_data)?;
+
+    // Capture metadata before rename
+    let (start_before, len_before, reserved_before, index_before) = {
+        let meta = region.meta().read();
+        (meta.start(), meta.len(), meta.reserved(), region.index())
+    };
+
+    // Rename
+    region.rename("renamed".to_string())?;
+
+    // Verify metadata preserved (except id)
+    {
+        let meta = region.meta().read();
+        assert_eq!(meta.id(), "renamed");
+        assert_eq!(meta.start(), start_before);
+        assert_eq!(meta.len(), len_before);
+        assert_eq!(meta.reserved(), reserved_before);
+        assert_eq!(region.index(), index_before);
+    }
+
+    // Verify data is still intact
+    let reader = region.create_reader();
+    assert_eq!(reader.read_all(), &large_data[..]);
+
+    Ok(())
+}
+
+#[test]
+fn test_rename_with_special_characters() -> Result<()> {
+    let (db, _temp) = setup_test_db()?;
+
+    let region = db.create_region_if_needed("simple")?;
+
+    // Rename with special characters (but not control characters)
+    region.rename("name-with-dashes".to_string())?;
+    assert!(db.regions().get_region_from_id("name-with-dashes").is_some());
+
+    region.rename("name_with_underscores".to_string())?;
+    assert!(db.regions().get_region_from_id("name_with_underscores").is_some());
+
+    region.rename("name.with.dots".to_string())?;
+    assert!(db.regions().get_region_from_id("name.with.dots").is_some());
+
+    region.rename("name:with:colons".to_string())?;
+    assert!(db.regions().get_region_from_id("name:with:colons").is_some());
+
+    Ok(())
+}
+
+#[test]
+fn test_concurrent_renames() -> Result<()> {
+    let temp = TempDir::new()?;
+    let db = Arc::new(Database::open(temp.path())?);
+
+    // Create regions upfront
+    let regions: Vec<_> = (0..10)
+        .map(|i| db.create_region_if_needed(&format!("region_{}", i)))
+        .collect::<Result<Vec<_>>>()?;
+
+    // Rename different regions concurrently
+    let handles: Vec<_> = regions
+        .into_iter()
+        .enumerate()
+        .map(|(i, region)| {
+            thread::spawn(move || {
+                region.rename(format!("renamed_{}", i))
+            })
+        })
+        .collect();
+
+    // Wait for all renames
+    for handle in handles {
+        handle.join().unwrap()?;
+    }
+
+    // Verify all renames succeeded
+    let regions_lock = db.regions();
+    for i in 0..10 {
+        assert!(regions_lock.get_region_from_id(&format!("region_{}", i)).is_none());
+        assert!(regions_lock.get_region_from_id(&format!("renamed_{}", i)).is_some());
+    }
+
+    Ok(())
+}

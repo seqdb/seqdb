@@ -176,6 +176,11 @@ where
         DirtyRawVecIterator::new(self)
     }
 
+    #[inline]
+    pub fn boxed_iter(&self) -> Result<BoxedVecIterator<'_, I, T>> {
+        Ok(Box::new(RawVecIterator::new(self)?))
+    }
+
     pub fn write_header_if_needed(&mut self) -> Result<()> {
         if self.header.modified() {
             self.header.write(&self.region)?;

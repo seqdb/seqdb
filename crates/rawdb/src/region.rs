@@ -100,20 +100,34 @@ impl Region {
     pub fn truncate_write_all(&self, from: u64, data: &[u8]) -> Result<()> {
         self.db().truncate_write_all_to_region(self, from, data)
     }
+
+    pub fn rename(&self, new_id: String) -> Result<()> {
+        let old_id = self.meta().read().id().to_string();
+        self.db().rename_region(&old_id, new_id)
+    }
+
+    pub fn remove(self) -> Result<()> {
+        self.db().remove_region(self)?;
+        Ok(())
+    }
 }
 
 impl RegionMetadata {
-    pub fn new(id: String, start: u64, len: u64, reserved: u64) -> Self {
-        assert!(start.is_multiple_of(PAGE_SIZE));
-        assert!(reserved >= PAGE_SIZE);
-        assert!(reserved.is_multiple_of(PAGE_SIZE));
-        assert!(len <= reserved);
+    fn validate_id(id: &str) {
         assert!(!id.is_empty(), "Region id must not be empty");
         assert!(id.len() <= 1024, "Region id must be <= 1024 bytes");
         assert!(
             !id.chars().any(|c| c.is_control()),
             "Region id must not contain control characters"
         );
+    }
+
+    pub fn new(id: String, start: u64, len: u64, reserved: u64) -> Self {
+        assert!(start.is_multiple_of(PAGE_SIZE));
+        assert!(reserved >= PAGE_SIZE);
+        assert!(reserved.is_multiple_of(PAGE_SIZE));
+        assert!(len <= reserved);
+        Self::validate_id(&id);
 
         Self {
             id,
@@ -157,6 +171,12 @@ impl RegionMetadata {
     #[inline]
     pub fn id(&self) -> &str {
         &self.id
+    }
+
+    pub fn set_id(&mut self, id: String) {
+        Self::validate_id(&id);
+        self.id = id;
+        self.dirty = true;
     }
 
     pub fn set_reserved(&mut self, reserved: u64) {
