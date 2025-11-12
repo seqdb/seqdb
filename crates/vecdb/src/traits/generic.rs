@@ -67,6 +67,13 @@ where
         }
     }
 
+    /// Reads value at index using provided reader without checking the upper bound.
+    #[doc(hidden)]
+    fn unchecked_read(&self, index: I, reader: &Reader) -> Result<T> {
+        self.unchecked_read_at(index.to_usize(), reader)
+    }
+
+    /// Reads value at usize index using provided reader without checking the upper bound.
     #[doc(hidden)]
     fn unchecked_read_at(&self, index: usize, reader: &Reader) -> Result<T>;
 

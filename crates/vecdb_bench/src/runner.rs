@@ -14,7 +14,7 @@ pub const NUM_ITERATIONS: usize = 10;
 pub enum Database {
     VecDbCompressed,
     VecDbRaw,
-    VecDbRawOld,
+    // VecDbRawOld,
     Fjall2,
     Fjall3,
     Redb,
