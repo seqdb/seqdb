@@ -189,6 +189,19 @@ where
     pub fn is_dirty(&self) -> bool {
         !self.is_pushed_empty()
     }
+
+    /// Removes this vector and all its associated regions from the database
+    pub fn remove(self) -> Result<()> {
+        // Remove main region (through inner RawVec)
+        self.inner.remove()?;
+
+        // Remove pages region
+        let pages = Arc::try_unwrap(self.pages)
+            .map_err(|_| crate::Error::Str("Cannot remove CompressedVec: pages still referenced"))?;
+        pages.into_inner().remove()?;
+
+        Ok(())
+    }
 }
 
 impl<I, T> Clone for CompressedVec<I, T> {

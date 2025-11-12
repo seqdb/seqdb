@@ -1315,6 +1315,11 @@ where
             exit,
         )
     }
+
+    /// Removes this vector and all its associated regions from the database
+    pub fn remove(self) -> Result<()> {
+        self.0.remove()
+    }
 }
 
 impl<I, T> AnyVec for EagerVec<I, T>

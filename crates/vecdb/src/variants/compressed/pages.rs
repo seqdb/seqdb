@@ -92,4 +92,9 @@ impl Pages {
             0
         }
     }
+
+    pub fn remove(self) -> Result<()> {
+        self.region.remove()?;
+        Ok(())
+    }
 }

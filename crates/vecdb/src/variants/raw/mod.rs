@@ -203,6 +203,23 @@ where
     const fn aligned_buffer_size() -> usize {
         (BUFFER_SIZE / Self::SIZE_OF_T) * Self::SIZE_OF_T
     }
+
+    /// Removes this vector and all its associated regions from the database
+    pub fn remove(self) -> Result<()> {
+        let db = self.region.db();
+        let holes_region_name = self.holes_region_name();
+        let has_stored_holes = self.has_stored_holes;
+
+        // Remove main region
+        self.region.remove()?;
+
+        // Remove holes region if it exists
+        if has_stored_holes {
+            let _ = db.remove_region_with_id(&holes_region_name);
+        }
+
+        Ok(())
+    }
 }
 
 impl<I, T> Clone for RawVec<I, T> {

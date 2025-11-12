@@ -56,6 +56,14 @@ where
             Ok(Self::Raw(RawVec::forced_import_with(options)?))
         }
     }
+
+    /// Removes this vector and all its associated regions from the database
+    pub fn remove(self) -> Result<()> {
+        match self {
+            StoredVec::Raw(v) => v.remove(),
+            StoredVec::Compressed(v) => v.remove(),
+        }
+    }
 }
 
 impl<I, T> AnyVec for StoredVec<I, T>

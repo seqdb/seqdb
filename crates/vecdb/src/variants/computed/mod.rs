@@ -258,6 +258,17 @@ where
             }
         }
     }
+
+    /// Removes the stored data if this is an Eager computed vector.
+    /// For Lazy vectors (which have no stored data), this is a no-op.
+    pub fn remove_if_stored(self) -> Result<()> {
+        match self {
+            ComputedVec::Eager { vec, .. } => vec.remove(),
+            ComputedVec::LazyFrom1(_) | ComputedVec::LazyFrom2(_) | ComputedVec::LazyFrom3(_) => {
+                Ok(())
+            }
+        }
+    }
 }
 
 impl<I, T, S1I, S1T, S2I, S2T, S3I, S3T> AnyVec for ComputedVec<I, T, S1I, S1T, S2I, S2T, S3I, S3T>
