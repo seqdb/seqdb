@@ -547,43 +547,6 @@ where
         self.safe_flush(exit)
     }
 
-    // pub fn compute_granular<T2>(
-    //     &mut self,
-    //     max_from: T,
-    //     first_indexes: &impl AnyIterableVec<T, I>,
-    //     indexes_count: &impl AnyIterableVec<T, T2>,
-    //     exit: &Exit,
-    // ) -> Result<()>
-    // where
-    //     I: StoredRaw,
-    //     T: StoredIndex,
-    //     T2: StoredRaw,
-    //     usize: From<T2>,
-    // {
-    //     self.validate_computed_version_or_reset(
-    //         Version::ZERO
-    //             + self.inner_version()
-    //             + first_indexes.version()
-    //             + indexes_count.version(),
-    //     )?;
-
-    //     let mut indexes_count_iter = indexes_count.iter();
-
-    //     let index = max_from.to_usize().min(self.len());
-    //     first_indexes
-    //         .iter()
-    //         .enumerate()
-    //         .skip(skip)
-    //         .try_for_each(|(value, first_index)| {
-    //             let first_index = first_index.to_usize();
-    //             let count = usize::from(indexes_count_iter.get_unwrap_at(value));
-    //             (first_index..first_index + count)
-    //                 .try_for_each(|index| self.forced_push_at_(index, value, exit))
-    //         })?;
-
-    //     self.safe_flush(exit)
-    // }
-
     pub fn compute_count_from_indexes<T2, T3>(
         &mut self,
         max_from: I,
@@ -603,51 +566,21 @@ where
         <T2 as TryInto<T>>::Error: core::error::Error + 'static,
         T3: VecValue,
     {
-        self.compute_filtered_count_from_indexes_(
+        self.compute_filtered_count_from_indexes(
             max_from,
             first_indexes,
             other_to_else,
-            None as Option<Box<dyn FnMut(T2) -> bool>>,
+            |_| true,
             exit,
         )
     }
 
-    pub fn compute_filtered_count_from_indexes<T2, T3, F>(
+    pub fn compute_filtered_count_from_indexes<T2, T3>(
         &mut self,
         max_from: I,
         first_indexes: &impl IterableVec<I, T2>,
         other_to_else: &impl IterableVec<T2, T3>,
-        filter: F,
-        exit: &Exit,
-    ) -> Result<()>
-    where
-        T: From<T2>,
-        T2: VecValue
-            + VecIndex
-            + Copy
-            + Add<usize, Output = T2>
-            + CheckedSub<T2>
-            + TryInto<T>
-            + Default,
-        <T2 as TryInto<T>>::Error: core::error::Error + 'static,
-        T3: VecValue,
-        F: FnMut(T2) -> bool,
-    {
-        self.compute_filtered_count_from_indexes_(
-            max_from,
-            first_indexes,
-            other_to_else,
-            Some(Box::new(filter)),
-            exit,
-        )
-    }
-
-    fn compute_filtered_count_from_indexes_<T2, T3>(
-        &mut self,
-        max_from: I,
-        first_indexes: &impl IterableVec<I, T2>,
-        other_to_else: &impl IterableVec<T2, T3>,
-        mut filter: Option<Box<dyn FnMut(T2) -> bool + '_>>,
+        mut filter: impl FnMut(T2) -> bool,
         exit: &Exit,
     ) -> Result<()>
     where
@@ -682,11 +615,7 @@ where
                     .unwrap_or_else(|| other_to_else.len());
 
                 let range = first_index.to_usize()..end;
-                let count = if let Some(filter) = filter.as_mut() {
-                    range.into_iter().filter(|i| filter(T2::from(*i))).count()
-                } else {
-                    range.count()
-                };
+                let count = range.into_iter().filter(|i| filter(T2::from(*i))).count();
                 self.forced_push_at(i, T::from(T2::from(count)), exit)
             })?;
 
@@ -926,6 +855,31 @@ where
         T3: VecValue,
         usize: From<T3>,
     {
+        self.compute_filtered_sum_from_indexes(
+            max_from,
+            first_indexes,
+            indexes_count,
+            source,
+            |_| true,
+            exit,
+        )
+    }
+
+    pub fn compute_filtered_sum_from_indexes<T2, T3>(
+        &mut self,
+        max_from: I,
+        first_indexes: &impl IterableVec<I, T2>,
+        indexes_count: &impl IterableVec<I, T3>,
+        source: &impl IterableVec<T2, T>,
+        mut filter: impl FnMut(&T) -> bool,
+        exit: &Exit,
+    ) -> Result<()>
+    where
+        T: From<usize> + Add<T, Output = T>,
+        T2: VecIndex + VecValue,
+        T3: VecValue,
+        usize: From<T3>,
+    {
         self.validate_computed_version_or_reset(
             Version::ZERO
                 + self.inner_version()
@@ -939,18 +893,15 @@ where
         if let Some(starting_first_index) = first_indexes.iter().get(max_from) {
             source_iter.set_position(starting_first_index);
         }
-        indexes_count
-            .iter()
-            .enumerate()
-            .skip(skip)
-            .try_for_each(|(i, count)| {
-                let count = usize::from(count);
-                // Sequential read - iterator advances automatically
-                let sum = (&mut source_iter)
-                    .take(count)
-                    .fold(T::from(0_usize), |acc, val| acc + val);
-                self.forced_push_at(i, sum, exit)
-            })?;
+        for (i, count) in indexes_count.iter().enumerate().skip(skip) {
+            let count = usize::from(count);
+            // Sequential read - iterator advances automatically
+            let sum = (&mut source_iter)
+                .take(count)
+                .filter(|v| filter(v))
+                .fold(T::from(0_usize), |acc, val| acc + val);
+            self.forced_push_at(i, sum, exit)?;
+        }
 
         self.safe_flush(exit)
     }
