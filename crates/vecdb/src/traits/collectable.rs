@@ -48,7 +48,7 @@ where
     fn collect_range_json_bytes(&self, from: Option<usize>, to: Option<usize>) -> Vec<u8> {
         let vec = self.iter_range(from, to).collect::<Vec<_>>();
         let mut bytes = Vec::with_capacity(self.len() * 21);
-        sonic_rs::to_writer(&mut bytes, &vec).unwrap();
+        serde_json::to_writer(&mut bytes, &vec).unwrap();
         bytes
     }
 

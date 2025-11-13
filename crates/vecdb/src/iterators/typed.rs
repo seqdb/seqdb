@@ -6,7 +6,7 @@ pub trait TypedVecIterator: VecIterator<Item = Self::T> {
     type T: VecValue;
 
     /// Sets the current position using the typed index.
-    #[inline]
+    #[inline(always)]
     fn set_position(&mut self, i: Self::I) {
         self.set_position_to(i.to_usize());
     }

@@ -45,20 +45,20 @@ where
     // ============================================================================
 
     /// Reads value at index using provided reader.
-    #[inline]
+    #[inline(always)]
     fn read(&self, index: I, reader: &Reader) -> Result<T> {
         self.read_at(index.to_usize(), reader)
     }
 
     /// Reads value at index, creating a temporary reader.
     /// For multiple reads, prefer `read()` with a reused reader.
-    #[inline]
+    #[inline(always)]
     fn read_once(&self, index: I) -> Result<T> {
         self.read(index, &self.create_reader())
     }
 
     /// Reads value at usize index using provided reader.
-    #[inline]
+    #[inline(always)]
     fn read_at(&self, index: usize, reader: &Reader) -> Result<T> {
         if likely(index < self.len()) {
             self.unchecked_read_at(index, reader)
@@ -69,6 +69,7 @@ where
 
     /// Reads value at index using provided reader without checking the upper bound.
     #[doc(hidden)]
+    #[inline(always)]
     fn unchecked_read(&self, index: I, reader: &Reader) -> Result<T> {
         self.unchecked_read_at(index.to_usize(), reader)
     }
@@ -85,7 +86,7 @@ where
     }
 
     /// Reads value at index using provided reader. Panics if read fails.
-    #[inline]
+    #[inline(always)]
     fn read_unwrap(&self, index: I, reader: &Reader) -> T {
         self.read(index, reader).unwrap()
     }
@@ -142,7 +143,7 @@ where
 
         // Check pushed (beyond stored length)
         if index >= stored_len {
-            return Ok(self.get_pushed_at(index, stored_len).cloned());
+            return Ok(self.pushed().get(index - stored_len).cloned());
         }
 
         // Check updated layer
@@ -195,7 +196,7 @@ where
 
     /// Gets value from pushed layer or storage using provided reader.
     /// Does not check the updated layer.
-    #[inline]
+    #[inline(always)]
     fn get_pushed_or_read(&self, index: I, reader: &Reader) -> Result<Option<T>> {
         self.get_pushed_or_read_at(index.to_usize(), reader)
     }
@@ -209,14 +210,12 @@ where
 
     /// Gets value from pushed layer or storage at usize index using provided reader.
     /// Does not check the updated layer.
-    #[inline]
+    #[inline(always)]
     fn get_pushed_or_read_at(&self, index: usize, reader: &Reader) -> Result<Option<T>> {
         let stored_len = self.stored_len();
-
         if index >= stored_len {
-            return Ok(self.get_pushed_at(index, stored_len).cloned());
+            return Ok(self.pushed().get(index - stored_len).cloned());
         }
-
         Ok(Some(self.unchecked_read_at(index, reader)?))
     }
 

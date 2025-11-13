@@ -17,7 +17,7 @@ pub enum Error {
     SystemTimeError(time::SystemTimeError),
     PCO(pco::errors::PcoError),
     RawDB(rawdb::Error),
-    Sonic(sonic_rs::Error),
+    SerdeJSON(serde_json::Error),
 
     Str(&'static str),
     String(String),
@@ -49,9 +49,9 @@ impl From<fmt::Error> for Error {
     }
 }
 
-impl From<sonic_rs::Error> for Error {
-    fn from(value: sonic_rs::Error) -> Self {
-        Self::Sonic(value)
+impl From<serde_json::Error> for Error {
+    fn from(value: serde_json::Error) -> Self {
+        Self::SerdeJSON(value)
     }
 }
 
@@ -90,7 +90,7 @@ impl fmt::Display for Error {
         match self {
             Error::IO(error) => Display::fmt(&error, f),
             Error::Format(error) => Display::fmt(&error, f),
-            Error::Sonic(error) => Display::fmt(&error, f),
+            Error::SerdeJSON(error) => Display::fmt(&error, f),
             Error::RawDB(error) => Display::fmt(&error, f),
             Error::TryLockError(_) => write!(
                 f,

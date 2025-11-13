@@ -163,6 +163,7 @@ where
     S3I: VecIndex,
     S3T: VecValue,
 {
+    #[inline]
     fn set_position_to(&mut self, i: usize) {
         self.index = i.min(self.end_index);
         if self.source1_same_index {

@@ -11,8 +11,8 @@ use rawdb::{Database, Reader, Region};
 
 use crate::{
     AnyStoredVec, AnyVec, BoxedVecIterator, CheckedSub, CollectableVec, Compressable, Exit, Format,
-    GenericStoredVec, IterableVec, Result, StoredVec, StoredVecIterator, TypedVec, VecIndex,
-    VecIterator, VecValue, Version,
+    GenericStoredVec, IterableVec, Result, StoredVec, StoredVecIterator, TypedVec,
+    TypedVecIterator, VecIndex, VecValue, Version,
     variants::{Header, ImportOptions},
 };
 
@@ -221,6 +221,59 @@ where
                     b,
                     iter2.next().unwrap(),
                     iter3.next().unwrap(),
+                    self,
+                ));
+                self.forced_push(i, v, exit)
+            })?;
+
+        self.safe_flush(exit)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn compute_transform4<A, B, C, D, E, F>(
+        &mut self,
+        max_from: A,
+        other1: &impl IterableVec<A, B>,
+        other2: &impl IterableVec<A, C>,
+        other3: &impl IterableVec<A, D>,
+        other4: &impl IterableVec<A, E>,
+        mut t: F,
+        exit: &Exit,
+    ) -> Result<()>
+    where
+        A: VecIndex,
+        B: VecValue,
+        C: VecValue,
+        D: VecValue,
+        E: VecValue,
+        F: FnMut((A, B, C, D, E, &Self)) -> (I, T),
+    {
+        self.validate_computed_version_or_reset(
+            Version::ZERO
+                + self.inner_version()
+                + other1.version()
+                + other2.version()
+                + other3.version()
+                + other4.version(),
+        )?;
+
+        let skip = max_from.to_usize().min(self.len());
+
+        let mut iter2 = other2.iter().skip(skip);
+        let mut iter3 = other3.iter().skip(skip);
+        let mut iter4 = other4.iter().skip(skip);
+
+        other1
+            .iter()
+            .enumerate()
+            .skip(skip)
+            .try_for_each(|(a, b)| {
+                let (i, v) = t((
+                    A::from(a),
+                    b,
+                    iter2.next().unwrap(),
+                    iter3.next().unwrap(),
+                    iter4.next().unwrap(),
                     self,
                 ));
                 self.forced_push(i, v, exit)
@@ -550,8 +603,13 @@ where
         <T2 as TryInto<T>>::Error: core::error::Error + 'static,
         T3: VecValue,
     {
-        let opt: Option<Box<dyn FnMut(T2) -> bool>> = None;
-        self.compute_filtered_count_from_indexes_(max_from, first_indexes, other_to_else, opt, exit)
+        self.compute_filtered_count_from_indexes_(
+            max_from,
+            first_indexes,
+            other_to_else,
+            None as Option<Box<dyn FnMut(T2) -> bool>>,
+            exit,
+        )
     }
 
     pub fn compute_filtered_count_from_indexes<T2, T3, F>(
@@ -688,29 +746,40 @@ where
 
         let skip = max_from.to_usize().min(self.len());
 
-        let mut prev = VecDeque::new();
+        // Monotonic deque: maintains indices in decreasing order of values
+        let mut deque: VecDeque<(usize, T2)> = VecDeque::new();
 
         source
             .iter()
             .enumerate()
             .skip(skip.checked_sub(window).unwrap_or_default())
             .try_for_each(|(i, value)| {
-                let value = value;
-
-                let len = prev.len();
-                if len > window {
-                    unreachable!()
-                } else if len == window {
-                    prev.pop_front();
+                // Remove elements outside the window from front
+                while let Some(&(idx, _)) = deque.front() {
+                    if i >= window && idx <= i - window {
+                        deque.pop_front();
+                    } else {
+                        break;
+                    }
                 }
 
-                prev.push_back(value);
+                // Remove elements smaller than current from back (maintain decreasing order)
+                while let Some((_, v)) = deque.back() {
+                    if v < &value {
+                        deque.pop_back();
+                    } else {
+                        break;
+                    }
+                }
+
+                deque.push_back((i, value));
 
                 if i < skip {
                     return Ok(());
                 }
 
-                let v = prev.iter().max().cloned().unwrap();
+                // Front element is the maximum
+                let v = deque.front().unwrap().1.clone();
 
                 self.forced_push_at(i, T::from(v), exit)
             })?;
@@ -735,29 +804,40 @@ where
 
         let skip = max_from.to_usize().min(self.len());
 
-        let mut prev = VecDeque::new();
+        // Monotonic deque: maintains indices in increasing order of values
+        let mut deque: VecDeque<(usize, T2)> = VecDeque::new();
 
         source
             .iter()
             .enumerate()
             .skip(skip.checked_sub(window).unwrap_or_default())
             .try_for_each(|(i, value)| {
-                let value = value;
-
-                let len = prev.len();
-                if len > window {
-                    unreachable!()
-                } else if len == window {
-                    prev.pop_front();
+                // Remove elements outside the window from front
+                while let Some(&(idx, _)) = deque.front() {
+                    if i >= window && idx <= i - window {
+                        deque.pop_front();
+                    } else {
+                        break;
+                    }
                 }
 
-                prev.push_back(value);
+                // Remove elements larger than current from back (maintain increasing order)
+                while let Some((_, v)) = deque.back() {
+                    if v > &value {
+                        deque.pop_back();
+                    } else {
+                        break;
+                    }
+                }
+
+                deque.push_back((i, value));
 
                 if i < skip {
                     return Ok(());
                 }
 
-                let v = prev.iter().min().cloned().unwrap();
+                // Front element is the minimum
+                let v = deque.front().unwrap().1.clone();
 
                 self.forced_push_at(i, T::from(v), exit)
             })?;
@@ -781,8 +861,25 @@ where
         )?;
 
         let skip = max_from.to_usize().min(self.len());
-        let mut prev = None;
-        let mut other_iter = source.iter();
+        let mut prev = skip
+            .checked_sub(1)
+            .and_then(|prev_i| self.into_iter().get(I::from(prev_i)))
+            .or(Some(T::default()));
+
+        // Initialize buffer for sliding window sum
+        let mut window_values = if window < usize::MAX {
+            VecDeque::with_capacity(window + 1)
+        } else {
+            VecDeque::new()
+        };
+
+        if skip > 0 {
+            let start = skip.saturating_sub(window);
+            source.iter().skip(start).take(skip - start).for_each(|v| {
+                window_values.push_back(T::from(v));
+            });
+        }
+
         source
             .iter()
             .enumerate()
@@ -790,26 +887,23 @@ where
             .try_for_each(|(i, value)| {
                 let value = T::from(value);
 
-                if prev.is_none() {
-                    let i = i.to_usize();
-                    prev.replace(if i > 0 {
-                        self.into_iter().get_at_unwrap(i - 1)
-                    } else {
-                        T::default()
-                    });
-                }
-
                 let processed_values_count = i.to_usize() + 1;
                 let len = (processed_values_count).min(window);
 
                 let sum = if processed_values_count > len {
                     let prev_sum = prev.unwrap();
-                    let value_to_subtract =
-                        T::from(other_iter.get_at_unwrap(i.to_usize().checked_sub(len).unwrap()));
+                    // Pop the oldest value from our window buffer
+                    let value_to_subtract = window_values.pop_front().unwrap();
                     prev_sum.checked_sub(value_to_subtract).unwrap() + value
                 } else {
                     prev.unwrap() + value
                 };
+
+                // Add current value to window buffer
+                window_values.push_back(value);
+                if window_values.len() > window {
+                    window_values.pop_front();
+                }
 
                 prev.replace(sum);
                 self.forced_push_at(i, sum, exit)
@@ -839,21 +933,22 @@ where
                 + indexes_count.version(),
         )?;
 
-        let mut indexes_count_iter = indexes_count.iter();
         let mut source_iter = source.iter();
         let skip = max_from.to_usize().min(self.len());
-        first_indexes
+        // Set position once - source indices are sequential
+        if let Some(starting_first_index) = first_indexes.iter().get(max_from) {
+            source_iter.set_position(starting_first_index);
+        }
+        indexes_count
             .iter()
             .enumerate()
             .skip(skip)
-            .try_for_each(|(i, first_index)| {
-                let count = usize::from(indexes_count_iter.get_at_unwrap(i));
-                let first_index = first_index.to_usize();
-                let range = first_index..first_index + count;
-                let mut sum = T::from(0_usize);
-                range.into_iter().for_each(|i| {
-                    sum = sum + source_iter.get_at_unwrap(i);
-                });
+            .try_for_each(|(i, count)| {
+                let count = usize::from(count);
+                // Sequential read - iterator advances automatically
+                let sum = (&mut source_iter)
+                    .take(count)
+                    .fold(T::from(0_usize), |acc, val| acc + val);
                 self.forced_push_at(i, sum, exit)
             })?;
 
@@ -877,9 +972,12 @@ where
             unreachable!("others should've length of 1 at least");
         }
 
-        let mut others_iter = others[1..].iter().map(|v| v.iter()).collect::<Vec<_>>();
-
         let skip = max_from.to_usize().min(self.len());
+        let mut others_iter = others[1..]
+            .iter()
+            .map(|v| v.iter().skip(skip))
+            .collect::<Vec<_>>();
+
         others
             .first()
             .unwrap()
@@ -889,7 +987,7 @@ where
             .try_for_each(|(i, v)| {
                 let mut sum = v;
                 others_iter.iter_mut().for_each(|iter| {
-                    sum = sum + iter.get_at_unwrap(i);
+                    sum = sum + iter.next().unwrap();
                 });
                 self.forced_push_at(i, sum, exit)
             })?;
@@ -914,9 +1012,11 @@ where
             unreachable!("others should've length of 1 at least");
         }
 
-        let mut others_iter = others[1..].iter().map(|v| v.iter()).collect::<Vec<_>>();
-
         let skip = max_from.to_usize().min(self.len());
+        let mut others_iter = others[1..]
+            .iter()
+            .map(|v| v.iter().skip(skip))
+            .collect::<Vec<_>>();
 
         others
             .first()
@@ -928,7 +1028,7 @@ where
                 let min = v;
                 let min = others_iter
                     .iter_mut()
-                    .map(|iter| iter.get_at_unwrap(i))
+                    .map(|iter| iter.next().unwrap())
                     .min()
                     .map_or(min, |min2| min.min(min2));
                 self.forced_push_at(i, min, exit)
@@ -954,9 +1054,12 @@ where
             unreachable!("others should've length of 1 at least");
         }
 
-        let mut others_iter = others[1..].iter().map(|v| v.iter()).collect::<Vec<_>>();
-
         let skip = max_from.to_usize().min(self.len());
+
+        let mut others_iter = others[1..]
+            .iter()
+            .map(|v| v.iter().skip(skip))
+            .collect::<Vec<_>>();
 
         others
             .first()
@@ -968,7 +1071,7 @@ where
                 let max = v;
                 let max = others_iter
                     .iter_mut()
-                    .map(|iter| iter.get_at_unwrap(i))
+                    .map(|iter| iter.next().unwrap())
                     .max()
                     .map_or(max, |max2| max.max(max2));
                 self.forced_push_at(i, max, exit)
@@ -1010,45 +1113,62 @@ where
         )?;
 
         let skip = max_from.to_usize().min(self.len());
-        let mut prev = None;
         let min_i = min_i.map(|i| i.to_usize());
         let min_prev_i = min_i.unwrap_or_default();
-        let mut other_iter = source.iter();
+
+        let mut prev = skip
+            .checked_sub(1)
+            .and_then(|prev_i| {
+                if prev_i > min_prev_i {
+                    self.into_iter().get(I::from(prev_i))
+                } else {
+                    Some(T::from(0.0))
+                }
+            })
+            .or(Some(T::from(0.0)));
+
+        // Initialize buffer for sliding window SMA
+        let mut window_values = if sma < usize::MAX {
+            VecDeque::with_capacity(sma + 1)
+        } else {
+            VecDeque::new()
+        };
+
+        if skip > 0 {
+            let start = skip.saturating_sub(sma).max(min_prev_i);
+            source.iter().skip(start).take(skip - start).for_each(|v| {
+                window_values.push_back(f32::from(v));
+            });
+        }
 
         source
             .iter()
             .enumerate()
             .skip(skip)
             .try_for_each(|(i, value)| {
-                let value = value;
-
                 if min_i.is_none() || min_i.is_some_and(|min_i| min_i <= i) {
-                    if prev.is_none() {
-                        let i = i.to_usize();
-                        prev.replace(if i > min_prev_i {
-                            self.into_iter().get_at_unwrap(i - 1)
-                        } else {
-                            T::from(0.0)
-                        });
-                    }
-
                     let processed_values_count = i.to_usize() - min_prev_i + 1;
                     let len = (processed_values_count).min(sma);
 
                     let value = f32::from(value);
 
-                    let sma = T::from(if processed_values_count > sma {
+                    let sma_result = T::from(if processed_values_count > sma {
                         let prev_sum = f32::from(prev.unwrap()) * len as f32;
-                        let value_to_subtract = f32::from(
-                            other_iter.get_at_unwrap(i.to_usize().checked_sub(sma).unwrap()),
-                        );
+                        // Pop the oldest value from our window buffer
+                        let value_to_subtract = window_values.pop_front().unwrap();
                         (prev_sum - value_to_subtract + value) / len as f32
                     } else {
                         (f32::from(prev.unwrap()) * (len - 1) as f32 + value) / len as f32
                     });
 
-                    prev.replace(sma);
-                    self.forced_push_at(i, sma, exit)
+                    // Add current value to window buffer
+                    window_values.push_back(value);
+                    if window_values.len() > sma {
+                        window_values.pop_front();
+                    }
+
+                    prev.replace(sma_result);
+                    self.forced_push_at(i, sma_result, exit)
                 } else {
                     self.forced_push_at(i, T::from(f32::NAN), exit)
                 }
@@ -1094,9 +1214,19 @@ where
         let _1_minus_k = 1.0 - k;
 
         let skip = max_from.to_usize().min(self.len());
-        let mut prev = None;
         let min_i = min_i.map(|i| i.to_usize());
         let min_prev_i = min_i.unwrap_or_default();
+
+        let mut prev = skip
+            .checked_sub(1)
+            .and_then(|prev_i| {
+                if prev_i >= min_prev_i {
+                    self.into_iter().get(I::from(prev_i))
+                } else {
+                    Some(T::from(0.0))
+                }
+            })
+            .or(Some(T::from(0.0)));
 
         source
             .iter()
@@ -1106,17 +1236,7 @@ where
                 let value = value;
 
                 if min_i.is_none() || min_i.is_some_and(|min_i| min_i <= index) {
-                    let i = index.to_usize();
-
-                    if prev.is_none() {
-                        prev.replace(if i > min_prev_i {
-                            self.into_iter().get_at_unwrap(i - 1)
-                        } else {
-                            T::from(0.0)
-                        });
-                    }
-
-                    let processed_values_count = i - min_prev_i + 1;
+                    let processed_values_count = index - min_prev_i + 1;
 
                     let value = f32::from(value);
 
@@ -1149,7 +1269,7 @@ where
     ) -> Result<()>
     where
         I: CheckedSub,
-        T2: VecValue + Default,
+        T2: Compressable + Default,
         f32: From<T2>,
         T: From<f32>,
     {
@@ -1158,16 +1278,19 @@ where
         )?;
 
         let skip = max_from.to_usize().min(self.len());
-        let mut source_iter = source.iter();
 
-        (skip.to_usize()..source.len()).try_for_each(|i| {
-            let previous_value = i
-                .checked_sub(len)
-                .map(|prev_i| f32::from(source_iter.get_at_unwrap(prev_i)))
-                .unwrap_or(f32::NAN);
+        let mut lookback = source.create_lookback(skip, len, 0);
 
-            self.forced_push_at(i, T::from(previous_value), exit)
-        })?;
+        source
+            .iter()
+            .enumerate()
+            .skip(skip)
+            .try_for_each(|(i, value)| {
+                let previous_value = f32::from(lookback.get_at_lookback(i, T2::default()));
+                lookback.push_and_maintain(value);
+
+                self.forced_push_at(i, T::from(previous_value), exit)
+            })?;
 
         self.safe_flush(exit)
     }
@@ -1188,17 +1311,16 @@ where
         )?;
 
         let skip = max_from.to_usize().min(self.len());
-        let mut source_iter = source.iter();
+
+        let mut lookback = source.create_lookback(skip, len, 0);
 
         source
             .iter()
             .enumerate()
             .skip(skip)
             .try_for_each(|(i, current)| {
-                let prev = i
-                    .checked_sub(len)
-                    .map(|prev_i| source_iter.get_at_unwrap(prev_i))
-                    .unwrap_or_default();
+                let prev = lookback.get_at_lookback(i, T::default());
+                lookback.push_and_maintain(current);
 
                 self.forced_push_at(i, current.checked_sub(prev).unwrap(), exit)
             })?;
@@ -1215,7 +1337,7 @@ where
     ) -> Result<()>
     where
         I: CheckedSub,
-        T2: VecValue + Default,
+        T2: Compressable + Default,
         f32: From<T2>,
         T: From<f32>,
     {
@@ -1224,19 +1346,16 @@ where
         )?;
 
         let skip = max_from.to_usize().min(self.len());
-        let mut source_iter = source.iter();
+
+        let mut lookback = source.create_lookback(skip, len, 0);
+
         source
             .iter()
             .enumerate()
             .skip(skip)
             .try_for_each(|(i, b)| {
-                let previous_value = f32::from(
-                    i.checked_sub(len)
-                        .map(|prev_i| source_iter.get_at_unwrap(prev_i))
-                        .unwrap_or_default(),
-                );
-
                 let last_value = f32::from(b);
+                let previous_value = f32::from(lookback.get_and_push(i, b, T2::default()));
 
                 let percentage_change = ((last_value / previous_value) - 1.0) * 100.0;
 

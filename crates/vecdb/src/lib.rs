@@ -14,6 +14,7 @@ pub use vecdb_derive::Compressable;
 mod error;
 mod exit;
 mod iterators;
+mod lookback;
 mod stamp;
 mod traits;
 mod variants;

@@ -256,6 +256,7 @@ where
     I: VecIndex,
     T: Compressable,
 {
+    #[inline]
     fn set_position_to(&mut self, i: usize) {
         let new_index = i.min(self.stored_len).min(self.end_index);
 

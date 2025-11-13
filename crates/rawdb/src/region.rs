@@ -138,7 +138,7 @@ impl RegionMetadata {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn start(&self) -> u64 {
         self.start
     }
@@ -151,7 +151,7 @@ impl RegionMetadata {
     }
 
     #[allow(clippy::len_without_is_empty)]
-    #[inline]
+    #[inline(always)]
     pub fn len(&self) -> u64 {
         self.len
     }
@@ -163,12 +163,12 @@ impl RegionMetadata {
         self.dirty = true;
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn reserved(&self) -> u64 {
         self.reserved
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn id(&self) -> &str {
         &self.id
     }
@@ -188,12 +188,12 @@ impl RegionMetadata {
         self.dirty = true;
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_clean(&self) -> bool {
         !self.is_dirty()
     }
@@ -203,7 +203,7 @@ impl RegionMetadata {
         self.dirty = false;
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn left(&self) -> u64 {
         self.reserved - self.len
     }
