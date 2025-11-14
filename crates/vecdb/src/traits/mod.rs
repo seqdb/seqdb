@@ -1,5 +1,4 @@
 mod any;
-mod checked_sub;
 mod collectable;
 mod compressable;
 mod formattable;
@@ -14,7 +13,6 @@ mod value;
 mod writable;
 
 pub use any::*;
-pub use checked_sub::*;
 pub use collectable::*;
 pub use compressable::*;
 pub use formattable::*;

@@ -27,10 +27,7 @@ pub use exit::*;
 pub use iterators::*;
 pub use stamp::*;
 pub use traits::*;
-pub use variants::{
-    CompressedVec, Computation, ComputedVec, ComputedVecFrom1, ComputedVecFrom2, ComputedVecFrom3,
-    EagerVec, Format, ImportOptions, LazyVecFrom1, LazyVecFrom2, LazyVecFrom3, RawVec, StoredVec,
-};
+pub use variants::*;
 pub use version::*;
 
 const ONE_KIB: usize = 1024;

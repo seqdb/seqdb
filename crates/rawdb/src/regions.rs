@@ -178,6 +178,8 @@ impl Regions {
     }
 
     pub fn flush(&self) -> Result<()> {
+        let mut needs_sync = false;
+
         // Write all dirty metadata to file
         for (index, region) in self
             .index_to_region
@@ -189,14 +191,18 @@ impl Regions {
             if region_meta.is_clean() {
                 continue;
             }
+            needs_sync = true;
             let start = (index * SIZE_OF_REGION_METADATA) as u64;
             let bytes = region_meta.to_bytes();
             self.file.write_all_at(&bytes, start)?;
             region_meta.clear_dirty();
         }
 
-        // Sync the metadata file
-        self.file.sync_data()?;
+        if needs_sync {
+            // Sync the metadata file
+            self.file.sync_data()?;
+        }
+
         Ok(())
     }
 }

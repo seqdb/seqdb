@@ -9,7 +9,7 @@ use crate::{Error, Result, Stamp, Version};
 use super::Format;
 
 const HEADER_VERSION: Version = Version::ONE;
-pub const HEADER_OFFSET: u64 = size_of::<HeaderInner>() as u64;
+pub(crate) const HEADER_OFFSET: u64 = size_of::<HeaderInner>() as u64;
 
 #[derive(Debug, Clone)]
 pub struct Header {

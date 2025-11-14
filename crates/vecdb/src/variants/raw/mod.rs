@@ -304,6 +304,10 @@ where
         self.saved_stamped_changes
     }
 
+    fn db(&self) -> Database {
+        self.region.db()
+    }
+
     #[inline]
     fn real_stored_len(&self) -> usize {
         (self.region.meta().read().len() as usize - HEADER_OFFSET as usize) / Self::SIZE_OF_T

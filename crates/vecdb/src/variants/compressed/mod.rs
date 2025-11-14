@@ -25,7 +25,7 @@ use pages::*;
 
 const PCO_COMPRESSION_LEVEL: usize = 4;
 /// Maximum size in bytes of a single compressed (pco) page
-pub const MAX_UNCOMPRESSED_PAGE_SIZE: usize = 16 * 1024; // 16 KiB
+pub(crate) const MAX_UNCOMPRESSED_PAGE_SIZE: usize = 16 * 1024; // 16 KiB
 
 const VERSION: Version = Version::TWO;
 
@@ -197,7 +197,7 @@ where
 
         // Remove pages region
         let pages = Arc::try_unwrap(self.pages)
-            .map_err(|_| crate::Error::Str("Cannot remove CompressedVec: pages still referenced"))?;
+            .map_err(|_| Error::Str("Cannot remove CompressedVec: pages still referenced"))?;
         pages.into_inner().remove()?;
 
         Ok(())
@@ -372,8 +372,14 @@ where
         Ok(())
     }
 
+    #[inline]
     fn serialize_changes(&self) -> Result<Vec<u8>> {
         self.inner.serialize_changes()
+    }
+
+    #[inline]
+    fn db(&self) -> Database {
+        self.inner.db()
     }
 }
 

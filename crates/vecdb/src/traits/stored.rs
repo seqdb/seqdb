@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use rawdb::Region;
+use rawdb::{Database, Region};
 
 use crate::{AnyVec, Exit, Result, Stamp, variants::Header};
 
@@ -19,12 +19,17 @@ pub trait AnyStoredVec: AnyVec {
 
     fn flush(&mut self) -> Result<()>;
 
+    #[doc(hidden)]
+    fn db(&self) -> Database;
+
     /// Flushes while holding the exit lock to ensure consistency during shutdown.
     #[inline]
     fn safe_flush(&mut self, exit: &Exit) -> Result<()> {
         // info!("safe flush {}", self.name());
         let _lock = exit.lock();
-        self.flush()
+        self.flush()?;
+        // self.db().flush()?; // Need to do a partial flush instead
+        Ok(())
     }
 
     /// The actual length stored on disk.

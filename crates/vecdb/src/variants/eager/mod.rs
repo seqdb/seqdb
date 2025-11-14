@@ -9,8 +9,14 @@ use std::{
 
 use rawdb::{Database, Reader, Region};
 
+mod checked_sub;
+mod saturating_add;
+
+pub use checked_sub::*;
+pub use saturating_add::*;
+
 use crate::{
-    AnyStoredVec, AnyVec, BoxedVecIterator, CheckedSub, CollectableVec, Compressable, Exit, Format,
+    AnyStoredVec, AnyVec, BoxedVecIterator, CollectableVec, Compressable, Exit, Format,
     GenericStoredVec, IterableVec, Result, StoredVec, StoredVecIterator, TypedVec,
     TypedVecIterator, VecIndex, VecValue, Version,
     variants::{Header, ImportOptions},
@@ -850,7 +856,7 @@ where
         exit: &Exit,
     ) -> Result<()>
     where
-        T: From<usize> + Add<T, Output = T>,
+        T: From<usize> + SaturatingAdd,
         T2: VecIndex + VecValue,
         T3: VecValue,
         usize: From<T3>,
@@ -875,7 +881,7 @@ where
         exit: &Exit,
     ) -> Result<()>
     where
-        T: From<usize> + Add<T, Output = T>,
+        T: From<usize> + SaturatingAdd,
         T2: VecIndex + VecValue,
         T3: VecValue,
         usize: From<T3>,
@@ -899,7 +905,7 @@ where
             let sum = (&mut source_iter)
                 .take(count)
                 .filter(|v| filter(v))
-                .fold(T::from(0_usize), |acc, val| acc + val);
+                .fold(T::from(0_usize), |acc, val| acc.saturating_add(val));
             self.forced_push_at(i, sum, exit)?;
         }
 
@@ -1473,8 +1479,14 @@ where
         self.0.real_stored_len()
     }
 
+    #[inline]
     fn serialize_changes(&self) -> Result<Vec<u8>> {
         self.0.serialize_changes()
+    }
+
+    #[inline]
+    fn db(&self) -> Database {
+        self.0.db()
     }
 }
 

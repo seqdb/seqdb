@@ -132,6 +132,14 @@ where
     }
 
     #[inline]
+    fn db(&self) -> Database {
+        match self {
+            StoredVec::Raw(v) => v.db(),
+            StoredVec::Compressed(v) => v.db(),
+        }
+    }
+
+    #[inline]
     fn header(&self) -> &Header {
         match self {
             StoredVec::Raw(v) => v.header(),
