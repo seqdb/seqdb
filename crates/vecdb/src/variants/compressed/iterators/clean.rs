@@ -1,7 +1,11 @@
-use std::iter::FusedIterator;
+use std::{
+    fs::File,
+    io::{Read, Seek, SeekFrom},
+    iter::FusedIterator,
+};
 
 use parking_lot::RwLockReadGuard;
-use rawdb::Reader;
+use rawdb::RegionMetadata;
 
 use crate::{
     AnyStoredVec, BUFFER_SIZE, Compressable, CompressedVec, GenericStoredVec, Result,
@@ -12,9 +16,11 @@ use crate::{
 use super::super::pages::Pages;
 
 /// Clean compressed vec iterator, for reading stored compressed data
+/// Uses dedicated file handle for sequential reads (better OS readahead than mmap)
 pub struct CleanCompressedVecIterator<'a, I, T> {
     pub(crate) _vec: &'a CompressedVec<I, T>,
-    reader: Reader<'a>,
+    file: File,         // Dedicated file handle for sequential reads
+    file_position: u64, // Current position in the file
     // Compressed data buffer (to reduce syscalls)
     buffer: Vec<u8>,
     buffer_len: usize,
@@ -27,6 +33,7 @@ pub struct CleanCompressedVecIterator<'a, I, T> {
     pub(crate) stored_len: usize,
     index: usize,
     end_index: usize,
+    _region_lock: RwLockReadGuard<'a, RegionMetadata>,
 }
 
 impl<'a, I, T> CleanCompressedVecIterator<'a, I, T>
@@ -39,12 +46,16 @@ where
     const NO_PAGE: usize = usize::MAX;
 
     pub fn new(vec: &'a CompressedVec<I, T>) -> Result<Self> {
+        let file = vec.inner.region().open_db_read_only_file()?;
+        let region_lock = vec.inner.region().meta().read();
+
         let pages = vec.pages.read();
         let stored_len = vec.stored_len();
 
         Ok(Self {
             _vec: vec,
-            reader: vec.create_reader(),
+            file,
+            file_position: 0,
             buffer: vec![0; BUFFER_SIZE],
             buffer_len: 0,
             buffer_page_start: 0,
@@ -55,6 +66,7 @@ where
             stored_len,
             index: 0,
             end_index: stored_len,
+            _region_lock: region_lock,
         })
     }
 
@@ -114,9 +126,14 @@ where
             return None;
         }
 
-        // Read compressed data into buffer
-        let compressed_data = self.reader.unchecked_read(start_offset, total_bytes as u64);
-        self.buffer[..total_bytes].copy_from_slice(compressed_data);
+        if self.file_position != start_offset {
+            self.file_position = start_offset;
+            self.file.seek(SeekFrom::Start(start_offset)).unwrap();
+        }
+
+        self.file
+            .read_exact(&mut self.buffer[..total_bytes])
+            .unwrap();
         self.buffer_len = total_bytes;
 
         Some(())
