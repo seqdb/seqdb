@@ -17,7 +17,7 @@ panic = "abort"
 
 [workspace.dependencies]
 libc = "0.2"
-log = "0.4.30"
+log = "0.4.33"
 parking_lot = "0.12.5"
 rawdb = { version = "=0.10.3", path = "crates/rawdb" }
 rayon = "1.12.0"
