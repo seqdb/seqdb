@@ -958,7 +958,7 @@ dependencies = [
 
 [[package]]
 name = "rawdb"
-version = "0.10.3"
+version = "0.10.4"
 dependencies = [
  "libc",
  "log",
@@ -1434,7 +1434,7 @@ checksum = "bfa6c38708f6257f1ec2ca7e5a11f9bbf58a27d7060078b6b333624968183d96"
 
 [[package]]
 name = "vecdb"
-version = "0.10.3"
+version = "0.10.4"
 dependencies = [
  "itoa",
  "libc",
@@ -1458,7 +1458,7 @@ dependencies = [
 
 [[package]]
 name = "vecdb_bench"
-version = "0.10.3"
+version = "0.10.4"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -1472,7 +1472,7 @@ dependencies = [
 
 [[package]]
 name = "vecdb_derive"
-version = "0.10.3"
+version = "0.10.4"
 dependencies = [
  "quote",
  "syn",
