@@ -7,12 +7,14 @@ use parking_lot::RwLock;
 
 mod any_vec;
 mod budget;
+mod cloneable;
 mod clone;
 mod read_only_clone;
 mod readable;
 mod typed;
 
 pub use budget::{CachedVecBudget, NoBudget};
+pub use cloneable::{CachedBoxedVec, CachedReadableVec};
 
 use crate::{ReadOnlyClone, ReadableVec, StoredVec, TypedVec, VecIndex, Version};
 
