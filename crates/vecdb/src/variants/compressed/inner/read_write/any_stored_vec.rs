@@ -142,22 +142,26 @@ where
         if values.is_empty() {
             values = taken;
         } else {
-            values.extend_from_slice(&taken);
+            values.extend(taken);
         }
 
         let num_pages = values.len().div_ceil(Self::PER_PAGE);
-        let mut buf = Vec::with_capacity(values.len() * Self::SIZE_OF_T);
+        let mut buf = Vec::new();
         let mut page_sizes: Vec<(usize, usize, bool)> = Vec::with_capacity(num_pages);
         for chunk in values.chunks(Self::PER_PAGE) {
-            if chunk.len() == Self::PER_PAGE {
-                let compressed = Self::compress_page(chunk)?;
-                page_sizes.push((compressed.len(), chunk.len(), false));
-                buf.extend_from_slice(&compressed);
+            let (encoded, is_raw) = if chunk.len() == Self::PER_PAGE {
+                (Self::compress_page(chunk)?, false)
             } else {
-                let raw = S::values_to_bytes(chunk);
-                page_sizes.push((raw.len(), chunk.len(), true));
-                buf.extend_from_slice(&raw);
+                (S::values_to_bytes(chunk), true)
+            };
+
+            if page_sizes.is_empty() {
+                // Size the aggregate from the first page's observed ratio
+                // instead of duplicating the entire uncompressed batch.
+                buf.reserve(encoded.len().saturating_mul(num_pages));
             }
+            page_sizes.push((encoded.len(), chunk.len(), is_raw));
+            buf.extend_from_slice(&encoded);
         }
 
         // Write the region before re-taking the pages lock to avoid deadlock.

@@ -279,6 +279,11 @@ macro_rules! impl_vec_wrapper {
             T: $value_trait,
         {
             #[inline(always)]
+            fn cursor_chunk_size(&self) -> usize {
+                $crate::ReadableVec::<I, T>::cursor_chunk_size(&self.0)
+            }
+
+            #[inline(always)]
             fn collect_one_at(&self, index: usize) -> Option<T> {
                 $crate::ReadableVec::<I, T>::collect_one_at(&self.0, index)
             }

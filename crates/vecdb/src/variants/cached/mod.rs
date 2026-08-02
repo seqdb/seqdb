@@ -7,8 +7,8 @@ use parking_lot::RwLock;
 
 mod any_vec;
 mod budget;
-mod cloneable;
 mod clone;
+mod cloneable;
 mod read_only_clone;
 mod readable;
 mod typed;

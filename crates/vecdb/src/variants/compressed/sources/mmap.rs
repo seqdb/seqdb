@@ -95,7 +95,8 @@ where
             let ptr = self.page_buf.as_ptr();
             let mut i = in_page_offset;
             while i < page_end {
-                accum = f(accum, unsafe { ptr.add(i).read() });
+                // Clone rather than move: page_buf still owns and drops every value.
+                accum = f(accum, unsafe { (&*ptr.add(i)).clone() });
                 i += 1;
             }
             self.pos = page_start + page_end;

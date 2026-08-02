@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::{READ_CHUNK_SIZE, ReadableVec, VecIndex, VecValue};
+use crate::{ReadableVec, VecIndex, VecValue};
 
 /// Buffered reader that reuses an internal buffer across chunked `read_into_at` calls.
 ///
@@ -36,16 +36,17 @@ pub struct Cursor<
 }
 
 impl<'a, I: VecIndex, T: VecValue, V: ReadableVec<I, T> + ?Sized> Cursor<'a, I, T, V> {
-    /// Creates a new cursor with default chunk size ([`READ_CHUNK_SIZE`]).
+    /// Creates a new cursor with the source's preferred chunk size.
     #[inline]
     pub fn new(source: &'a V) -> Self {
         let len = source.len();
+        let chunk_size = source.cursor_chunk_size().max(1);
         Self {
             source,
-            buf: Vec::with_capacity(READ_CHUNK_SIZE.min(len)),
+            buf: Vec::with_capacity(chunk_size.min(len)),
             buf_start: 0,
             pos: 0,
-            chunk_size: READ_CHUNK_SIZE,
+            chunk_size,
             len,
             _phantom: PhantomData,
         }

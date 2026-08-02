@@ -174,7 +174,8 @@ where
             let ptr = self.decoded_values.as_ptr();
             let mut i = in_page_offset;
             while i < page_end {
-                accum = f(accum, unsafe { ptr.add(i).read() });
+                // Clone rather than move: decoded_values still owns and drops every value.
+                accum = f(accum, unsafe { (&*ptr.add(i)).clone() });
                 i += 1;
             }
             self.index = page_start + page_end;

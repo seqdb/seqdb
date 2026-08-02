@@ -1,7 +1,7 @@
 use tempfile::TempDir;
 use vecdb::{
-    AnyStoredVec, AnyVec, Bytes, BytesVec, Database, ImportableVec, ReadableVec, Version,
-    WritableVec,
+    AnyStoredVec, AnyVec, Bytes, BytesVec, Database, HEADER_OFFSET, ImportableVec, ReadableVec,
+    Version, WritableVec,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Bytes)]
@@ -9,6 +9,8 @@ struct Timestamp(u64);
 
 #[test]
 fn test_derive_bytes_vec_value() -> vecdb::Result<()> {
+    const { assert!(Timestamp::IS_NATIVE_LAYOUT) };
+
     let temp = TempDir::new()?;
     let db = Database::open(temp.path())?;
 
@@ -21,6 +23,17 @@ fn test_derive_bytes_vec_value() -> vecdb::Result<()> {
 
     // Test write
     vec.write()?;
+
+    let expected = [
+        12_345_u64.to_le_bytes(),
+        67_890_u64.to_le_bytes(),
+        111_213_u64.to_le_bytes(),
+    ]
+    .concat();
+    assert_eq!(
+        &vec.region().create_reader().read_all()[HEADER_OFFSET..],
+        expected
+    );
 
     // Test collect
     let collected: Vec<Timestamp> = vec.collect();
@@ -40,6 +53,8 @@ struct Price(f64);
 
 #[test]
 fn test_derive_with_float() -> vecdb::Result<()> {
+    const { assert!(Price::IS_NATIVE_LAYOUT) };
+
     let temp = TempDir::new()?;
     let db = Database::open(temp.path())?;
 

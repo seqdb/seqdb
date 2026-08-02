@@ -13,11 +13,24 @@ use super::super::{RawStrategy, ReadWriteRawVec};
 ///
 /// Only sees **stored** (persisted) values — does not check holes, updates,
 /// or pushed values. For full dirty-state reads, use `get_any_or_read`.
+///
+/// The reader holds the current mmap generation alive. Drop long-lived readers
+/// before writes that may grow the database and remap the file.
 pub struct VecReader<I, T, S> {
     _reader: Reader,
     data: *const u8,
     stored_len: usize,
     _marker: PhantomData<(I, T, S)>,
+}
+
+/// Forward cursor over a raw vector reader.
+///
+/// Unlike [`crate::Cursor`], this reads values directly from the existing mmap
+/// and does not allocate or copy through a staging buffer. Like [`VecReader`],
+/// it only sees persisted values.
+pub struct VecReaderCursor<I, T, S> {
+    reader: VecReader<I, T, S>,
+    pos: usize,
 }
 
 unsafe impl<I: Send, T: Send, S: Send> Send for VecReader<I, T, S> {}
@@ -92,5 +105,70 @@ where
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.stored_len == 0
+    }
+
+    /// Creates an allocation-free cursor over the persisted values.
+    #[inline]
+    pub fn cursor(self) -> VecReaderCursor<I, T, S> {
+        VecReaderCursor {
+            reader: self,
+            pos: 0,
+        }
+    }
+}
+
+impl<I, T, S> VecReaderCursor<I, T, S>
+where
+    T: VecValue,
+    S: RawStrategy<T>,
+{
+    /// Returns the current absolute position.
+    #[inline(always)]
+    pub fn position(&self) -> usize {
+        self.pos
+    }
+
+    /// Returns the number of values remaining.
+    #[inline(always)]
+    pub fn remaining(&self) -> usize {
+        self.reader.len().saturating_sub(self.pos)
+    }
+
+    /// Advances the position by `n` without reading.
+    #[inline(always)]
+    pub fn advance(&mut self, n: usize) {
+        self.pos = self.pos.saturating_add(n).min(self.reader.len());
+    }
+
+    /// Returns the value at absolute `index` without changing the position.
+    #[inline(always)]
+    pub fn get(&self, index: usize) -> Option<T> {
+        self.reader.try_get(index)
+    }
+
+    /// Returns the next value and advances the position.
+    #[inline(always)]
+    #[allow(clippy::should_implement_trait)]
+    pub fn next(&mut self) -> Option<T> {
+        let value = self.reader.try_get(self.pos)?;
+        self.pos += 1;
+        Some(value)
+    }
+
+    /// Folds over the next `n` values and advances the position.
+    #[inline]
+    pub fn fold<B>(&mut self, n: usize, mut init: B, mut f: impl FnMut(B, T) -> B) -> B {
+        let end = self.pos.saturating_add(n).min(self.reader.len());
+        while self.pos < end {
+            init = f(init, self.reader.get(self.pos));
+            self.pos += 1;
+        }
+        init
+    }
+
+    /// Calls `f` for each of the next `n` values and advances the position.
+    #[inline]
+    pub fn for_each(&mut self, n: usize, mut f: impl FnMut(T)) {
+        self.fold(n, (), |(), value| f(value));
     }
 }

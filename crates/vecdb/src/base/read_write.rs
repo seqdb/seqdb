@@ -163,11 +163,10 @@ where
         let pushed = self.pushed();
         let slice_from = start - stored_len;
         let slice_to = (to - stored_len).min(pushed.len());
-        let ptr = pushed.as_ptr();
         let mut acc = init;
         let mut i = slice_from;
         while i < slice_to {
-            acc = f(acc, unsafe { ptr.add(i).read() });
+            acc = f(acc, pushed[i].clone());
             i += 1;
         }
         acc

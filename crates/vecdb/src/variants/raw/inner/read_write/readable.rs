@@ -1,3 +1,5 @@
+use rawdb::unlikely;
+
 use crate::{AnyStoredVec, HEADER_OFFSET, ReadableVec, VecIndex, VecValue};
 
 use super::{super::RawStrategy, ReadWriteRawVec};
@@ -14,17 +16,25 @@ where
         if index >= len {
             return None;
         }
-        if self.has_dirty_stored() {
-            return self
-                .get_any_or_read_at(index, &self.create_reader())
-                .ok()
-                .flatten();
+
+        if unlikely(!self.holes().is_empty()) && self.holes().contains(&index) {
+            return None;
         }
+
         let stored_len = self.stored_len();
         if index >= stored_len {
             return self.base.pushed().get(index - stored_len).cloned();
         }
-        Some(self.unchecked_read_at(index, &self.create_reader()))
+
+        if unlikely(!self.updated().is_empty())
+            && let Some(value) = self.updated().get(&index)
+        {
+            return Some(value.clone());
+        }
+
+        Some(self.base.region().with_read_bytes(|bytes| unsafe {
+            S::read_from_ptr(bytes.as_ptr().add(HEADER_OFFSET), index * size_of::<T>())
+        }))
     }
 
     #[inline(always)]

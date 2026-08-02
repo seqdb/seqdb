@@ -14,13 +14,9 @@ where
         if index >= len {
             return None;
         }
-        let reader = self.base.region().create_reader();
-        Some(unsafe {
-            S::read_from_ptr(
-                reader.prefixed(HEADER_OFFSET).as_ptr(),
-                index * size_of::<T>(),
-            )
-        })
+        Some(self.base.region().with_read_bytes(|bytes| unsafe {
+            S::read_from_ptr(bytes.as_ptr().add(HEADER_OFFSET), index * size_of::<T>())
+        }))
     }
 
     #[inline(always)]

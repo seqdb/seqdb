@@ -215,7 +215,7 @@ where
 
     #[inline(always)]
     pub fn read_at(&self, index: usize, reader: &Reader) -> Result<T> {
-        let len = self.base.len();
+        let len = self.stored_len();
         if likely(index < len) {
             Ok(self.unchecked_read_at(index, reader))
         } else {
@@ -229,7 +229,18 @@ where
 
     #[inline]
     pub fn read_at_once(&self, index: usize) -> Result<T> {
-        self.read_at(index, &self.create_reader())
+        let len = self.stored_len();
+        if index >= len {
+            return Err(Error::IndexTooHigh {
+                index,
+                len,
+                name: self.name().to_string(),
+            });
+        }
+
+        Ok(self.base.region().with_read_bytes(|bytes| unsafe {
+            S::read_from_ptr(bytes.as_ptr().add(HEADER_OFFSET), index * Self::SIZE_OF_T)
+        }))
     }
 
     #[inline]
@@ -244,7 +255,11 @@ where
 
     #[inline(always)]
     pub fn get_pushed_or_read_at(&self, index: usize, reader: &VecReader<I, T, S>) -> Option<T> {
-        let stored_len = self.stored_len();
+        // The reader snapshots the persisted boundary when it is created.
+        // Using that boundary avoids reloading SharedLen for every lookup and
+        // lets the inlined reader.get() reuse the same bounds check.
+        let stored_len = reader.len();
+        debug_assert_eq!(stored_len, self.stored_len(), "stale VecReader");
         if index >= stored_len {
             return self.base.pushed().get(index - stored_len).cloned();
         }

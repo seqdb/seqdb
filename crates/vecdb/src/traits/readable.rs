@@ -31,6 +31,8 @@ pub const READ_CHUNK_SIZE: usize = 4096;
 /// # Point reads
 ///
 /// For raw vecs, use `VecReader::get()` for O(1) random access.
+/// For sequential persisted raw reads, use `vec.reader().cursor()` to avoid
+/// the general cursor's staging buffer.
 /// For any vec through the trait, use `collect_one(i)` — this materializes
 /// a single value (decodes a page for compressed vecs).
 ///
@@ -46,6 +48,15 @@ pub const READ_CHUNK_SIZE: usize = 4096;
 /// with static dispatch (`&impl ReadableVec` or concrete type).
 pub trait ReadableVec<I: VecIndex, T: VecValue>: AnyVec {
     // ── Required ─────────────────────────────────────────────────────
+
+    /// Preferred number of values per cursor refill.
+    ///
+    /// Compressed vectors return their format page size so sequential cursors
+    /// decode each page once. Other vectors use [`READ_CHUNK_SIZE`].
+    #[inline]
+    fn cursor_chunk_size(&self) -> usize {
+        READ_CHUNK_SIZE
+    }
 
     /// Appends elements in `[from, to)` to `buf`.
     ///

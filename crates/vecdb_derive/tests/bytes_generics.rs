@@ -17,6 +17,8 @@ struct FloatWrapper<T>(T);
 
 #[test]
 fn test_derive_bytes_with_single_generic() -> vecdb::Result<()> {
+    const { assert!(Wrapper::<u64>::IS_NATIVE_LAYOUT) };
+
     let temp = TempDir::new()?;
     let db = Database::open(temp.path())?;
 
@@ -76,6 +78,8 @@ fn test_derive_bytes_with_different_types() -> vecdb::Result<()> {
 // Test with nested generics
 #[test]
 fn test_derive_bytes_with_nested_generics() -> vecdb::Result<()> {
+    const { assert!(Container::<u32>::IS_NATIVE_LAYOUT) };
+
     let temp = TempDir::new()?;
     let db = Database::open(temp.path())?;
 

@@ -1,6 +1,7 @@
 use tempfile::TempDir;
 use vecdb::{
-    AnyStoredVec, AnyVec, Database, ImportableVec, Pco, PcoVec, ReadableVec, Version, WritableVec,
+    AnyStoredVec, AnyVec, Bytes, Database, ImportableVec, Pco, PcoVec, ReadableVec, Version,
+    WritableVec,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Pco)]
@@ -8,6 +9,8 @@ struct Timestamp(u64);
 
 #[test]
 fn test_derive_pco_vec_value() -> vecdb::Result<()> {
+    const { assert!(Timestamp::IS_NATIVE_LAYOUT) };
+
     let temp = TempDir::new()?;
     let db = Database::open(temp.path())?;
 
@@ -39,6 +42,8 @@ struct Price(f64);
 
 #[test]
 fn test_derive_with_float() -> vecdb::Result<()> {
+    const { assert!(Price::IS_NATIVE_LAYOUT) };
+
     let temp = TempDir::new()?;
     let db = Database::open(temp.path())?;
 

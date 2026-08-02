@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use crate::{
-    AnyVec, ReadOnlyClone, ReadableVec, StoredVec, TypedVec, VecIndex, VecValue,
-};
+use crate::{AnyVec, ReadOnlyClone, ReadableVec, StoredVec, TypedVec, VecIndex, VecValue};
 
 use super::CachedVec;
 
@@ -45,12 +43,8 @@ where
 impl<V> CachedVec<V>
 where
     V: StoredVec,
-    V::ReadOnly: TypedVec<I = V::I, T = V::T>
-        + ReadableVec<V::I, V::T>
-        + Clone
-        + Send
-        + Sync
-        + 'static,
+    V::ReadOnly:
+        TypedVec<I = V::I, T = V::T> + ReadableVec<V::I, V::T> + Clone + Send + Sync + 'static,
 {
     pub fn read_only_cached_boxed_clone(&self) -> CachedBoxedVec<V::I, V::T> {
         Box::new(self.read_only_clone())

@@ -5,8 +5,8 @@ mod readable;
 mod typed;
 
 use crate::{
-    Error, MMAP_CROSSOVER_BYTES, RawIoSource, RawMmapSource, ReadOnlyBaseVec, Result, Stamp,
-    VecIndex, VecReader, VecValue,
+    Error, HEADER_OFFSET, MMAP_CROSSOVER_BYTES, RawIoSource, RawMmapSource, ReadOnlyBaseVec,
+    Result, Stamp, VecIndex, VecReader, VecValue,
 };
 
 use super::RawStrategy;
@@ -58,13 +58,18 @@ where
 
     #[inline]
     pub fn read_at_once(&self, index: usize) -> Result<T> {
-        self.reader()
-            .try_get(index)
-            .ok_or_else(|| Error::IndexTooHigh {
+        let len = self.base.len();
+        if index >= len {
+            return Err(Error::IndexTooHigh {
                 index,
-                len: self.base.len(),
+                len,
                 name: self.base.name().to_string(),
-            })
+            });
+        }
+
+        Ok(self.base.region().with_read_bytes(|bytes| unsafe {
+            S::read_from_ptr(bytes.as_ptr().add(HEADER_OFFSET), index * size_of::<T>())
+        }))
     }
 
     #[inline]

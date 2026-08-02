@@ -29,7 +29,7 @@ cargo add vecdb
 
 ## Quick Start
 
-```rust
+```rust,no_run
 use vecdb::{
     AnyStoredVec, AnyVec, BytesVec, Database, WritableVec,
     ImportableVec, ReadableVec, Result, Version

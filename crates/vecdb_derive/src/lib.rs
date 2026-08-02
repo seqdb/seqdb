@@ -76,6 +76,10 @@ pub fn derive_bytes(input: TokenStream) -> TokenStream {
         quote! {
             impl #impl_generics ::vecdb::Bytes for #struct_name #ty_generics #where_clause {
                 type Array = <#inner_type as ::vecdb::Bytes>::Array;
+                const IS_NATIVE_LAYOUT: bool =
+                    <#inner_type as ::vecdb::Bytes>::IS_NATIVE_LAYOUT
+                    && ::core::mem::size_of::<Self>() == ::core::mem::size_of::<#inner_type>()
+                    && ::core::mem::align_of::<Self>() == ::core::mem::align_of::<#inner_type>();
 
                 fn to_bytes(&self) -> Self::Array {
                     self.0.to_bytes()
@@ -90,6 +94,10 @@ pub fn derive_bytes(input: TokenStream) -> TokenStream {
         quote! {
             impl ::vecdb::Bytes for #struct_name {
                 type Array = <#inner_type as ::vecdb::Bytes>::Array;
+                const IS_NATIVE_LAYOUT: bool =
+                    <#inner_type as ::vecdb::Bytes>::IS_NATIVE_LAYOUT
+                    && ::core::mem::size_of::<Self>() == ::core::mem::size_of::<#inner_type>()
+                    && ::core::mem::align_of::<Self>() == ::core::mem::align_of::<#inner_type>();
 
                 fn to_bytes(&self) -> Self::Array {
                     self.0.to_bytes()
@@ -193,6 +201,10 @@ pub fn derive_pco(input: TokenStream) -> TokenStream {
         quote! {
             impl #impl_generics ::vecdb::Bytes for #struct_name #ty_generics #where_clause {
                 type Array = <#inner_type as ::vecdb::Bytes>::Array;
+                const IS_NATIVE_LAYOUT: bool =
+                    <#inner_type as ::vecdb::Bytes>::IS_NATIVE_LAYOUT
+                    && ::core::mem::size_of::<Self>() == ::core::mem::size_of::<#inner_type>()
+                    && ::core::mem::align_of::<Self>() == ::core::mem::align_of::<#inner_type>();
 
                 fn to_bytes(&self) -> Self::Array {
                     self.0.to_bytes()
@@ -213,6 +225,10 @@ pub fn derive_pco(input: TokenStream) -> TokenStream {
         quote! {
             impl ::vecdb::Bytes for #struct_name {
                 type Array = <#inner_type as ::vecdb::Bytes>::Array;
+                const IS_NATIVE_LAYOUT: bool =
+                    <#inner_type as ::vecdb::Bytes>::IS_NATIVE_LAYOUT
+                    && ::core::mem::size_of::<Self>() == ::core::mem::size_of::<#inner_type>()
+                    && ::core::mem::align_of::<Self>() == ::core::mem::align_of::<#inner_type>();
 
                 fn to_bytes(&self) -> Self::Array {
                     self.0.to_bytes()

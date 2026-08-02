@@ -50,6 +50,22 @@ impl Region {
         Reader::new(self)
     }
 
+    /// Runs `f` with the region's current bytes while holding the mmap read lock.
+    ///
+    /// Unlike [`Reader`], this is intended for a single scoped read and does not
+    /// clone the region or extend a lock guard's lifetime.
+    #[inline]
+    pub fn with_read_bytes<R>(&self, f: impl FnOnce(&[u8]) -> R) -> R {
+        let db = self.db();
+        let meta = self.meta();
+        let start = meta.start();
+        let end = start + meta.len();
+        drop(meta);
+
+        let mmap = db.mmap();
+        f(&mmap[start..end])
+    }
+
     pub fn open_db_read_only_file(&self) -> Result<File> {
         self.db().open_read_only_file()
     }

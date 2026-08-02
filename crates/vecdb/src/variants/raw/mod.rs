@@ -6,7 +6,7 @@ mod zerocopy;
 
 pub use bytes::*;
 pub use inner::*;
-pub use sources::VecReader;
 pub(crate) use sources::*;
+pub use sources::{VecReader, VecReaderCursor};
 #[cfg(feature = "zerocopy")]
 pub use zerocopy::*;

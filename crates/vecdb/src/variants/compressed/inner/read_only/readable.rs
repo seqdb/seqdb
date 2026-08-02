@@ -1,4 +1,4 @@
-use crate::{ReadableVec, VecIndex, VecValue};
+use crate::{READ_CHUNK_SIZE, ReadableVec, VecIndex, VecValue};
 
 use super::{
     super::{CompressionStrategy, ReadWriteCompressedVec},
@@ -11,6 +11,12 @@ where
     T: VecValue,
     S: CompressionStrategy<T>,
 {
+    #[inline(always)]
+    fn cursor_chunk_size(&self) -> usize {
+        let per_page = ReadWriteCompressedVec::<I, T, S>::PER_PAGE;
+        per_page * READ_CHUNK_SIZE.div_ceil(per_page)
+    }
+
     #[inline(always)]
     fn read_into_at(&self, from: usize, to: usize, buf: &mut Vec<T>) {
         let len = self.base.len();
